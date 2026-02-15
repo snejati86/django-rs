@@ -44,20 +44,22 @@ use axum::routing::any;
 use django_rs_core::{DjangoError, Settings};
 use django_rs_http::urls::resolver::URLResolver;
 use django_rs_http::{HttpRequest, HttpResponse};
+use django_rs_template::engine::Engine;
 
 use crate::middleware::{Middleware, MiddlewarePipeline, ViewHandler};
 
 /// The main application type for django-rs.
 ///
-/// `DjangoApp` combines a URL resolver, middleware pipeline, and settings into
-/// a single application that can be converted to an Axum router or run directly
-/// as an HTTP server.
+/// `DjangoApp` combines a URL resolver, middleware pipeline, settings, and a
+/// template engine into a single application that can be converted to an Axum
+/// router or run directly as an HTTP server.
 ///
 /// This mirrors Django's application setup in `wsgi.py` or `asgi.py`.
 pub struct DjangoApp {
     url_conf: Option<URLResolver>,
     middleware: MiddlewarePipeline,
     settings: Settings,
+    engine: Option<Arc<Engine>>,
 }
 
 impl DjangoApp {
@@ -67,6 +69,7 @@ impl DjangoApp {
             url_conf: None,
             middleware: MiddlewarePipeline::new(),
             settings,
+            engine: None,
         }
     }
 
@@ -84,9 +87,21 @@ impl DjangoApp {
         self
     }
 
+    /// Sets the template engine for this application.
+    #[must_use]
+    pub fn engine(mut self, engine: Engine) -> Self {
+        self.engine = Some(Arc::new(engine));
+        self
+    }
+
     /// Returns a reference to the application settings.
     pub fn settings(&self) -> &Settings {
         &self.settings
+    }
+
+    /// Returns a reference to the template engine, if configured.
+    pub fn template_engine(&self) -> Option<&Arc<Engine>> {
+        self.engine.as_ref()
     }
 
     /// Returns `true` if URL configuration has been set.
@@ -190,6 +205,7 @@ impl std::fmt::Debug for DjangoApp {
         f.debug_struct("DjangoApp")
             .field("has_urls", &self.url_conf.is_some())
             .field("middleware_count", &self.middleware.len())
+            .field("has_engine", &self.engine.is_some())
             .field("debug", &self.settings.debug)
             .finish()
     }

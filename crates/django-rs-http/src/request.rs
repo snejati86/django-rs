@@ -189,6 +189,13 @@ impl HttpRequest {
         &self.meta
     }
 
+    /// Returns a mutable reference to the META dictionary.
+    ///
+    /// This allows middleware to inject server-level metadata such as session data.
+    pub fn meta_mut(&mut self) -> &mut HashMap<String, String> {
+        &mut self.meta
+    }
+
     /// Returns the raw request body bytes.
     pub fn body(&self) -> &[u8] {
         &self.body

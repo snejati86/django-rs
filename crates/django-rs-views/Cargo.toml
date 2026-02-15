@@ -15,6 +15,7 @@ django-rs-core.workspace = true
 django-rs-http.workspace = true
 django-rs-template.workspace = true
 django-rs-db.workspace = true
+django-rs-forms.workspace = true
 axum.workspace = true
 hyper.workspace = true
 tower.workspace = true
@@ -27,6 +28,7 @@ chrono.workspace = true
 async-trait.workspace = true
 flate2.workspace = true
 tracing.workspace = true
+rand.workspace = true
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["full"] }

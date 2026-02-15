@@ -237,10 +237,23 @@ impl SessionBackend for CookieSessionBackend {
 /// On each response, saves modified session data back to the backend and sets
 /// the session cookie.
 ///
+/// Session data is serialized into the request's META dictionary:
+/// - `SESSION_KEY`: the session key string
+/// - `SESSION_DATA`: JSON-serialized session data
+/// - `SESSION_MODIFIED`: "true" or "false"
+/// - `SESSION_IS_NEW`: "true" if a new session was created
+///
+/// Views can access and modify session data via the META entries. On response,
+/// modified sessions are saved and the session cookie is set/updated.
+///
 /// This mirrors Django's `SessionMiddleware`.
 pub struct SessionMiddleware {
     backend: Box<dyn SessionBackend>,
     cookie_name: String,
+    cookie_path: String,
+    cookie_httponly: bool,
+    cookie_secure: bool,
+    cookie_samesite: String,
 }
 
 impl SessionMiddleware {
@@ -249,6 +262,10 @@ impl SessionMiddleware {
         Self {
             backend: Box::new(backend),
             cookie_name: "sessionid".to_string(),
+            cookie_path: "/".to_string(),
+            cookie_httponly: true,
+            cookie_secure: false,
+            cookie_samesite: "Lax".to_string(),
         }
     }
 
@@ -259,9 +276,35 @@ impl SessionMiddleware {
         self
     }
 
+    /// Sets the cookie path.
+    #[must_use]
+    pub fn with_cookie_path(mut self, path: &str) -> Self {
+        self.cookie_path = path.to_string();
+        self
+    }
+
+    /// Sets whether the cookie should be marked as secure.
+    #[must_use]
+    pub fn with_cookie_secure(mut self, secure: bool) -> Self {
+        self.cookie_secure = secure;
+        self
+    }
+
+    /// Sets the `SameSite` attribute for the session cookie.
+    #[must_use]
+    pub fn with_cookie_samesite(mut self, samesite: &str) -> Self {
+        self.cookie_samesite = samesite.to_string();
+        self
+    }
+
     /// Returns the cookie name used for sessions.
     pub fn cookie_name(&self) -> &str {
         &self.cookie_name
+    }
+
+    /// Returns a reference to the session backend.
+    pub fn backend(&self) -> &dyn SessionBackend {
+        &*self.backend
     }
 
     /// Extracts the session key from the request cookies.
@@ -279,26 +322,118 @@ impl SessionMiddleware {
         }
         None
     }
+
+    /// Builds the Set-Cookie header value for the session cookie.
+    fn build_set_cookie(&self, session_key: &str) -> String {
+        use std::fmt::Write;
+        let mut cookie = format!("{}={}", self.cookie_name, session_key);
+        let _ = write!(cookie, "; Path={}", self.cookie_path);
+        if self.cookie_httponly {
+            cookie.push_str("; HttpOnly");
+        }
+        if self.cookie_secure {
+            cookie.push_str("; Secure");
+        }
+        if !self.cookie_samesite.is_empty() {
+            let _ = write!(cookie, "; SameSite={}", self.cookie_samesite);
+        }
+        cookie
+    }
 }
 
 #[async_trait]
 impl Middleware for SessionMiddleware {
     async fn process_request(&self, request: &mut HttpRequest) -> Option<HttpResponse> {
-        // Try to load an existing session
         if let Some(session_key) = self.get_session_key_from_request(request) {
-            if self.backend.exists(&session_key).await.unwrap_or(false) {
-                // Store the session key in META for use by views
-                // Note: in a full implementation, the session data would be loaded lazily
+            // Try to load an existing session from the backend
+            if let Ok(session) = self.backend.load(&session_key).await {
+                // Serialize session data as JSON into META
+                let session_data_json =
+                    serde_json::to_string(&session.data).unwrap_or_default();
+
+                // Store session key, data, and modification flag in META
+                let meta = request.meta_mut();
+                meta.insert("SESSION_KEY".to_string(), session_key);
+                meta.insert("SESSION_DATA".to_string(), session_data_json);
+                meta.insert("SESSION_MODIFIED".to_string(), "false".to_string());
+                meta.insert("SESSION_IS_NEW".to_string(), "false".to_string());
+            } else {
+                // Session not found or expired -- create a new empty session
+                let new_key = generate_session_key();
+                let meta = request.meta_mut();
+                meta.insert("SESSION_KEY".to_string(), new_key);
+                meta.insert("SESSION_DATA".to_string(), "{}".to_string());
+                meta.insert("SESSION_MODIFIED".to_string(), "false".to_string());
+                meta.insert("SESSION_IS_NEW".to_string(), "true".to_string());
             }
+        } else {
+            // No session cookie — create a new session
+            let new_key = generate_session_key();
+            let meta = request.meta_mut();
+            meta.insert("SESSION_KEY".to_string(), new_key);
+            meta.insert("SESSION_DATA".to_string(), "{}".to_string());
+            meta.insert("SESSION_MODIFIED".to_string(), "false".to_string());
+            meta.insert("SESSION_IS_NEW".to_string(), "true".to_string());
         }
         None
     }
 
     async fn process_response(
         &self,
-        _request: &HttpRequest,
+        request: &HttpRequest,
         response: HttpResponse,
     ) -> HttpResponse {
+        let meta = request.meta();
+        let Some(session_key) = meta.get("SESSION_KEY") else {
+            return response;
+        };
+        let session_key = session_key.clone();
+
+        let session_data_str = meta
+            .get("SESSION_DATA")
+            .cloned()
+            .unwrap_or_else(|| "{}".to_string());
+        let modified = meta
+            .get("SESSION_MODIFIED")
+            .is_some_and(|v| v == "true");
+        let is_new = meta
+            .get("SESSION_IS_NEW")
+            .is_some_and(|v| v == "true");
+
+        // Only save and set cookie if session was modified or is new with data
+        let data: HashMap<String, serde_json::Value> =
+            serde_json::from_str(&session_data_str).unwrap_or_default();
+
+        let should_save = modified || (is_new && !data.is_empty());
+
+        if should_save {
+            let mut session = SessionData::new(session_key.clone());
+            session.data = data;
+
+            // Save session to backend
+            let _ = self.backend.save(&session).await;
+
+            // Set the session cookie
+            let cookie_value = self.build_set_cookie(&session_key);
+            let mut resp = response;
+            if let Ok(header_value) = http::header::HeaderValue::from_str(&cookie_value) {
+                resp.headers_mut()
+                    .insert(http::header::SET_COOKIE, header_value);
+            }
+            return resp;
+        }
+
+        // If session already existed (not new), always set the cookie to maintain it
+        if !is_new {
+            let cookie_value = self.build_set_cookie(&session_key);
+            let mut resp = response;
+            if let Ok(header_value) = http::header::HeaderValue::from_str(&cookie_value) {
+                resp.headers_mut()
+                    .insert(http::header::SET_COOKIE, header_value);
+            }
+            return resp;
+        }
+
         response
     }
 
