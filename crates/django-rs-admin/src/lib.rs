@@ -14,6 +14,10 @@
 //! - **Contrib modules** ([`contrib`]) - Reusable utilities including content types,
 //!   messages, humanize formatting, sitemaps, and static files management
 //!
+//! - **Database integration** ([`db`]) - CRUD operations backed by a database
+//!   executor, with pagination, search, and filtering support
+//! - **`LogEntry`** ([`log_entry`]) - Audit trail for admin actions (create, change, delete)
+//!
 //! ## Architecture
 //!
 //! The admin panel uses a **React frontend** (built separately) with this crate
@@ -40,6 +44,8 @@
 pub mod actions;
 pub mod api;
 pub mod contrib;
+pub mod db;
 pub mod filters;
+pub mod log_entry;
 pub mod model_admin;
 pub mod site;
