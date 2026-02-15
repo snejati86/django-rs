@@ -14,6 +14,8 @@ use http::{HeaderMap, HeaderValue, StatusCode};
 
 use django_rs_core::DjangoError;
 
+use crate::cookies::{self, Cookie};
+
 /// The body content of an HTTP response.
 ///
 /// Supports plain bytes, text, and streaming bodies.
@@ -192,6 +194,47 @@ impl HttpResponse {
             ResponseContent::Text(t) => Some(t.as_bytes().to_vec()),
             ResponseContent::Streaming(_) => None,
         }
+    }
+
+    /// Creates a redirect response (302 Found) to the given URL.
+    pub fn redirect(url: &str) -> Self {
+        let mut response = Self::new(StatusCode::FOUND, "");
+        if let Ok(value) = HeaderValue::from_str(url) {
+            response.headers.insert(http::header::LOCATION, value);
+        }
+        response
+    }
+
+    /// Sets a cookie on the response.
+    ///
+    /// Adds a `Set-Cookie` header with the given cookie attributes.
+    #[allow(clippy::needless_pass_by_value)]
+    pub fn set_cookie(&mut self, cookie: Cookie) {
+        let header_value = cookie.to_set_cookie_header();
+        if let Ok(value) = HeaderValue::from_str(&header_value) {
+            self.headers.append(http::header::SET_COOKIE, value);
+        }
+    }
+
+    /// Deletes a cookie by setting it with `Max-Age=0`.
+    ///
+    /// This causes the browser to remove the cookie.
+    pub fn delete_cookie(&mut self, name: &str, path: &str, domain: Option<&str>) {
+        let mut cookie = Cookie::new(name, "");
+        cookie.max_age = Some(0);
+        cookie.path = path.to_string();
+        cookie.domain = domain.map(String::from);
+        self.set_cookie(cookie);
+    }
+
+    /// Sets a signed cookie using HMAC-SHA256.
+    ///
+    /// The cookie value is signed with the secret key and salt so it can
+    /// be verified later with `HttpRequest::get_signed_cookie`.
+    pub fn set_signed_cookie(&mut self, mut cookie: Cookie, secret_key: &str, salt: &str) {
+        let signed_value = cookies::sign_cookie_value(&cookie.value, secret_key, salt);
+        cookie.value = signed_value;
+        self.set_cookie(cookie);
     }
 
     /// Returns the full content type header value including charset.
@@ -781,5 +824,119 @@ mod tests {
         let resp = HttpResponse::new(StatusCode::CREATED, "Created");
         assert_eq!(resp.status(), StatusCode::CREATED);
         assert_eq!(resp.content_bytes().unwrap(), b"Created");
+    }
+
+    // ── Cookie setting tests ────────────────────────────────────────
+
+    #[test]
+    fn test_set_cookie_basic() {
+        let mut resp = HttpResponse::ok("test");
+        resp.set_cookie(Cookie::new("name", "value"));
+        let set_cookie = resp
+            .headers()
+            .get(http::header::SET_COOKIE)
+            .unwrap()
+            .to_str()
+            .unwrap();
+        assert!(set_cookie.contains("name=value"));
+    }
+
+    #[test]
+    fn test_set_cookie_with_attributes() {
+        let mut resp = HttpResponse::ok("test");
+        resp.set_cookie(
+            Cookie::new("session", "token")
+                .max_age(3600)
+                .httponly(true)
+                .secure(true)
+                .samesite(crate::cookies::SameSite::Lax),
+        );
+        let set_cookie = resp
+            .headers()
+            .get(http::header::SET_COOKIE)
+            .unwrap()
+            .to_str()
+            .unwrap();
+        assert!(set_cookie.contains("session=token"));
+        assert!(set_cookie.contains("Max-Age=3600"));
+        assert!(set_cookie.contains("HttpOnly"));
+        assert!(set_cookie.contains("Secure"));
+        assert!(set_cookie.contains("SameSite=Lax"));
+    }
+
+    #[test]
+    fn test_set_multiple_cookies() {
+        let mut resp = HttpResponse::ok("test");
+        resp.set_cookie(Cookie::new("a", "1"));
+        resp.set_cookie(Cookie::new("b", "2"));
+        let cookies: Vec<_> = resp
+            .headers()
+            .get_all(http::header::SET_COOKIE)
+            .iter()
+            .collect();
+        assert_eq!(cookies.len(), 2);
+    }
+
+    #[test]
+    fn test_delete_cookie() {
+        let mut resp = HttpResponse::ok("test");
+        resp.delete_cookie("session", "/", None);
+        let set_cookie = resp
+            .headers()
+            .get(http::header::SET_COOKIE)
+            .unwrap()
+            .to_str()
+            .unwrap();
+        assert!(set_cookie.contains("session="));
+        assert!(set_cookie.contains("Max-Age=0"));
+    }
+
+    #[test]
+    fn test_delete_cookie_with_domain() {
+        let mut resp = HttpResponse::ok("test");
+        resp.delete_cookie("session", "/app", Some("example.com"));
+        let set_cookie = resp
+            .headers()
+            .get(http::header::SET_COOKIE)
+            .unwrap()
+            .to_str()
+            .unwrap();
+        assert!(set_cookie.contains("Domain=example.com"));
+        assert!(set_cookie.contains("Path=/app"));
+    }
+
+    #[test]
+    fn test_set_signed_cookie() {
+        let mut resp = HttpResponse::ok("test");
+        resp.set_signed_cookie(
+            Cookie::new("data", "secret-value"),
+            "my-secret-key",
+            "my-salt",
+        );
+        let set_cookie = resp
+            .headers()
+            .get(http::header::SET_COOKIE)
+            .unwrap()
+            .to_str()
+            .unwrap();
+        // The cookie value should be signed (contains colons for value:timestamp:sig)
+        assert!(set_cookie.contains("data="));
+        // The signed value should contain the timestamp separator
+        let value_part = set_cookie.split('=').nth(1).unwrap().split(';').next().unwrap();
+        assert!(value_part.contains(':'));
+    }
+
+    #[test]
+    fn test_redirect_convenience() {
+        let resp = HttpResponse::redirect("/new-location/");
+        assert_eq!(resp.status(), StatusCode::FOUND);
+        assert_eq!(
+            resp.headers()
+                .get(http::header::LOCATION)
+                .unwrap()
+                .to_str()
+                .unwrap(),
+            "/new-location/"
+        );
     }
 }

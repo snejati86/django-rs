@@ -16,7 +16,7 @@ pub mod generic;
 pub use class_based::{ContextMixin, RedirectView, TemplateResponseMixin, TemplateView, View};
 pub use form_view::{
     bind_form_from_request, cleaned_data_as_strings, extract_post_data, form_context_to_json,
-    form_errors,
+    form_errors, FormView,
 };
 pub use function::{
     login_required, require_get, require_http_methods, require_post, ViewFunction,

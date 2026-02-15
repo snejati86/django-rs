@@ -44,6 +44,7 @@
 #![allow(clippy::option_if_let_else)]
 
 pub mod middleware;
+pub mod pagination;
 pub mod server;
 pub mod session;
 pub mod views;
@@ -55,8 +56,8 @@ pub use session::{
     CookieSessionBackend, InMemorySessionBackend, SessionBackend, SessionData, SessionMiddleware,
 };
 pub use views::{
-    ContextMixin, CreateView, DeleteView, DetailView, ListView, RedirectView, TemplateView,
-    TemplateResponseMixin, UpdateView, View, ViewFunction,
+    ContextMixin, CreateView, DeleteView, DetailView, FormView, ListView, RedirectView,
+    TemplateView, TemplateResponseMixin, UpdateView, View, ViewFunction,
     bind_form_from_request, cleaned_data_as_strings, extract_post_data, form_context_to_json,
     form_errors,
 };

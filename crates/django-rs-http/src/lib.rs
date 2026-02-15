@@ -43,12 +43,15 @@
 // Response factory types (JsonResponse, etc.) deliberately return HttpResponse from new().
 #![allow(clippy::new_ret_no_self)]
 
+pub mod cookies;
 pub mod querydict;
 pub mod request;
 pub mod response;
+pub mod upload;
 pub mod urls;
 
 // Re-export primary types at the crate root for convenience.
+pub use cookies::{Cookie, CookieError, SameSite};
 pub use querydict::QueryDict;
 pub use request::HttpRequest;
 pub use response::{
@@ -56,6 +59,7 @@ pub use response::{
     HttpResponseNotFound, HttpResponsePermanentRedirect, HttpResponseRedirect,
     HttpResponseServerError, JsonResponse, ResponseContent, StreamingHttpResponse,
 };
+pub use upload::{MultipartData, UploadedFile};
 
 use std::future::Future;
 use std::pin::Pin;
