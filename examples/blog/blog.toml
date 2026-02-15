@@ -1,0 +1,15 @@
+# django-rs Blog Example Configuration
+#
+# This file demonstrates loading settings from a TOML configuration file.
+# Settings defined here override the programmatic defaults.
+
+debug = true
+secret_key = "change-me-in-production"
+log_level = "info"
+
+# Email settings
+email_host = "localhost"
+email_port = 25
+
+# Allowed hosts
+allowed_hosts = ["localhost", "127.0.0.1"]

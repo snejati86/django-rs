@@ -56,7 +56,8 @@ pub mod serialization;
 pub use cache::{CacheBackend, CacheValue, DatabaseCache, DummyCache, FileCache, InMemoryCache};
 pub use command::{CommandRegistry, ManagementCommand};
 pub use email::{
-    ConsoleBackend, EmailBackend, EmailMessage, FileBackend, InMemoryBackend, SmtpBackend,
+    Attachment, ConsoleBackend, EmailBackend, EmailMessage, FileBackend, InMemoryBackend,
+    SmtpBackend, get_connection, send_mail, send_mass_mail,
 };
 pub use files::{FileSystemStorage, Storage, UploadedFile};
 pub use serialization::{JsonSerializer, PrettyJsonSerializer, Serializer};

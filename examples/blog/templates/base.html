@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}django-rs Blog{% endblock %}</title>
+    <style>
+        body { font-family: system-ui, sans-serif; max-width: 800px; margin: 0 auto; padding: 1rem; }
+        nav { border-bottom: 1px solid #ccc; padding-bottom: 0.5rem; margin-bottom: 1rem; }
+        nav a { margin-right: 1rem; text-decoration: none; color: #0066cc; }
+        .post { margin-bottom: 2rem; padding-bottom: 1rem; border-bottom: 1px solid #eee; }
+        .post h2 a { text-decoration: none; color: #333; }
+        .post .meta { color: #666; font-size: 0.9rem; }
+        footer { margin-top: 2rem; border-top: 1px solid #ccc; padding-top: 0.5rem; color: #999; }
+    </style>
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    <nav>
+        <a href="/posts/">Home</a>
+        <a href="/posts/create/">New Post</a>
+    </nav>
+
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer>
+        <p>Powered by django-rs</p>
+    </footer>
+</body>
+</html>

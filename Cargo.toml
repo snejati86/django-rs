@@ -16,6 +16,7 @@ members = [
     "crates/django-rs-signals",
     "crates/django-rs-cli",
     "crates/django-rs-test",
+    "examples/blog",
 ]
 
 [workspace.package]
