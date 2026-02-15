@@ -46,6 +46,7 @@
 #![allow(clippy::match_same_arms)]
 #![allow(clippy::single_char_pattern)]
 
+pub mod executor;
 pub mod fields;
 pub mod model;
 pub mod query;
@@ -53,6 +54,10 @@ pub mod validators;
 pub mod value;
 
 // Re-export the most commonly used types at the crate root.
+pub use executor::{
+    create_model, create_model_with_hooks, delete_model, delete_model_with_hooks, refresh_model,
+    save_model, save_model_with_hooks, DbExecutor, ModelLifecycleHooks,
+};
 pub use fields::{FieldDef, FieldType, OnDelete};
 pub use model::{Model, ModelMeta};
 pub use query::{
