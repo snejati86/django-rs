@@ -46,6 +46,7 @@ impl Model for User {
                 FieldDef::new("age", FieldType::IntegerField),
                 FieldDef::new("email", FieldType::CharField).max_length(200),
             ],
+            constraints: vec![],
         });
         &META
     }
@@ -112,6 +113,7 @@ impl Model for Product {
                 FieldDef::new("name", FieldType::CharField).max_length(200),
                 FieldDef::new("price", FieldType::FloatField),
             ],
+            constraints: vec![],
         });
         &META
     }
@@ -168,6 +170,7 @@ impl Model for HookedProduct {
                 FieldDef::new("name", FieldType::CharField).max_length(100),
                 FieldDef::new("count", FieldType::IntegerField),
             ],
+            constraints: vec![],
         });
         &META
     }
@@ -1000,7 +1003,7 @@ async fn test_isnull_filter() {
             static META: LazyLock<ModelMeta> = LazyLock::new(|| ModelMeta {
                 app_label: "test", model_name: "nulluser", db_table: "nt".to_string(),
                 verbose_name: "nu".to_string(), verbose_name_plural: "nus".to_string(),
-                ordering: vec![], unique_together: vec![], indexes: vec![], abstract_model: false, fields: vec![],
+                ordering: vec![], unique_together: vec![], indexes: vec![], abstract_model: false, fields: vec![], constraints: vec![],
             });
             &META
         }

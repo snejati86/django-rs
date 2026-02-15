@@ -19,6 +19,7 @@
 //! - [`fields`] - Field definitions ([`FieldDef`](fields::FieldDef)) and types
 //! - [`value`] - The backend-agnostic [`Value`](value::Value) enum
 //! - [`query`] - Query building, lookups, expressions, and compilation
+//! - [`constraints`] - Database constraints (CHECK, UNIQUE)
 //! - [`validators`] - Field validators
 
 // These clippy lints are intentionally allowed for the ORM crate:
@@ -50,6 +51,7 @@
 // significant_drop_tightening: false positives with async Mutex guards
 #![allow(clippy::significant_drop_tightening)]
 
+pub mod constraints;
 pub mod executor;
 pub mod fields;
 pub mod model;
@@ -59,6 +61,7 @@ pub mod validators;
 pub mod value;
 
 // Re-export the most commonly used types at the crate root.
+pub use constraints::{CheckConstraint, Constraint, UniqueConstraint};
 pub use executor::{
     create_model, create_model_with_hooks, delete_model, delete_model_with_hooks, refresh_model,
     save_model, save_model_with_hooks, DbExecutor, ModelLifecycleHooks,
@@ -66,8 +69,9 @@ pub use executor::{
 pub use fields::{FieldDef, FieldType, OnDelete};
 pub use model::{Model, ModelMeta};
 pub use query::{
-    AggregateFunc, DatabaseBackendType, Expression, Lookup, Manager, OrderBy, Q, Query, QuerySet,
-    Row, SelectColumn, SqlCompiler, When, WhereNode,
+    AggregateFunc, DatabaseBackendType, Exists, Expression, Lookup, Manager, OrderBy, OuterRef, Q,
+    Query, QuerySet, Row, SelectColumn, SqlCompiler, SubqueryExpression, When, WhereNode,
+    WindowExpression, WindowFrame, WindowFrameBound, WindowFrameType, WindowFunction,
 };
 pub use validators::Validator;
 pub use value::Value;

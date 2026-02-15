@@ -277,6 +277,7 @@ mod tests {
                     fields: vec![
                         FieldDef::new("id", FieldType::BigAutoField).primary_key(),
                     ],
+                    constraints: vec![],
                 });
                 &META
             }

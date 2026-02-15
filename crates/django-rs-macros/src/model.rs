@@ -305,6 +305,7 @@ pub fn derive_model_impl(input: DeriveInput) -> TokenStream {
                         indexes: vec![#(#all_indexes),*],
                         abstract_model: #abstract_model,
                         fields: vec![#(#field_def_tokens),*],
+                        constraints: vec![],
                     }
                 });
                 &META

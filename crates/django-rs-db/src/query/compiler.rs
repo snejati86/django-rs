@@ -7,6 +7,7 @@
 //!
 //! This is the equivalent of Django's `django.db.models.sql.compiler`.
 
+use super::expressions::window::{WindowExpression, WindowFunction};
 use super::expressions::Expression;
 use super::lookups::{Lookup, Q};
 use crate::value::Value;
@@ -558,6 +559,19 @@ impl SqlCompiler {
     }
 
     /// Compiles a `WhereNode` into SQL, appending to the provided string.
+    ///
+    /// This is the public entry point for modules that need to compile
+    /// WHERE conditions outside of a full query (e.g., constraint DDL).
+    pub fn compile_where_node_pub(
+        &self,
+        node: &WhereNode,
+        sql: &mut String,
+        params: &mut Vec<Value>,
+    ) {
+        self.compile_where_node(node, sql, params);
+    }
+
+    /// Compiles a `WhereNode` into SQL, appending to the provided string.
     fn compile_where_node(
         &self,
         node: &WhereNode,
@@ -759,7 +773,7 @@ impl SqlCompiler {
     }
 
     /// Compiles an expression into SQL.
-    fn compile_expression(
+    pub(crate) fn compile_expression(
         &self,
         expr: &Expression,
         params: &mut Vec<Value>,
@@ -811,6 +825,47 @@ impl SqlCompiler {
                 params.extend(sub_params);
                 format!("({sub_sql})")
             }
+            Expression::OuterRef(column) => {
+                // OuterRef references a column from the outer query.
+                // Rendered as a simple quoted column reference that will be
+                // resolved by the outer query context.
+                format!("\"{column}\"")
+            }
+            Expression::Exists { query, negated } => {
+                // Compile the inner query as SELECT 1 to check for existence.
+                let mut exists_query = (**query).clone();
+                exists_query.select = vec![SelectColumn::Expression(
+                    Expression::RawSQL("1".to_string(), vec![]),
+                    "__exists__".to_string(),
+                )];
+                exists_query.order_by.clear();
+                let (sub_sql, sub_params) = self.compile_select(&exists_query);
+                params.extend(sub_params);
+                if *negated {
+                    format!("NOT EXISTS ({sub_sql})")
+                } else {
+                    format!("EXISTS ({sub_sql})")
+                }
+            }
+            Expression::Window(window_expr) => {
+                self.compile_window_expression(window_expr, params)
+            }
+            Expression::Extract { part, expr } => {
+                let expr_sql = self.compile_expression(expr, params);
+                format!("EXTRACT({part} FROM {expr_sql})")
+            }
+            Expression::DateTrunc { precision, expr } => {
+                let expr_sql = self.compile_expression(expr, params);
+                format!("DATE_TRUNC('{precision}', {expr_sql})")
+            }
+            Expression::Cast { expr, data_type } => {
+                let expr_sql = self.compile_expression(expr, params);
+                format!("CAST({expr_sql} AS {data_type})")
+            }
+            Expression::Collate { expr, collation } => {
+                let expr_sql = self.compile_expression(expr, params);
+                format!("{expr_sql} COLLATE \"{collation}\"")
+            }
             Expression::RawSQL(raw, raw_params) => {
                 params.extend(raw_params.clone());
                 raw.clone()
@@ -834,6 +889,101 @@ impl SqlCompiler {
                 let l = self.compile_expression(left, params);
                 let r = self.compile_expression(right, params);
                 format!("({l} / {r})")
+            }
+        }
+    }
+
+    /// Compiles a window expression into SQL.
+    fn compile_window_expression(
+        &self,
+        window: &WindowExpression,
+        params: &mut Vec<Value>,
+    ) -> String {
+        // Compile the function call part
+        let func_sql = self.compile_window_function(&window.function, params);
+
+        // Compile the OVER clause
+        let mut over_parts: Vec<String> = Vec::new();
+
+        if !window.partition_by.is_empty() {
+            let parts: Vec<String> = window
+                .partition_by
+                .iter()
+                .map(|col| format!("\"{col}\""))
+                .collect();
+            over_parts.push(format!("PARTITION BY {}", parts.join(", ")));
+        }
+
+        if !window.order_by.is_empty() {
+            let orders: Vec<String> = window
+                .order_by
+                .iter()
+                .map(|(col, desc)| {
+                    let dir = if *desc { "DESC" } else { "ASC" };
+                    format!("\"{col}\" {dir}")
+                })
+                .collect();
+            over_parts.push(format!("ORDER BY {}", orders.join(", ")));
+        }
+
+        if let Some(ref frame) = window.frame {
+            over_parts.push(frame.to_sql());
+        }
+
+        let over_clause = over_parts.join(" ");
+        format!("{func_sql} OVER ({over_clause})")
+    }
+
+    /// Compiles a window function call (the part before OVER).
+    fn compile_window_function(
+        &self,
+        func: &WindowFunction,
+        params: &mut Vec<Value>,
+    ) -> String {
+        match func {
+            WindowFunction::RowNumber => "ROW_NUMBER()".to_string(),
+            WindowFunction::Rank => "RANK()".to_string(),
+            WindowFunction::DenseRank => "DENSE_RANK()".to_string(),
+            WindowFunction::CumeDist => "CUME_DIST()".to_string(),
+            WindowFunction::PercentRank => "PERCENT_RANK()".to_string(),
+            WindowFunction::Ntile(n) => format!("NTILE({n})"),
+            WindowFunction::Lag { expression, offset, default } => {
+                let expr_sql = self.compile_expression(expression, params);
+                let mut args = vec![expr_sql];
+                if let Some(off) = offset {
+                    args.push(off.to_string());
+                    if let Some(def) = default {
+                        args.push(self.compile_expression(def, params));
+                    }
+                }
+                format!("LAG({})", args.join(", "))
+            }
+            WindowFunction::Lead { expression, offset, default } => {
+                let expr_sql = self.compile_expression(expression, params);
+                let mut args = vec![expr_sql];
+                if let Some(off) = offset {
+                    args.push(off.to_string());
+                    if let Some(def) = default {
+                        args.push(self.compile_expression(def, params));
+                    }
+                }
+                format!("LEAD({})", args.join(", "))
+            }
+            WindowFunction::FirstValue(expr) => {
+                let expr_sql = self.compile_expression(expr, params);
+                format!("FIRST_VALUE({expr_sql})")
+            }
+            WindowFunction::LastValue(expr) => {
+                let expr_sql = self.compile_expression(expr, params);
+                format!("LAST_VALUE({expr_sql})")
+            }
+            WindowFunction::NthValue(expr, n) => {
+                let expr_sql = self.compile_expression(expr, params);
+                format!("NTH_VALUE({expr_sql}, {n})")
+            }
+            WindowFunction::Aggregate(expr) => {
+                // For aggregates used as window functions, compile normally
+                self.compile_expression(expr, params)
             }
         }
     }
