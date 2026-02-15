@@ -19,7 +19,7 @@ use crate::operations::{
 ///
 /// Contains all models across all apps, keyed by `(app_label, model_name)`.
 /// This is the fundamental input to the autodetector.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct ProjectState {
     /// All models in the project, keyed by `(app_label, model_name)`.
     pub models: HashMap<(String, String), ModelState>,
@@ -41,7 +41,7 @@ impl ProjectState {
 }
 
 /// Options for a model, equivalent to Django's `class Meta`.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct ModelOptions {
     /// The explicit database table name, if set.
     pub db_table: Option<String>,
@@ -57,7 +57,7 @@ pub struct ModelOptions {
 /// require the full `FieldDef` (which contains non-cloneable validators).
 /// Instead it uses [`MigrationFieldDef`] which captures all schema-relevant
 /// information.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ModelState {
     /// The application label this model belongs to.
     pub app_label: String,
@@ -104,7 +104,7 @@ impl ModelState {
 /// Unlike [`django_rs_db::fields::FieldDef`], this struct is fully `Clone`-able
 /// because it omits validators (which are runtime objects). It captures all
 /// information needed for schema generation.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct MigrationFieldDef {
     /// The field name.
     pub name: String,

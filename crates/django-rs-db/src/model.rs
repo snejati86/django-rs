@@ -122,7 +122,7 @@ pub struct ModelMeta {
 }
 
 /// A database index definition.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Index {
     /// Optional name for the index.
     pub name: Option<String>,

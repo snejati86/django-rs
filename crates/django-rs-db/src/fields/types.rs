@@ -12,7 +12,8 @@ use crate::value::Value;
 /// Each variant maps to a Django field class. Relational fields (`ForeignKey`,
 /// `OneToOneField`, `ManyToManyField`) carry additional metadata about the
 /// relationship.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "type")]
 pub enum FieldType {
     /// Auto-incrementing 32-bit integer primary key.
     AutoField,
@@ -96,7 +97,7 @@ pub enum FieldType {
 ///
 /// This mirrors Django's `on_delete` parameter for `ForeignKey` and
 /// `OneToOneField`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum OnDelete {
     /// Delete all related objects (CASCADE).
     Cascade,

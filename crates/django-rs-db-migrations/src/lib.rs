@@ -48,6 +48,7 @@ pub mod loader;
 pub mod migration;
 pub mod operations;
 pub mod schema_editor;
+pub mod serializer;
 pub mod squash;
 
 // Re-export key types at the crate root.
@@ -59,4 +60,5 @@ pub use operations::Operation;
 pub use schema_editor::{
     MySqlSchemaEditor, PostgresSchemaEditor, SchemaEditor, SqliteSchemaEditor,
 };
+pub use serializer::SerializableMigration;
 pub use squash::MigrationSquasher;
