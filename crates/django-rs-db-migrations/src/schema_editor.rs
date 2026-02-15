@@ -277,6 +277,24 @@ fn pg_type_sql(field_type: &FieldType, max_length: Option<usize>) -> String {
         FieldType::FilePathField => "VARCHAR(255)".to_string(),
         FieldType::ForeignKey { .. } | FieldType::OneToOneField { .. } => "BIGINT".to_string(),
         FieldType::ManyToManyField { .. } => String::new(), // handled separately
+        FieldType::ArrayField { base_field, .. } => {
+            format!("{}[]", pg_type_sql(base_field, None))
+        }
+        FieldType::HStoreField => "HSTORE".to_string(),
+        FieldType::IntegerRangeField => "INT4RANGE".to_string(),
+        FieldType::BigIntegerRangeField => "INT8RANGE".to_string(),
+        FieldType::FloatRangeField => "NUMRANGE".to_string(),
+        FieldType::DateRangeField => "DATERANGE".to_string(),
+        FieldType::DateTimeRangeField => "TSTZRANGE".to_string(),
+        FieldType::GeneratedField {
+            expression,
+            output_field,
+            db_persist,
+        } => {
+            let output_type = pg_type_sql(output_field, None);
+            let persist = if *db_persist { "STORED" } else { "VIRTUAL" };
+            format!("{output_type} GENERATED ALWAYS AS ({expression}) {persist}")
+        }
     }
 }
 
@@ -458,6 +476,15 @@ fn sqlite_type_sql(field_type: &FieldType) -> &'static str {
         FieldType::JsonField => "TEXT",
         FieldType::ForeignKey { .. } | FieldType::OneToOneField { .. } => "INTEGER",
         FieldType::ManyToManyField { .. } => "",
+        // PostgreSQL-specific types: use TEXT representation in SQLite
+        FieldType::ArrayField { .. }
+        | FieldType::HStoreField
+        | FieldType::IntegerRangeField
+        | FieldType::BigIntegerRangeField
+        | FieldType::FloatRangeField
+        | FieldType::DateRangeField
+        | FieldType::DateTimeRangeField
+        | FieldType::GeneratedField { .. } => "TEXT",
     }
 }
 
@@ -627,6 +654,22 @@ fn mysql_type_sql(field_type: &FieldType, max_length: Option<usize>) -> String {
         FieldType::FilePathField => "VARCHAR(255)".to_string(),
         FieldType::ForeignKey { .. } | FieldType::OneToOneField { .. } => "BIGINT".to_string(),
         FieldType::ManyToManyField { .. } => String::new(),
+        // PostgreSQL-specific types: use JSON representation in MySQL
+        FieldType::ArrayField { .. } | FieldType::HStoreField => "JSON".to_string(),
+        FieldType::IntegerRangeField
+        | FieldType::BigIntegerRangeField
+        | FieldType::FloatRangeField
+        | FieldType::DateRangeField
+        | FieldType::DateTimeRangeField => "VARCHAR(255)".to_string(),
+        FieldType::GeneratedField {
+            expression,
+            output_field,
+            db_persist,
+        } => {
+            let output_type = mysql_type_sql(output_field, None);
+            let persist = if *db_persist { "STORED" } else { "VIRTUAL" };
+            format!("{output_type} GENERATED ALWAYS AS ({expression}) {persist}")
+        }
     }
 }
 
@@ -634,6 +677,7 @@ fn mysql_type_sql(field_type: &FieldType, max_length: Option<usize>) -> String {
 mod tests {
     use super::*;
     use crate::autodetect::MigrationFieldDef;
+    use django_rs_db::model::IndexType;
 
     fn pg() -> PostgresSchemaEditor {
         PostgresSchemaEditor
@@ -957,6 +1001,7 @@ mod tests {
             name: Some("idx_title".into()),
             fields: vec!["title".into()],
             unique: false,
+            index_type: IndexType::default(),
         };
         let sqls = pg().create_index("blog_post", &idx);
         assert_eq!(
@@ -971,6 +1016,7 @@ mod tests {
             name: Some("uniq_email".into()),
             fields: vec!["email".into()],
             unique: true,
+            index_type: IndexType::default(),
         };
         let sqls = pg().create_index("users", &idx);
         assert!(sqls[0].contains("UNIQUE INDEX"));
@@ -1106,6 +1152,7 @@ mod tests {
             name: Some("idx_title".into()),
             fields: vec!["title".into()],
             unique: false,
+            index_type: IndexType::default(),
         };
         let sqls = sqlite().create_index("blog_post", &idx);
         assert!(sqls[0].contains("CREATE INDEX"));
@@ -1274,6 +1321,7 @@ mod tests {
             name: Some("idx_title".into()),
             fields: vec!["title".into()],
             unique: false,
+            index_type: IndexType::default(),
         };
         let sqls = mysql().create_index("blog_post", &idx);
         assert!(sqls[0].contains("CREATE INDEX `idx_title`"));

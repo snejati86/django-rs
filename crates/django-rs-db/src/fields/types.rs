@@ -91,6 +91,38 @@ pub enum FieldType {
         /// The name used for the reverse relation.
         related_name: Option<String>,
     },
+    // ── PostgreSQL-specific field types ──────────────────────────────────
+    /// PostgreSQL array field. Stores a homogeneous array of another field type.
+    /// SQL: `INTEGER[]`, `TEXT[]`, etc.
+    ArrayField {
+        /// The base field type for the array elements.
+        base_field: Box<FieldType>,
+        /// Optional maximum array size.
+        size: Option<usize>,
+    },
+    /// PostgreSQL hstore field. Stores key-value pairs as `hstore` type.
+    HStoreField,
+    /// PostgreSQL integer range field (`int4range`).
+    IntegerRangeField,
+    /// PostgreSQL big integer range field (`int8range`).
+    BigIntegerRangeField,
+    /// PostgreSQL floating-point range field (`numrange`).
+    FloatRangeField,
+    /// PostgreSQL date range field (`daterange`).
+    DateRangeField,
+    /// PostgreSQL date-time range field (`tstzrange`).
+    DateTimeRangeField,
+    /// A database-computed generated field (Django 5.0+).
+    /// The value is always computed by the database engine.
+    GeneratedField {
+        /// The SQL expression that computes the field value.
+        expression: String,
+        /// The output field type (determines the column type).
+        output_field: Box<FieldType>,
+        /// Whether the generated column is stored (STORED) or virtual (VIRTUAL).
+        /// PostgreSQL only supports STORED.
+        db_persist: bool,
+    },
 }
 
 /// Behavior when a referenced object is deleted (ON DELETE action).
@@ -247,6 +279,57 @@ impl FieldDef {
                 | FieldType::ManyToManyField { .. }
         )
     }
+
+    /// Returns `true` if this is a database-generated field.
+    pub const fn is_generated(&self) -> bool {
+        matches!(self.field_type, FieldType::GeneratedField { .. })
+    }
+}
+
+impl FieldType {
+    /// Returns the SQL column type for the given field type on PostgreSQL.
+    ///
+    /// This is used by schema generation and migration tools.
+    pub fn pg_column_type(&self) -> String {
+        match self {
+            Self::AutoField => "SERIAL".to_string(),
+            Self::BigAutoField => "BIGSERIAL".to_string(),
+            Self::CharField => "VARCHAR".to_string(),
+            Self::TextField => "TEXT".to_string(),
+            Self::IntegerField => "INTEGER".to_string(),
+            Self::BigIntegerField => "BIGINT".to_string(),
+            Self::SmallIntegerField => "SMALLINT".to_string(),
+            Self::FloatField => "DOUBLE PRECISION".to_string(),
+            Self::DecimalField {
+                max_digits,
+                decimal_places,
+            } => format!("NUMERIC({max_digits}, {decimal_places})"),
+            Self::BooleanField => "BOOLEAN".to_string(),
+            Self::DateField => "DATE".to_string(),
+            Self::DateTimeField => "TIMESTAMP".to_string(),
+            Self::TimeField => "TIME".to_string(),
+            Self::DurationField => "INTERVAL".to_string(),
+            Self::UuidField => "UUID".to_string(),
+            Self::BinaryField => "BYTEA".to_string(),
+            Self::JsonField => "JSONB".to_string(),
+            Self::EmailField | Self::UrlField | Self::SlugField | Self::FilePathField => {
+                "VARCHAR".to_string()
+            }
+            Self::IpAddressField => "INET".to_string(),
+            Self::ForeignKey { .. } | Self::OneToOneField { .. } => "INTEGER".to_string(),
+            Self::ManyToManyField { .. } => String::new(),
+            Self::ArrayField { base_field, .. } => {
+                format!("{}[]", base_field.pg_column_type())
+            }
+            Self::HStoreField => "HSTORE".to_string(),
+            Self::IntegerRangeField => "INT4RANGE".to_string(),
+            Self::BigIntegerRangeField => "INT8RANGE".to_string(),
+            Self::FloatRangeField => "NUMRANGE".to_string(),
+            Self::DateRangeField => "DATERANGE".to_string(),
+            Self::DateTimeRangeField => "TSTZRANGE".to_string(),
+            Self::GeneratedField { output_field, .. } => output_field.pg_column_type(),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -336,5 +419,147 @@ mod tests {
         } else {
             panic!("Expected DecimalField");
         }
+    }
+
+    // ── PostgreSQL-specific field type tests ────────────────────────────
+
+    #[test]
+    fn test_array_field() {
+        let f = FieldDef::new("tags", FieldType::ArrayField {
+            base_field: Box::new(FieldType::CharField),
+            size: None,
+        });
+        if let FieldType::ArrayField { base_field, size } = &f.field_type {
+            assert!(matches!(**base_field, FieldType::CharField));
+            assert!(size.is_none());
+        } else {
+            panic!("Expected ArrayField");
+        }
+    }
+
+    #[test]
+    fn test_array_field_with_size() {
+        let f = FieldDef::new("scores", FieldType::ArrayField {
+            base_field: Box::new(FieldType::IntegerField),
+            size: Some(10),
+        });
+        if let FieldType::ArrayField { size, .. } = &f.field_type {
+            assert_eq!(*size, Some(10));
+        } else {
+            panic!("Expected ArrayField");
+        }
+    }
+
+    #[test]
+    fn test_hstore_field() {
+        let f = FieldDef::new("metadata", FieldType::HStoreField);
+        assert!(matches!(f.field_type, FieldType::HStoreField));
+    }
+
+    #[test]
+    fn test_range_fields() {
+        let int_range = FieldType::IntegerRangeField;
+        assert_eq!(int_range.pg_column_type(), "INT4RANGE");
+
+        let bigint_range = FieldType::BigIntegerRangeField;
+        assert_eq!(bigint_range.pg_column_type(), "INT8RANGE");
+
+        let float_range = FieldType::FloatRangeField;
+        assert_eq!(float_range.pg_column_type(), "NUMRANGE");
+
+        let date_range = FieldType::DateRangeField;
+        assert_eq!(date_range.pg_column_type(), "DATERANGE");
+
+        let datetime_range = FieldType::DateTimeRangeField;
+        assert_eq!(datetime_range.pg_column_type(), "TSTZRANGE");
+    }
+
+    #[test]
+    fn test_generated_field() {
+        let f = FieldDef::new("full_name", FieldType::GeneratedField {
+            expression: "first_name || ' ' || last_name".to_string(),
+            output_field: Box::new(FieldType::CharField),
+            db_persist: true,
+        });
+        assert!(f.is_generated());
+        if let FieldType::GeneratedField {
+            expression,
+            output_field,
+            db_persist,
+        } = &f.field_type
+        {
+            assert_eq!(expression, "first_name || ' ' || last_name");
+            assert!(matches!(**output_field, FieldType::CharField));
+            assert!(*db_persist);
+        } else {
+            panic!("Expected GeneratedField");
+        }
+    }
+
+    #[test]
+    fn test_generated_field_not_editable() {
+        // Generated fields should typically not be editable.
+        let f = FieldDef::new("total", FieldType::GeneratedField {
+            expression: "price * quantity".to_string(),
+            output_field: Box::new(FieldType::FloatField),
+            db_persist: true,
+        });
+        // By default editable is true; user should set it to false.
+        assert!(f.is_generated());
+    }
+
+    #[test]
+    fn test_pg_column_type_array() {
+        let ft = FieldType::ArrayField {
+            base_field: Box::new(FieldType::IntegerField),
+            size: None,
+        };
+        assert_eq!(ft.pg_column_type(), "INTEGER[]");
+    }
+
+    #[test]
+    fn test_pg_column_type_nested_array() {
+        let ft = FieldType::ArrayField {
+            base_field: Box::new(FieldType::ArrayField {
+                base_field: Box::new(FieldType::IntegerField),
+                size: None,
+            }),
+            size: None,
+        };
+        assert_eq!(ft.pg_column_type(), "INTEGER[][]");
+    }
+
+    #[test]
+    fn test_pg_column_type_hstore() {
+        assert_eq!(FieldType::HStoreField.pg_column_type(), "HSTORE");
+    }
+
+    #[test]
+    fn test_pg_column_type_generated() {
+        let ft = FieldType::GeneratedField {
+            expression: "a + b".to_string(),
+            output_field: Box::new(FieldType::IntegerField),
+            db_persist: true,
+        };
+        // The column type of a generated field is its output_field type.
+        assert_eq!(ft.pg_column_type(), "INTEGER");
+    }
+
+    #[test]
+    fn test_is_generated_false_for_regular() {
+        let f = FieldDef::new("name", FieldType::CharField);
+        assert!(!f.is_generated());
+    }
+
+    #[test]
+    fn test_pg_column_types_basic() {
+        assert_eq!(FieldType::AutoField.pg_column_type(), "SERIAL");
+        assert_eq!(FieldType::BigAutoField.pg_column_type(), "BIGSERIAL");
+        assert_eq!(FieldType::TextField.pg_column_type(), "TEXT");
+        assert_eq!(FieldType::BooleanField.pg_column_type(), "BOOLEAN");
+        assert_eq!(FieldType::UuidField.pg_column_type(), "UUID");
+        assert_eq!(FieldType::JsonField.pg_column_type(), "JSONB");
+        assert_eq!(FieldType::BinaryField.pg_column_type(), "BYTEA");
+        assert_eq!(FieldType::IpAddressField.pg_column_type(), "INET");
     }
 }

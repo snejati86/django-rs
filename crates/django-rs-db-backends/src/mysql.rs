@@ -79,6 +79,11 @@ impl MySqlBackend {
                     .unwrap_or_default();
                     mysql_async::Value::from(json)
                 }
+                Value::HStore(map) => {
+                    let json = serde_json::to_string(map).unwrap_or_default();
+                    mysql_async::Value::from(json)
+                }
+                Value::Range { .. } => mysql_async::Value::from(v.to_string()),
             })
             .collect()
     }

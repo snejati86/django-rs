@@ -707,6 +707,7 @@ mod tests {
     use crate::autodetect::MigrationFieldDef;
     use crate::schema_editor::PostgresSchemaEditor;
     use django_rs_db::fields::FieldType;
+    use django_rs_db::model::IndexType;
 
     fn pg_editor() -> PostgresSchemaEditor {
         PostgresSchemaEditor
@@ -991,6 +992,7 @@ mod tests {
                 name: Some("idx_title".into()),
                 fields: vec!["title".into()],
                 unique: false,
+                    index_type: IndexType::default(),
             },
         };
         assert_eq!(op.describe(), "Add index idx_title on post");
@@ -1004,6 +1006,7 @@ mod tests {
                 name: Some("idx_title".into()),
                 fields: vec!["title".into()],
                 unique: false,
+                    index_type: IndexType::default(),
             },
         };
         let sqls = op

@@ -137,6 +137,23 @@ impl<M: Model> QuerySet<M> {
         self.using.as_deref()
     }
 
+    /// Forces this queryset to use a specific database connection.
+    ///
+    /// This is the equivalent of Django's `QuerySet.using(db)`. The `db`
+    /// parameter is an alias that corresponds to a key in the `DATABASES`
+    /// configuration.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let qs = Article::objects().all().using("replica");
+    /// ```
+    #[must_use]
+    pub fn using(mut self, db: impl Into<String>) -> Self {
+        self.using = Some(db.into());
+        self
+    }
+
     // ── Filtering methods (lazy) ─────────────────────────────────────
 
     /// Adds a filter condition. Returns a new queryset.

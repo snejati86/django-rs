@@ -411,6 +411,7 @@ pub fn migration_file_path(
 mod tests {
     use super::*;
     use django_rs_db::fields::{FieldType, OnDelete};
+    use django_rs_db::model::IndexType;
 
     fn make_field(name: &str, ft: FieldType) -> MigrationFieldDef {
         MigrationFieldDef::new(name, ft)
@@ -486,6 +487,7 @@ mod tests {
                         name: Some("idx_email".into()),
                         fields: vec!["email".into()],
                         unique: true,
+                    index_type: IndexType::default(),
                     },
                 },
                 SerializableOperation::RemoveIndex {
@@ -831,6 +833,7 @@ mod tests {
             name: Some("idx_email".into()),
             fields: vec!["email".into()],
             unique: true,
+                    index_type: IndexType::default(),
         };
         let json = serde_json::to_string(&index).unwrap();
         let deserialized: Index = serde_json::from_str(&json).unwrap();
