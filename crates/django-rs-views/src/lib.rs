@@ -50,9 +50,15 @@ pub mod views;
 
 // Re-export the most commonly used types at the crate root.
 pub use middleware::{Middleware, MiddlewarePipeline};
+pub use middleware::builtin::{
+    AuthenticationMiddleware, CacheMiddleware, LocaleMiddleware, LoginRequiredMiddleware,
+    Message, MessageLevel, MessageMiddleware,
+    add_message, add_message_with_tags, error, get_messages, info, success, warning,
+};
 pub use server::DjangoApp;
 pub use session::{
-    CookieSessionBackend, InMemorySessionBackend, SessionBackend, SessionData, SessionMiddleware,
+    CookieSessionBackend, DatabaseSessionBackend, FileSessionBackend, InMemorySessionBackend,
+    SessionBackend, SessionData, SessionMiddleware, SignedCookieSessionBackend,
 };
 pub use views::{
     ContextMixin, CreateView, DeleteView, DetailView, ListView, RedirectView, TemplateView,

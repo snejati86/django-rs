@@ -231,6 +231,502 @@ impl SessionBackend for CookieSessionBackend {
     }
 }
 
+// ── DatabaseSessionBackend ─────────────────────────────────────────
+
+/// A database-backed session backend using [`DbExecutor`].
+///
+/// Stores sessions in a `django_session` table with columns:
+/// - `session_key TEXT PRIMARY KEY`
+/// - `session_data TEXT` (JSON-serialized)
+/// - `expire_date TEXT` (ISO 8601 timestamp)
+///
+/// This mirrors Django's `django.contrib.sessions.backends.db`.
+pub struct DatabaseSessionBackend {
+    db: Arc<dyn django_rs_db::executor::DbExecutor>,
+}
+
+impl DatabaseSessionBackend {
+    /// Creates a new database session backend with the given executor.
+    pub fn new(db: Arc<dyn django_rs_db::executor::DbExecutor>) -> Self {
+        Self { db }
+    }
+
+    /// Creates the `django_session` table if it does not already exist.
+    pub async fn create_table(&self) -> Result<(), DjangoError> {
+        let sql = "CREATE TABLE IF NOT EXISTS django_session (\
+            session_key TEXT PRIMARY KEY, \
+            session_data TEXT NOT NULL, \
+            expire_date TEXT NOT NULL\
+        )";
+        self.db
+            .execute_sql(sql, &[])
+            .await
+            .map(|_| ())
+    }
+}
+
+#[async_trait]
+impl SessionBackend for DatabaseSessionBackend {
+    async fn load(&self, session_key: &str) -> Result<SessionData, DjangoError> {
+        let sql = "SELECT session_key, session_data, expire_date \
+                    FROM django_session \
+                    WHERE session_key = $1";
+        let row = self
+            .db
+            .query_one(
+                sql,
+                &[django_rs_db::value::Value::String(session_key.to_string())],
+            )
+            .await?;
+
+        let data_str: String = row.get("session_data")?;
+        let expire_str: String = row.get("expire_date")?;
+
+        let expire_date = chrono::DateTime::parse_from_rfc3339(&expire_str)
+            .map(|dt| dt.with_timezone(&Utc))
+            .map_err(|e| {
+                DjangoError::NotFound(format!(
+                    "Session '{session_key}' expire_date parse error: {e}"
+                ))
+            })?;
+
+        if Utc::now() > expire_date {
+            return Err(DjangoError::NotFound(format!(
+                "Session '{session_key}' has expired"
+            )));
+        }
+
+        let data: HashMap<String, serde_json::Value> =
+            serde_json::from_str(&data_str).unwrap_or_default();
+
+        Ok(SessionData {
+            session_key: session_key.to_string(),
+            data,
+            expire_date,
+            modified: false,
+        })
+    }
+
+    async fn save(&self, session: &SessionData) -> Result<String, DjangoError> {
+        let data_json = serde_json::to_string(&session.data)
+            .map_err(|e| DjangoError::InternalServerError(format!("Failed to serialize session: {e}")))?;
+        let expire_str = session.expire_date.to_rfc3339();
+
+        // Use INSERT OR REPLACE (SQLite) / ON CONFLICT (Postgres-compatible)
+        let sql = "INSERT INTO django_session (session_key, session_data, expire_date) \
+                    VALUES ($1, $2, $3) \
+                    ON CONFLICT(session_key) DO UPDATE SET \
+                    session_data = $2, expire_date = $3";
+
+        self.db
+            .execute_sql(
+                sql,
+                &[
+                    django_rs_db::value::Value::String(session.session_key.clone()),
+                    django_rs_db::value::Value::String(data_json),
+                    django_rs_db::value::Value::String(expire_str),
+                ],
+            )
+            .await?;
+
+        Ok(session.session_key.clone())
+    }
+
+    async fn delete(&self, session_key: &str) -> Result<(), DjangoError> {
+        let sql = "DELETE FROM django_session WHERE session_key = $1";
+        self.db
+            .execute_sql(
+                sql,
+                &[django_rs_db::value::Value::String(session_key.to_string())],
+            )
+            .await?;
+        Ok(())
+    }
+
+    async fn exists(&self, session_key: &str) -> Result<bool, DjangoError> {
+        let sql = "SELECT session_key FROM django_session WHERE session_key = $1";
+        match self
+            .db
+            .query(
+                sql,
+                &[django_rs_db::value::Value::String(session_key.to_string())],
+            )
+            .await
+        {
+            Ok(rows) => Ok(!rows.is_empty()),
+            Err(_) => Ok(false),
+        }
+    }
+
+    async fn clear_expired(&self) -> Result<(), DjangoError> {
+        let now_str = Utc::now().to_rfc3339();
+        let sql = "DELETE FROM django_session WHERE expire_date < $1";
+        self.db
+            .execute_sql(
+                sql,
+                &[django_rs_db::value::Value::String(now_str)],
+            )
+            .await?;
+        Ok(())
+    }
+}
+
+// ── SignedCookieSessionBackend ──────────────────────────────────────
+
+/// A session backend that stores all session data in a signed cookie.
+///
+/// Session data is serialized to JSON, signed with HMAC-SHA256, and stored
+/// directly in the cookie value. No server-side storage is required.
+///
+/// **Size limit:** Cookies are limited to 4096 bytes. An error is returned
+/// if the signed data exceeds this limit.
+///
+/// This mirrors Django's `django.contrib.sessions.backends.signed_cookies`.
+pub struct SignedCookieSessionBackend {
+    secret_key: String,
+    salt: String,
+    /// Maximum cookie size in bytes.
+    max_cookie_size: usize,
+}
+
+impl SignedCookieSessionBackend {
+    /// Creates a new signed cookie backend with the given secret key.
+    pub fn new(secret_key: &str) -> Self {
+        Self {
+            secret_key: secret_key.to_string(),
+            salt: "django.contrib.sessions.backends.signed_cookies".to_string(),
+            max_cookie_size: 4096,
+        }
+    }
+
+    /// Sets a custom salt for HMAC signing.
+    #[must_use]
+    pub fn with_salt(mut self, salt: &str) -> Self {
+        self.salt = salt.to_string();
+        self
+    }
+
+    /// Sets the maximum cookie size.
+    #[must_use]
+    pub fn with_max_cookie_size(mut self, size: usize) -> Self {
+        self.max_cookie_size = size;
+        self
+    }
+
+    /// Signs data with HMAC-SHA256 and returns `base64(data).base64(signature)`.
+    fn sign(&self, data: &str) -> String {
+        use hmac::{Hmac, Mac};
+        use sha2::Sha256;
+
+        let key = format!("{}:{}", self.salt, self.secret_key);
+        let mut mac =
+            Hmac::<Sha256>::new_from_slice(key.as_bytes()).expect("HMAC can take key of any size");
+        mac.update(data.as_bytes());
+        let signature = mac.finalize().into_bytes();
+
+        let data_b64 = base64::Engine::encode(
+            &base64::engine::general_purpose::URL_SAFE_NO_PAD,
+            data.as_bytes(),
+        );
+        let sig_b64 = base64::Engine::encode(
+            &base64::engine::general_purpose::URL_SAFE_NO_PAD,
+            signature,
+        );
+
+        format!("{data_b64}.{sig_b64}")
+    }
+
+    /// Verifies and extracts the original data from a signed cookie value.
+    fn unsign(&self, signed_value: &str) -> Result<String, DjangoError> {
+        use hmac::{Hmac, Mac};
+        use sha2::Sha256;
+
+        let parts: Vec<&str> = signed_value.rsplitn(2, '.').collect();
+        if parts.len() != 2 {
+            return Err(DjangoError::InternalServerError(
+                "Invalid signed cookie format".to_string(),
+            ));
+        }
+
+        let sig_b64 = parts[0];
+        let data_b64 = parts[1];
+
+        let data_bytes = base64::Engine::decode(
+            &base64::engine::general_purpose::URL_SAFE_NO_PAD,
+            data_b64,
+        )
+        .map_err(|e| DjangoError::InternalServerError(format!("Invalid base64 data: {e}")))?;
+
+        let expected_sig = base64::Engine::decode(
+            &base64::engine::general_purpose::URL_SAFE_NO_PAD,
+            sig_b64,
+        )
+        .map_err(|e| DjangoError::InternalServerError(format!("Invalid base64 signature: {e}")))?;
+
+        let data_str =
+            String::from_utf8(data_bytes).map_err(|e| DjangoError::InternalServerError(e.to_string()))?;
+
+        // Verify signature
+        let key = format!("{}:{}", self.salt, self.secret_key);
+        let mut mac =
+            Hmac::<Sha256>::new_from_slice(key.as_bytes()).expect("HMAC can take key of any size");
+        mac.update(data_str.as_bytes());
+
+        mac.verify_slice(&expected_sig)
+            .map_err(|_| DjangoError::InternalServerError("Invalid cookie signature".to_string()))?;
+
+        Ok(data_str)
+    }
+}
+
+#[async_trait]
+impl SessionBackend for SignedCookieSessionBackend {
+    async fn load(&self, session_key: &str) -> Result<SessionData, DjangoError> {
+        // The "session_key" is the signed cookie value
+        let data_str = self.unsign(session_key)?;
+
+        // Parse the JSON envelope containing data and expiry
+        let envelope: serde_json::Value = serde_json::from_str(&data_str)
+            .map_err(|e| DjangoError::InternalServerError(format!("Invalid session JSON: {e}")))?;
+
+        let session_data: HashMap<String, serde_json::Value> = envelope
+            .get("data")
+            .and_then(|v| serde_json::from_value(v.clone()).ok())
+            .unwrap_or_default();
+
+        let expire_str = envelope
+            .get("expire_date")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+
+        let expire_date = chrono::DateTime::parse_from_rfc3339(expire_str).map_or_else(
+            |_| Utc::now() + Duration::weeks(2),
+            |dt| dt.with_timezone(&Utc),
+        );
+
+        if Utc::now() > expire_date {
+            return Err(DjangoError::NotFound("Session has expired".to_string()));
+        }
+
+        let key = envelope
+            .get("session_key")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+
+        Ok(SessionData {
+            session_key: key,
+            data: session_data,
+            expire_date,
+            modified: false,
+        })
+    }
+
+    async fn save(&self, session: &SessionData) -> Result<String, DjangoError> {
+        let envelope = serde_json::json!({
+            "session_key": session.session_key,
+            "data": session.data,
+            "expire_date": session.expire_date.to_rfc3339(),
+        });
+
+        let json_str = serde_json::to_string(&envelope)
+            .map_err(|e| DjangoError::InternalServerError(format!("Failed to serialize session: {e}")))?;
+
+        let signed = self.sign(&json_str);
+
+        if signed.len() > self.max_cookie_size {
+            return Err(DjangoError::InternalServerError(format!(
+                "Session cookie exceeds maximum size of {} bytes (actual: {})",
+                self.max_cookie_size,
+                signed.len()
+            )));
+        }
+
+        Ok(signed)
+    }
+
+    async fn delete(&self, _session_key: &str) -> Result<(), DjangoError> {
+        // For signed cookies, "deleting" means the client won't send the cookie anymore.
+        // Nothing to do server-side.
+        Ok(())
+    }
+
+    async fn exists(&self, session_key: &str) -> Result<bool, DjangoError> {
+        // Verify that the signed value is valid
+        match self.unsign(session_key) {
+            Ok(_) => Ok(true),
+            Err(_) => Ok(false),
+        }
+    }
+
+    async fn clear_expired(&self) -> Result<(), DjangoError> {
+        // No server-side storage to clean up
+        Ok(())
+    }
+}
+
+// ── FileSessionBackend ─────────────────────────────────────────────
+
+/// A file-based session backend that stores each session as a JSON file.
+///
+/// Sessions are stored as `{storage_path}/{session_key}.json`. This is
+/// suitable for development and single-server deployments.
+///
+/// This mirrors Django's `django.contrib.sessions.backends.file`.
+pub struct FileSessionBackend {
+    storage_path: std::path::PathBuf,
+}
+
+impl FileSessionBackend {
+    /// Creates a new file session backend that stores sessions in the given directory.
+    ///
+    /// The directory will be created if it does not exist.
+    pub fn new(storage_path: impl Into<std::path::PathBuf>) -> Self {
+        Self {
+            storage_path: storage_path.into(),
+        }
+    }
+
+    /// Returns the file path for a given session key.
+    fn session_file(&self, session_key: &str) -> std::path::PathBuf {
+        self.storage_path.join(format!("{session_key}.json"))
+    }
+
+    /// Ensures the storage directory exists.
+    async fn ensure_dir(&self) -> Result<(), DjangoError> {
+        tokio::fs::create_dir_all(&self.storage_path)
+            .await
+            .map_err(|e| {
+                DjangoError::InternalServerError(format!(
+                    "Failed to create session directory '{}': {e}",
+                    self.storage_path.display()
+                ))
+            })
+    }
+}
+
+/// Internal file format for session files.
+#[derive(serde::Serialize, serde::Deserialize)]
+struct FileSessionEnvelope {
+    session_key: String,
+    data: HashMap<String, serde_json::Value>,
+    expire_date: String,
+}
+
+#[async_trait]
+impl SessionBackend for FileSessionBackend {
+    async fn load(&self, session_key: &str) -> Result<SessionData, DjangoError> {
+        let path = self.session_file(session_key);
+        let content = tokio::fs::read_to_string(&path).await.map_err(|_| {
+            DjangoError::NotFound(format!("Session '{session_key}' not found"))
+        })?;
+
+        let envelope: FileSessionEnvelope = serde_json::from_str(&content).map_err(|e| {
+            DjangoError::InternalServerError(format!("Invalid session file for '{session_key}': {e}"))
+        })?;
+
+        let expire_date = chrono::DateTime::parse_from_rfc3339(&envelope.expire_date)
+            .map(|dt| dt.with_timezone(&Utc))
+            .map_err(|e| {
+                DjangoError::InternalServerError(format!(
+                    "Invalid expire_date in session '{session_key}': {e}"
+                ))
+            })?;
+
+        if Utc::now() > expire_date {
+            // Remove the expired file
+            let _ = tokio::fs::remove_file(&path).await;
+            return Err(DjangoError::NotFound(format!(
+                "Session '{session_key}' has expired"
+            )));
+        }
+
+        Ok(SessionData {
+            session_key: envelope.session_key,
+            data: envelope.data,
+            expire_date,
+            modified: false,
+        })
+    }
+
+    async fn save(&self, session: &SessionData) -> Result<String, DjangoError> {
+        self.ensure_dir().await?;
+
+        let envelope = FileSessionEnvelope {
+            session_key: session.session_key.clone(),
+            data: session.data.clone(),
+            expire_date: session.expire_date.to_rfc3339(),
+        };
+
+        let content = serde_json::to_string_pretty(&envelope)
+            .map_err(|e| DjangoError::InternalServerError(format!("Failed to serialize session: {e}")))?;
+
+        let path = self.session_file(&session.session_key);
+        tokio::fs::write(&path, content.as_bytes())
+            .await
+            .map_err(|e| {
+                DjangoError::InternalServerError(format!(
+                    "Failed to write session file '{}': {e}",
+                    path.display()
+                ))
+            })?;
+
+        Ok(session.session_key.clone())
+    }
+
+    async fn delete(&self, session_key: &str) -> Result<(), DjangoError> {
+        let path = self.session_file(session_key);
+        match tokio::fs::remove_file(&path).await {
+            Ok(()) | Err(_) => Ok(()),
+        }
+    }
+
+    async fn exists(&self, session_key: &str) -> Result<bool, DjangoError> {
+        let path = self.session_file(session_key);
+        Ok(path.exists())
+    }
+
+    async fn clear_expired(&self) -> Result<(), DjangoError> {
+        self.ensure_dir().await?;
+
+        let mut entries = tokio::fs::read_dir(&self.storage_path).await.map_err(|e| {
+            DjangoError::InternalServerError(format!(
+                "Failed to read session directory '{}': {e}",
+                self.storage_path.display()
+            ))
+        })?;
+
+        loop {
+            let entry: tokio::fs::DirEntry = match entries.next_entry().await {
+                Ok(Some(e)) => e,
+                Ok(None) | Err(_) => break,
+            };
+            let path: std::path::PathBuf = entry.path();
+            let ext_match = path
+                .extension()
+                .and_then(std::ffi::OsStr::to_str)
+                == Some("json");
+            if !ext_match {
+                continue;
+            }
+
+            if let Ok(content) = tokio::fs::read_to_string(&path).await {
+                if let Ok(envelope) = serde_json::from_str::<FileSessionEnvelope>(&content) {
+                    if let Ok(expire_date) =
+                        chrono::DateTime::parse_from_rfc3339(&envelope.expire_date)
+                    {
+                        if Utc::now() > expire_date.with_timezone(&Utc) {
+                            let _ = tokio::fs::remove_file(&path).await;
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+}
+
 /// Middleware that integrates the session framework into the request/response pipeline.
 ///
 /// On each request, loads the session data from the backend using the session cookie.
@@ -721,5 +1217,208 @@ mod tests {
         std::thread::sleep(std::time::Duration::from_millis(1));
         let key2 = generate_session_key();
         assert_ne!(key1, key2);
+    }
+
+    // ── SignedCookieSessionBackend tests ────────────────────────────
+
+    #[tokio::test]
+    async fn test_signed_cookie_save_and_load() {
+        let backend = SignedCookieSessionBackend::new("my-secret-key-1234");
+        let mut session = SessionData::new("signed-session".to_string());
+        session.set("user", serde_json::json!("bob"));
+
+        let cookie_value = backend.save(&session).await.unwrap();
+        assert!(!cookie_value.is_empty());
+        assert!(cookie_value.contains('.'));
+
+        let loaded = backend.load(&cookie_value).await.unwrap();
+        assert_eq!(loaded.get("user"), Some(&serde_json::json!("bob")));
+        assert_eq!(loaded.session_key, "signed-session");
+    }
+
+    #[tokio::test]
+    async fn test_signed_cookie_tamper_detection() {
+        let backend = SignedCookieSessionBackend::new("my-secret-key-1234");
+        let mut session = SessionData::new("test".to_string());
+        session.set("admin", serde_json::json!(true));
+
+        let cookie_value = backend.save(&session).await.unwrap();
+
+        // Tamper with the data portion
+        let tampered = format!("tampered{cookie_value}");
+        let result = backend.load(&tampered).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_signed_cookie_wrong_key() {
+        let backend1 = SignedCookieSessionBackend::new("key-1");
+        let backend2 = SignedCookieSessionBackend::new("key-2");
+
+        let session = SessionData::new("test".to_string());
+        let cookie_value = backend1.save(&session).await.unwrap();
+
+        let result = backend2.load(&cookie_value).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_signed_cookie_expired_session() {
+        let backend = SignedCookieSessionBackend::new("secret");
+        let mut session = SessionData::new("expired".to_string());
+        session.expire_date = Utc::now() - Duration::hours(1);
+
+        let cookie_value = backend.save(&session).await.unwrap();
+        let result = backend.load(&cookie_value).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_signed_cookie_size_limit() {
+        let backend = SignedCookieSessionBackend::new("secret")
+            .with_max_cookie_size(100);
+        let mut session = SessionData::new("big".to_string());
+        // Add a large value
+        session.set("data", serde_json::json!("x".repeat(200)));
+
+        let result = backend.save(&session).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_signed_cookie_exists() {
+        let backend = SignedCookieSessionBackend::new("secret");
+        let session = SessionData::new("test".to_string());
+        let cookie_value = backend.save(&session).await.unwrap();
+
+        assert!(backend.exists(&cookie_value).await.unwrap());
+        assert!(!backend.exists("invalid-cookie").await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn test_signed_cookie_delete() {
+        let backend = SignedCookieSessionBackend::new("secret");
+        // Delete is a no-op for signed cookies
+        let result = backend.delete("anything").await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_signed_cookie_clear_expired() {
+        let backend = SignedCookieSessionBackend::new("secret");
+        // clear_expired is a no-op for signed cookies
+        let result = backend.clear_expired().await;
+        assert!(result.is_ok());
+    }
+
+    // ── FileSessionBackend tests ───────────────────────────────────
+
+    #[tokio::test]
+    async fn test_file_backend_save_and_load() {
+        let dir = tempfile::tempdir().unwrap();
+        let backend = FileSessionBackend::new(dir.path());
+
+        let mut session = SessionData::new("file-session".to_string());
+        session.set("color", serde_json::json!("blue"));
+
+        backend.save(&session).await.unwrap();
+
+        let loaded = backend.load("file-session").await.unwrap();
+        assert_eq!(loaded.get("color"), Some(&serde_json::json!("blue")));
+    }
+
+    #[tokio::test]
+    async fn test_file_backend_load_nonexistent() {
+        let dir = tempfile::tempdir().unwrap();
+        let backend = FileSessionBackend::new(dir.path());
+        let result = backend.load("nonexistent").await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_file_backend_delete() {
+        let dir = tempfile::tempdir().unwrap();
+        let backend = FileSessionBackend::new(dir.path());
+
+        let session = SessionData::new("to-delete".to_string());
+        backend.save(&session).await.unwrap();
+        assert!(backend.exists("to-delete").await.unwrap());
+
+        backend.delete("to-delete").await.unwrap();
+        assert!(!backend.exists("to-delete").await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn test_file_backend_exists() {
+        let dir = tempfile::tempdir().unwrap();
+        let backend = FileSessionBackend::new(dir.path());
+
+        assert!(!backend.exists("nope").await.unwrap());
+
+        let session = SessionData::new("yes".to_string());
+        backend.save(&session).await.unwrap();
+        assert!(backend.exists("yes").await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn test_file_backend_overwrite() {
+        let dir = tempfile::tempdir().unwrap();
+        let backend = FileSessionBackend::new(dir.path());
+
+        let mut session = SessionData::new("overwrite".to_string());
+        session.set("val", serde_json::json!(1));
+        backend.save(&session).await.unwrap();
+
+        session.set("val", serde_json::json!(2));
+        backend.save(&session).await.unwrap();
+
+        let loaded = backend.load("overwrite").await.unwrap();
+        assert_eq!(loaded.get("val"), Some(&serde_json::json!(2)));
+    }
+
+    #[tokio::test]
+    async fn test_file_backend_expired_session() {
+        let dir = tempfile::tempdir().unwrap();
+        let backend = FileSessionBackend::new(dir.path());
+
+        let mut session = SessionData::new("expired".to_string());
+        session.expire_date = Utc::now() - Duration::hours(1);
+        backend.save(&session).await.unwrap();
+
+        let result = backend.load("expired").await;
+        assert!(result.is_err());
+        // File should be cleaned up
+        assert!(!backend.exists("expired").await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn test_file_backend_clear_expired() {
+        let dir = tempfile::tempdir().unwrap();
+        let backend = FileSessionBackend::new(dir.path());
+
+        // Active session
+        let active = SessionData::new("active".to_string());
+        backend.save(&active).await.unwrap();
+
+        // Expired session
+        let mut expired = SessionData::new("expired".to_string());
+        expired.expire_date = Utc::now() - Duration::hours(1);
+        backend.save(&expired).await.unwrap();
+
+        backend.clear_expired().await.unwrap();
+
+        assert!(backend.exists("active").await.unwrap());
+        assert!(!backend.exists("expired").await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn test_file_backend_creates_directory() {
+        let dir = tempfile::tempdir().unwrap();
+        let nested = dir.path().join("nested").join("sessions");
+        let backend = FileSessionBackend::new(&nested);
+
+        let session = SessionData::new("test".to_string());
+        backend.save(&session).await.unwrap();
+        assert!(nested.exists());
     }
 }
