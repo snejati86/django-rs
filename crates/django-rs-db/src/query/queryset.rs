@@ -15,7 +15,8 @@
 //! ```
 
 use super::compiler::{
-    DatabaseBackendType, OrderBy, Query, SelectColumn, SqlCompiler, WhereNode,
+    CompoundQuery, CompoundType, DatabaseBackendType, InheritanceType, OrderBy,
+    PrefetchRelatedField, Query, SelectColumn, SelectRelatedField, SqlCompiler, WhereNode,
 };
 use super::expressions::Expression;
 use super::lookups::Q;
@@ -23,6 +24,7 @@ use crate::executor::DbExecutor;
 use crate::model::Model;
 use crate::value::Value;
 use django_rs_core::{DjangoError, DjangoResult};
+use std::collections::HashMap;
 use std::marker::PhantomData;
 
 /// The entry point for model-level query operations.
@@ -237,25 +239,59 @@ impl<M: Model> QuerySet<M> {
     }
 
     /// Adds `select_related` fields (controls JOIN behavior).
+    ///
+    /// When select_related fields are configured with `select_related_with()`,
+    /// the SQL compiler generates LEFT OUTER JOINs to eagerly load related
+    /// objects in a single query. This is equivalent to Django's
+    /// `QuerySet.select_related()`.
+    ///
+    /// This simpler version stores field names as hints. For full functionality
+    /// with actual JOIN generation, use `select_related_with()`.
     #[must_use]
-    pub fn select_related(mut self, fields: Vec<&str>) -> Self {
-        // Store the fields for JOIN generation during execution.
-        // For now, this is a placeholder that records the intent.
+    pub fn select_related(self, fields: Vec<&str>) -> Self {
+        // For backward compatibility, store field names as hints in group_by.
+        // Real JOIN generation uses select_related_with().
+        let mut qs = self;
         for field in fields {
-            self.query.group_by.push(format!("__select_related__{field}"));
+            qs.query.group_by.push(format!("__select_related__{field}"));
         }
+        qs
+    }
+
+    /// Adds `select_related` fields with full relation metadata for JOIN generation.
+    ///
+    /// Each entry provides the field name, related table, FK column, related PK column,
+    /// and a table alias for the JOIN. The SQL compiler generates LEFT OUTER JOINs
+    /// and the result set includes columns from the joined tables.
+    #[must_use]
+    pub fn select_related_with(mut self, fields: Vec<SelectRelatedField>) -> Self {
+        self.query.select_related.extend(fields);
         self
     }
 
     /// Adds `prefetch_related` fields.
+    ///
+    /// This simpler version stores field names as hints. For full functionality
+    /// with actual batch queries, use `prefetch_related_with()`.
     #[must_use]
-    pub fn prefetch_related(mut self, fields: Vec<&str>) -> Self {
-        // Placeholder for prefetch intent — execution handled by backend.
+    pub fn prefetch_related(self, fields: Vec<&str>) -> Self {
+        let mut qs = self;
         for field in fields {
-            self.query
+            qs.query
                 .group_by
                 .push(format!("__prefetch_related__{field}"));
         }
+        qs
+    }
+
+    /// Adds `prefetch_related` fields with full relation metadata.
+    ///
+    /// After the main query executes, additional batch queries are issued
+    /// for each prefetch field to load related objects. The results are
+    /// returned alongside the main query results via `execute_with_prefetch()`.
+    #[must_use]
+    pub fn prefetch_related_with(mut self, fields: Vec<PrefetchRelatedField>) -> Self {
+        self.query.prefetch_related.extend(fields);
         self
     }
 
@@ -274,21 +310,49 @@ impl<M: Model> QuerySet<M> {
     }
 
     /// Combines two querysets with UNION.
+    ///
+    /// By default, UNION deduplicates rows. Pass `all=true` to use UNION ALL
+    /// which preserves duplicates and is faster.
     #[must_use]
-    pub fn union(self, _other: QuerySet<M>) -> Self {
-        // Placeholder — full UNION support requires extending Query AST
+    pub fn union(mut self, other: QuerySet<M>) -> Self {
+        self.query.compound_queries.push(CompoundQuery {
+            compound_type: CompoundType::Union,
+            other: Box::new(other.query),
+        });
+        self
+    }
+
+    /// Combines two querysets with UNION ALL (preserves duplicates).
+    #[must_use]
+    pub fn union_all(mut self, other: QuerySet<M>) -> Self {
+        self.query.compound_queries.push(CompoundQuery {
+            compound_type: CompoundType::UnionAll,
+            other: Box::new(other.query),
+        });
         self
     }
 
     /// Combines two querysets with INTERSECT.
+    ///
+    /// Returns only rows that appear in both querysets.
     #[must_use]
-    pub fn intersection(self, _other: QuerySet<M>) -> Self {
+    pub fn intersection(mut self, other: QuerySet<M>) -> Self {
+        self.query.compound_queries.push(CompoundQuery {
+            compound_type: CompoundType::Intersect,
+            other: Box::new(other.query),
+        });
         self
     }
 
-    /// Combines two querysets with EXCEPT/MINUS.
+    /// Combines two querysets with EXCEPT (MINUS on some backends).
+    ///
+    /// Returns rows from this queryset that do not appear in the other.
     #[must_use]
-    pub fn difference(self, _other: QuerySet<M>) -> Self {
+    pub fn difference(mut self, other: QuerySet<M>) -> Self {
+        self.query.compound_queries.push(CompoundQuery {
+            compound_type: CompoundType::Except,
+            other: Box::new(other.query),
+        });
         self
     }
 
@@ -557,6 +621,83 @@ impl<M: Model> QuerySet<M> {
         let (sql, params) = self.to_sql(db.backend_type());
         db.insert_returning_id(&sql, &params).await
     }
+
+    /// Executes the main query and then runs prefetch_related batch queries.
+    ///
+    /// Returns a tuple of `(models, prefetch_cache)` where `prefetch_cache` is a
+    /// `HashMap<String, Vec<Row>>` mapping each prefetch field name to the rows
+    /// returned by its batch query.
+    ///
+    /// This is the async execution counterpart of `prefetch_related_with()`.
+    pub async fn execute_with_prefetch(
+        &self,
+        db: &dyn DbExecutor,
+    ) -> DjangoResult<(Vec<M>, HashMap<String, Vec<super::compiler::Row>>)> {
+        if self.is_none {
+            return Ok((Vec::new(), HashMap::new()));
+        }
+
+        // Execute the main query
+        let (sql, params) = self.to_sql(db.backend_type());
+        let rows = db.query(&sql, &params).await?;
+        let models: Vec<M> = rows.iter().map(M::from_row).collect::<Result<Vec<_>, _>>()?;
+
+        // Collect PK values from results for the prefetch IN clause
+        let pk_values: Vec<Value> = models
+            .iter()
+            .filter_map(|m| m.pk().cloned())
+            .collect();
+
+        // Run prefetch queries
+        let compiler = SqlCompiler::new(db.backend_type());
+        let prefetch_queries =
+            compiler.compile_prefetch_queries(&self.query.prefetch_related, &pk_values);
+
+        let mut prefetch_cache = HashMap::new();
+        for (field_name, pf_sql, pf_params) in prefetch_queries {
+            let pf_rows = db.query(&pf_sql, &pf_params).await?;
+            prefetch_cache.insert(field_name, pf_rows);
+        }
+
+        Ok((models, prefetch_cache))
+    }
+
+    /// Sets the inheritance type on the underlying query.
+    ///
+    /// This configures how the SQL compiler generates queries for models
+    /// with multi-table or proxy inheritance.
+    #[must_use]
+    pub fn set_inheritance(mut self, inheritance: InheritanceType) -> Self {
+        self.query.inheritance = inheritance;
+        self
+    }
+}
+
+/// Result of a prefetch_related query, containing the main query results
+/// and a cache of related objects keyed by field name.
+#[derive(Debug)]
+pub struct PrefetchResult<M: Model> {
+    /// The main query result models.
+    pub models: Vec<M>,
+    /// Cached prefetch query results, keyed by field name.
+    pub prefetch_cache: HashMap<String, Vec<super::compiler::Row>>,
+}
+
+impl<M: Model> PrefetchResult<M> {
+    /// Returns a reference to the prefetched rows for the given field.
+    pub fn get_prefetched(&self, field_name: &str) -> Option<&Vec<super::compiler::Row>> {
+        self.prefetch_cache.get(field_name)
+    }
+
+    /// Returns the number of main result models.
+    pub fn len(&self) -> usize {
+        self.models.len()
+    }
+
+    /// Returns true if there are no main result models.
+    pub fn is_empty(&self) -> bool {
+        self.models.is_empty()
+    }
 }
 
 #[cfg(test)]
@@ -594,6 +735,7 @@ mod tests {
                     FieldDef::new("age", FieldType::IntegerField),
                 ],
                 constraints: vec![],
+                inheritance_type: crate::query::compiler::InheritanceType::None,
             });
             &META
         }
@@ -914,5 +1056,283 @@ mod tests {
         assert!(sql.contains("LIMIT 25"));
         assert!(sql.contains("OFFSET 50"));
         assert_eq!(params.len(), 4); // 2 contains + 1 gte + 1 gt
+    }
+
+    // ── UNION / INTERSECT / EXCEPT queryset tests ────────────────────
+
+    #[test]
+    fn test_queryset_union() {
+        let mgr = Manager::<User>::new();
+        let qs1 = mgr.filter(Q::filter("age", Lookup::Lt(Value::from(25))));
+        let qs2 = mgr.filter(Q::filter("age", Lookup::Gt(Value::from(60))));
+        let combined = qs1.union(qs2);
+        let (sql, params) = combined.to_sql(pg());
+        assert!(sql.contains("UNION"));
+        assert!(!sql.contains("UNION ALL"));
+        assert_eq!(params.len(), 2);
+    }
+
+    #[test]
+    fn test_queryset_union_all() {
+        let mgr = Manager::<User>::new();
+        let qs1 = mgr.all();
+        let qs2 = mgr.all();
+        let combined = qs1.union_all(qs2);
+        let (sql, _) = combined.to_sql(pg());
+        assert!(sql.contains("UNION ALL"));
+    }
+
+    #[test]
+    fn test_queryset_intersection() {
+        let mgr = Manager::<User>::new();
+        let qs1 = mgr.filter(Q::filter("age", Lookup::Gte(Value::from(18))));
+        let qs2 = mgr.filter(Q::filter("age", Lookup::Lte(Value::from(65))));
+        let combined = qs1.intersection(qs2);
+        let (sql, params) = combined.to_sql(pg());
+        assert!(sql.contains("INTERSECT"));
+        assert_eq!(params.len(), 2);
+    }
+
+    #[test]
+    fn test_queryset_difference() {
+        let mgr = Manager::<User>::new();
+        let qs1 = mgr.all();
+        let qs2 = mgr.filter(Q::filter("age", Lookup::Lt(Value::from(18))));
+        let combined = qs1.difference(qs2);
+        let (sql, params) = combined.to_sql(pg());
+        assert!(sql.contains("EXCEPT"));
+        assert_eq!(params.len(), 1);
+    }
+
+    #[test]
+    fn test_queryset_union_with_order_by() {
+        let mgr = Manager::<User>::new();
+        let qs1 = mgr.filter(Q::filter("age", Lookup::Lt(Value::from(25))));
+        let qs2 = mgr.filter(Q::filter("age", Lookup::Gt(Value::from(60))));
+        let combined = qs1.union(qs2).order_by(vec![OrderBy::asc("name")]);
+        let (sql, _) = combined.to_sql(pg());
+        let union_pos = sql.find("UNION").unwrap();
+        let order_pos = sql.find("ORDER BY").unwrap();
+        assert!(order_pos > union_pos);
+    }
+
+    #[test]
+    fn test_queryset_union_with_limit() {
+        let mgr = Manager::<User>::new();
+        let qs1 = mgr.all();
+        let qs2 = mgr.all();
+        let combined = qs1.union(qs2).limit(10);
+        let (sql, _) = combined.to_sql(pg());
+        assert!(sql.contains("UNION"));
+        assert!(sql.contains("LIMIT 10"));
+    }
+
+    #[test]
+    fn test_queryset_chained_unions() {
+        let mgr = Manager::<User>::new();
+        let qs1 = mgr.filter(Q::filter("age", Lookup::Lt(Value::from(20))));
+        let qs2 = mgr.filter(Q::filter("age", Lookup::Gt(Value::from(60))));
+        let qs3 = mgr.filter(Q::filter("name", Lookup::Exact(Value::from("Admin"))));
+        let combined = qs1.union(qs2).union(qs3);
+        let (sql, params) = combined.to_sql(pg());
+        assert_eq!(sql.matches("UNION").count(), 2);
+        assert_eq!(params.len(), 3);
+    }
+
+    #[test]
+    fn test_queryset_union_sqlite() {
+        let mgr = Manager::<User>::new();
+        let qs1 = mgr.filter(Q::filter("age", Lookup::Lt(Value::from(25))));
+        let qs2 = mgr.filter(Q::filter("age", Lookup::Gt(Value::from(60))));
+        let combined = qs1.union(qs2);
+        let (sql, _) = combined.to_sql(sqlite());
+        assert!(sql.contains("UNION"));
+        assert!(!sql.contains('$'));
+    }
+
+    // ── select_related queryset tests ────────────────────────────────
+
+    #[test]
+    fn test_queryset_select_related_with() {
+        let mgr = Manager::<User>::new();
+        let qs = mgr.all().select_related_with(vec![
+            crate::query::compiler::SelectRelatedField {
+                field_name: "profile".to_string(),
+                related_table: "auth_profile".to_string(),
+                fk_column: "profile_id".to_string(),
+                related_column: "id".to_string(),
+                alias: "profile".to_string(),
+            },
+        ]);
+        let (sql, _) = qs.to_sql(pg());
+        assert!(sql.contains("LEFT JOIN \"auth_profile\" AS \"profile\""));
+        assert!(sql.contains("\"auth_user\".\"profile_id\" = \"profile\".\"id\""));
+    }
+
+    #[test]
+    fn test_queryset_select_related_with_filter() {
+        let mgr = Manager::<User>::new();
+        let qs = mgr
+            .filter(Q::filter("age", Lookup::Gte(Value::from(18))))
+            .select_related_with(vec![crate::query::compiler::SelectRelatedField {
+                field_name: "department".to_string(),
+                related_table: "org_department".to_string(),
+                fk_column: "department_id".to_string(),
+                related_column: "id".to_string(),
+                alias: "dept".to_string(),
+            }]);
+        let (sql, params) = qs.to_sql(pg());
+        assert!(sql.contains("LEFT JOIN \"org_department\" AS \"dept\""));
+        assert!(sql.contains("WHERE"));
+        assert_eq!(params.len(), 1);
+    }
+
+    #[test]
+    fn test_queryset_select_related_hint_backward_compat() {
+        let mgr = Manager::<User>::new();
+        let qs = mgr.all().select_related(vec!["author", "category"]);
+        // The hint-style select_related stores in group_by but they're filtered out
+        let (sql, _) = qs.to_sql(pg());
+        assert!(!sql.contains("GROUP BY"));
+        assert!(!sql.contains("__select_related__"));
+    }
+
+    // ── prefetch_related queryset tests ──────────────────────────────
+
+    #[test]
+    fn test_queryset_prefetch_related_with() {
+        let mgr = Manager::<User>::new();
+        let qs = mgr.all().prefetch_related_with(vec![
+            crate::query::compiler::PrefetchRelatedField {
+                field_name: "orders".to_string(),
+                related_table: "shop_order".to_string(),
+                source_column: "id".to_string(),
+                related_column: "user_id".to_string(),
+            },
+        ]);
+        // Main query should be normal (no JOIN)
+        let (sql, _) = qs.to_sql(pg());
+        assert!(!sql.contains("JOIN"));
+        assert!(sql.contains("FROM \"auth_user\""));
+        // But the prefetch data is stored in the query
+        assert_eq!(qs.query().prefetch_related.len(), 1);
+    }
+
+    #[test]
+    fn test_queryset_prefetch_related_hint_backward_compat() {
+        let mgr = Manager::<User>::new();
+        let qs = mgr.all().prefetch_related(vec!["comments"]);
+        let (sql, _) = qs.to_sql(pg());
+        assert!(!sql.contains("GROUP BY"));
+        assert!(!sql.contains("__prefetch_related__"));
+    }
+
+    // ── Model inheritance queryset tests ─────────────────────────────
+
+    #[test]
+    fn test_queryset_set_inheritance_proxy() {
+        let mgr = Manager::<User>::new();
+        let qs = mgr.all().set_inheritance(
+            crate::query::compiler::InheritanceType::Proxy {
+                parent_table: "base_user".to_string(),
+            },
+        );
+        let (sql, _) = qs.to_sql(pg());
+        assert!(sql.contains("FROM \"base_user\""));
+        assert!(!sql.contains("FROM \"auth_user\""));
+    }
+
+    #[test]
+    fn test_queryset_set_inheritance_multi_table() {
+        let mgr = Manager::<User>::new();
+        let qs = mgr.all().set_inheritance(
+            crate::query::compiler::InheritanceType::MultiTable {
+                parent_table: "base_person".to_string(),
+                parent_link_column: "person_ptr_id".to_string(),
+                parent_pk_column: "id".to_string(),
+            },
+        );
+        let (sql, _) = qs.to_sql(pg());
+        assert!(sql.contains("FROM \"auth_user\""));
+        assert!(sql.contains("INNER JOIN \"base_person\""));
+        assert!(sql.contains(
+            "\"auth_user\".\"person_ptr_id\" = \"base_person\".\"id\""
+        ));
+    }
+
+    #[test]
+    fn test_queryset_multi_table_with_filter() {
+        let mgr = Manager::<User>::new();
+        let qs = mgr
+            .filter(Q::filter("name", Lookup::Exact(Value::from("Alice"))))
+            .set_inheritance(crate::query::compiler::InheritanceType::MultiTable {
+                parent_table: "base_person".to_string(),
+                parent_link_column: "person_ptr_id".to_string(),
+                parent_pk_column: "id".to_string(),
+            });
+        let (sql, params) = qs.to_sql(pg());
+        assert!(sql.contains("INNER JOIN \"base_person\""));
+        assert!(sql.contains("WHERE \"name\" = $1"));
+        assert_eq!(params.len(), 1);
+    }
+
+    #[test]
+    fn test_queryset_proxy_with_select_related() {
+        let mgr = Manager::<User>::new();
+        let qs = mgr
+            .all()
+            .set_inheritance(crate::query::compiler::InheritanceType::Proxy {
+                parent_table: "base_user".to_string(),
+            })
+            .select_related_with(vec![crate::query::compiler::SelectRelatedField {
+                field_name: "group".to_string(),
+                related_table: "auth_group".to_string(),
+                fk_column: "group_id".to_string(),
+                related_column: "id".to_string(),
+                alias: "grp".to_string(),
+            }]);
+        let (sql, _) = qs.to_sql(pg());
+        assert!(sql.contains("FROM \"base_user\""));
+        assert!(sql.contains("LEFT JOIN \"auth_group\" AS \"grp\""));
+        assert!(sql.contains("\"base_user\".\"group_id\" = \"grp\".\"id\""));
+    }
+
+    // ── PrefetchResult tests ─────────────────────────────────────────
+
+    #[test]
+    fn test_prefetch_result_accessors() {
+        use super::super::compiler::Row;
+        let result = super::PrefetchResult::<User> {
+            models: vec![
+                User { id: 1, name: "Alice".to_string(), age: 30 },
+                User { id: 2, name: "Bob".to_string(), age: 25 },
+            ],
+            prefetch_cache: {
+                let mut m = std::collections::HashMap::new();
+                m.insert(
+                    "orders".to_string(),
+                    vec![Row::new(
+                        vec!["id".to_string(), "user_id".to_string()],
+                        vec![Value::Int(1), Value::Int(1)],
+                    )],
+                );
+                m
+            },
+        };
+        assert_eq!(result.len(), 2);
+        assert!(!result.is_empty());
+        assert!(result.get_prefetched("orders").is_some());
+        assert_eq!(result.get_prefetched("orders").unwrap().len(), 1);
+        assert!(result.get_prefetched("nonexistent").is_none());
+    }
+
+    #[test]
+    fn test_prefetch_result_empty() {
+        let result = super::PrefetchResult::<User> {
+            models: vec![],
+            prefetch_cache: std::collections::HashMap::new(),
+        };
+        assert_eq!(result.len(), 0);
+        assert!(result.is_empty());
     }
 }

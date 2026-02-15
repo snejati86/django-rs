@@ -260,6 +260,7 @@ mod tests {
             FieldDef::new("slug", FieldType::SlugField),
         ],
         constraints: vec![],
+        inheritance_type: django_rs_db::query::compiler::InheritanceType::None,
     });
 
     fn get_test_meta() -> &'static ModelMeta {
