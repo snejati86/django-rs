@@ -1264,3 +1264,180 @@ async fn test_detail_view_with_nested_object() {
     let body = String::from_utf8(response.content_bytes().unwrap()).unwrap();
     assert_eq!(body, "tech");
 }
+
+// ============================================================================
+// Middleware Pipeline Integration Tests
+// ============================================================================
+
+use django_rs_views::middleware::builtin::{
+    AuthenticationMiddleware, CacheMiddleware, LocaleMiddleware, LoginRequiredMiddleware,
+    MessageMiddleware, MessageLevel,
+};
+
+#[tokio::test]
+async fn test_session_auth_pipeline_authenticated_user() {
+    // Test that SessionMiddleware -> AuthenticationMiddleware pipeline
+    // correctly loads user info from session
+    let backend = InMemorySessionBackend::new();
+
+    // Pre-populate a session with auth data
+    let mut session = SessionData::new("auth-session-1".to_string());
+    session.set("_auth_user_id", serde_json::json!("42"));
+    backend.save(&session).await.unwrap();
+
+    let mut pipeline = MiddlewarePipeline::new();
+    pipeline.add(SessionMiddleware::new(backend));
+    pipeline.add(AuthenticationMiddleware);
+
+    let handler: django_rs_views::middleware::ViewHandler = Box::new(|req| {
+        Box::pin(async move {
+            let user_id = req.meta().get("USER_ID").cloned().unwrap_or_default();
+            let authed = req.meta().get("USER_AUTHENTICATED").cloned().unwrap_or_default();
+            HttpResponse::ok(&format!("user={user_id},auth={authed}"))
+        })
+    });
+
+    let request = HttpRequest::builder()
+        .header("cookie", "sessionid=auth-session-1")
+        .build();
+    let response = pipeline.process(request, &handler).await;
+    let body = String::from_utf8(response.content_bytes().unwrap()).unwrap();
+    assert!(body.contains("user=42"));
+    assert!(body.contains("auth=true"));
+}
+
+#[tokio::test]
+async fn test_session_auth_pipeline_anonymous_user() {
+    let backend = InMemorySessionBackend::new();
+
+    let mut pipeline = MiddlewarePipeline::new();
+    pipeline.add(SessionMiddleware::new(backend));
+    pipeline.add(AuthenticationMiddleware);
+
+    let handler: django_rs_views::middleware::ViewHandler = Box::new(|req| {
+        Box::pin(async move {
+            let authed = req.meta().get("USER_AUTHENTICATED").cloned().unwrap_or_default();
+            HttpResponse::ok(&format!("auth={authed}"))
+        })
+    });
+
+    let request = HttpRequest::builder().build();
+    let response = pipeline.process(request, &handler).await;
+    let body = String::from_utf8(response.content_bytes().unwrap()).unwrap();
+    assert!(body.contains("auth=false"));
+}
+
+#[tokio::test]
+async fn test_session_auth_messages_pipeline() {
+    // Full pipeline: Session -> Auth -> Messages
+    let backend = InMemorySessionBackend::new();
+
+    let mut session = SessionData::new("msg-session".to_string());
+    session.set("_auth_user_id", serde_json::json!("7"));
+    backend.save(&session).await.unwrap();
+
+    let mut pipeline = MiddlewarePipeline::new();
+    pipeline.add(SessionMiddleware::new(backend));
+    pipeline.add(AuthenticationMiddleware);
+    pipeline.add(MessageMiddleware);
+
+    let handler: django_rs_views::middleware::ViewHandler = Box::new(|req| {
+        Box::pin(async move {
+            let authed = req.meta().get("USER_AUTHENTICATED").cloned().unwrap_or_default();
+            let has_store = req.meta().contains_key("_messages_store");
+            HttpResponse::ok(&format!("auth={authed},msgs={has_store}"))
+        })
+    });
+
+    let request = HttpRequest::builder()
+        .header("cookie", "sessionid=msg-session")
+        .build();
+    let response = pipeline.process(request, &handler).await;
+    let body = String::from_utf8(response.content_bytes().unwrap()).unwrap();
+    assert!(body.contains("auth=true"));
+    assert!(body.contains("msgs=true"));
+}
+
+#[tokio::test]
+async fn test_login_required_blocks_anonymous() {
+    // Session -> Auth -> LoginRequired
+    let backend = InMemorySessionBackend::new();
+
+    let mut pipeline = MiddlewarePipeline::new();
+    pipeline.add(SessionMiddleware::new(backend));
+    pipeline.add(AuthenticationMiddleware);
+    pipeline.add(LoginRequiredMiddleware::default());
+
+    let handler: django_rs_views::middleware::ViewHandler = Box::new(|_req| {
+        Box::pin(async move { HttpResponse::ok("protected content") })
+    });
+
+    let request = HttpRequest::builder()
+        .path("/dashboard/")
+        .build();
+    let response = pipeline.process(request, &handler).await;
+    assert_eq!(response.status(), http::StatusCode::FOUND);
+    let location = response
+        .headers()
+        .get(http::header::LOCATION)
+        .unwrap()
+        .to_str()
+        .unwrap();
+    assert!(location.contains("/accounts/login/"));
+}
+
+#[tokio::test]
+async fn test_login_required_allows_authenticated() {
+    let backend = InMemorySessionBackend::new();
+
+    let mut session = SessionData::new("authed-session".to_string());
+    session.set("_auth_user_id", serde_json::json!("1"));
+    backend.save(&session).await.unwrap();
+
+    let mut pipeline = MiddlewarePipeline::new();
+    pipeline.add(SessionMiddleware::new(backend));
+    pipeline.add(AuthenticationMiddleware);
+    pipeline.add(LoginRequiredMiddleware::default());
+
+    let handler: django_rs_views::middleware::ViewHandler = Box::new(|_req| {
+        Box::pin(async move { HttpResponse::ok("protected content") })
+    });
+
+    let request = HttpRequest::builder()
+        .path("/dashboard/")
+        .header("cookie", "sessionid=authed-session")
+        .build();
+    let response = pipeline.process(request, &handler).await;
+    assert_eq!(response.status(), http::StatusCode::OK);
+}
+
+#[tokio::test]
+async fn test_locale_middleware_in_pipeline() {
+    let backend = InMemorySessionBackend::new();
+
+    let mut pipeline = MiddlewarePipeline::new();
+    pipeline.add(SessionMiddleware::new(backend));
+    pipeline.add(LocaleMiddleware {
+        default_language: "en".to_string(),
+        supported_languages: vec!["en".to_string(), "fr".to_string()],
+    });
+
+    let handler: django_rs_views::middleware::ViewHandler = Box::new(|req| {
+        Box::pin(async move {
+            let lang = req.meta().get("LANGUAGE_CODE").cloned().unwrap_or_default();
+            HttpResponse::ok(&format!("lang={lang}"))
+        })
+    });
+
+    let request = HttpRequest::builder()
+        .header("accept-language", "fr-FR,fr;q=0.9,en;q=0.8")
+        .build();
+    let response = pipeline.process(request, &handler).await;
+    let body = String::from_utf8(response.content_bytes().unwrap()).unwrap();
+    assert!(body.contains("lang=fr"));
+    // Check Content-Language header was set
+    assert_eq!(
+        response.headers().get("content-language").unwrap().to_str().unwrap(),
+        "fr"
+    );
+}
