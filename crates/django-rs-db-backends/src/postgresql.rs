@@ -266,6 +266,42 @@ impl DatabaseBackend for PostgresBackend {
     }
 }
 
+#[async_trait::async_trait]
+impl django_rs_db::DbExecutor for PostgresBackend {
+    fn backend_type(&self) -> DatabaseBackendType {
+        DatabaseBackendType::PostgreSQL
+    }
+
+    async fn execute_sql(&self, sql: &str, params: &[Value]) -> Result<u64, DjangoError> {
+        self.execute(sql, params).await
+    }
+
+    async fn query(&self, sql: &str, params: &[Value]) -> Result<Vec<Row>, DjangoError> {
+        DatabaseBackend::query(self, sql, params).await
+    }
+
+    async fn query_one(&self, sql: &str, params: &[Value]) -> Result<Row, DjangoError> {
+        DatabaseBackend::query_one(self, sql, params).await
+    }
+
+    async fn insert_returning_id(
+        &self,
+        sql: &str,
+        params: &[Value],
+    ) -> Result<Value, DjangoError> {
+        // PostgreSQL supports RETURNING; append it to the SQL
+        let sql_returning = format!("{sql} RETURNING id");
+        let rows = DatabaseBackend::query(self, &sql_returning, params).await?;
+        if let Some(row) = rows.into_iter().next() {
+            Ok(row.get::<Value>("id")?)
+        } else {
+            Err(DjangoError::DatabaseError(
+                "INSERT RETURNING returned no rows".to_string(),
+            ))
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

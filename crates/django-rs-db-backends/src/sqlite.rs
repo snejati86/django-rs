@@ -243,6 +243,49 @@ impl DatabaseBackend for SqliteBackend {
     }
 }
 
+#[async_trait::async_trait]
+impl django_rs_db::DbExecutor for SqliteBackend {
+    fn backend_type(&self) -> DatabaseBackendType {
+        DatabaseBackendType::SQLite
+    }
+
+    async fn execute_sql(&self, sql: &str, params: &[Value]) -> Result<u64, DjangoError> {
+        self.execute(sql, params).await
+    }
+
+    async fn query(&self, sql: &str, params: &[Value]) -> Result<Vec<Row>, DjangoError> {
+        DatabaseBackend::query(self, sql, params).await
+    }
+
+    async fn query_one(&self, sql: &str, params: &[Value]) -> Result<Row, DjangoError> {
+        DatabaseBackend::query_one(self, sql, params).await
+    }
+
+    async fn insert_returning_id(
+        &self,
+        sql: &str,
+        params: &[Value],
+    ) -> Result<Value, DjangoError> {
+        let conn = self.conn.clone();
+        let sql = sql.to_string();
+        let params = params.to_vec();
+
+        tokio::task::spawn_blocking(move || {
+            let conn = conn.blocking_lock();
+            let mut stmt = conn
+                .prepare(&sql)
+                .map_err(|e| DjangoError::DatabaseError(format!("{e}")))?;
+            Self::bind_params(&mut stmt, &params)?;
+            stmt.raw_execute()
+                .map_err(|e| DjangoError::DatabaseError(format!("{e}")))?;
+            let id = conn.last_insert_rowid();
+            Ok(Value::Int(id))
+        })
+        .await
+        .map_err(|e| DjangoError::DatabaseError(format!("Task join error: {e}")))?
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

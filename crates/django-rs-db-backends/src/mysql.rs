@@ -195,6 +195,47 @@ impl DatabaseBackend for MySqlBackend {
     }
 }
 
+#[async_trait::async_trait]
+impl django_rs_db::DbExecutor for MySqlBackend {
+    fn backend_type(&self) -> DatabaseBackendType {
+        DatabaseBackendType::MySQL
+    }
+
+    async fn execute_sql(&self, sql: &str, params: &[Value]) -> Result<u64, DjangoError> {
+        self.execute(sql, params).await
+    }
+
+    async fn query(&self, sql: &str, params: &[Value]) -> Result<Vec<Row>, DjangoError> {
+        DatabaseBackend::query(self, sql, params).await
+    }
+
+    async fn query_one(&self, sql: &str, params: &[Value]) -> Result<Row, DjangoError> {
+        DatabaseBackend::query_one(self, sql, params).await
+    }
+
+    async fn insert_returning_id(
+        &self,
+        sql: &str,
+        params: &[Value],
+    ) -> Result<Value, DjangoError> {
+        use mysql_async::prelude::Queryable;
+
+        let mut conn = self
+            .pool
+            .get_conn()
+            .await
+            .map_err(|e| DjangoError::OperationalError(format!("MySQL connection error: {e}")))?;
+
+        let mysql_params = Self::values_to_params(params);
+        conn.exec_drop(sql, mysql_params)
+            .await
+            .map_err(|e| DjangoError::DatabaseError(format!("{e}")))?;
+
+        let last_id = conn.last_insert_id().unwrap_or(0);
+        Ok(Value::Int(last_id as i64))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

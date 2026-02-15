@@ -60,6 +60,9 @@ pub use crate::query::compiler::Row;
 ///     fn app_label() -> &'static str { "blog" }
 ///
 ///     fn pk(&self) -> Option<&Value> { None }
+///     fn set_pk(&mut self, value: Value) {
+///         if let Value::Int(id) = value { self.id = id; }
+///     }
 ///     fn field_values(&self) -> Vec<(&'static str, Value)> {
 ///         vec![("id", Value::Int(self.id)), ("title", Value::String(self.title.clone()))]
 ///     }
@@ -84,8 +87,26 @@ pub trait Model: Send + Sync + 'static {
     /// Returns a reference to the primary key value, or `None` if unsaved.
     fn pk(&self) -> Option<&Value>;
 
+    /// Sets the primary key value on this instance (used after INSERT).
+    fn set_pk(&mut self, value: Value);
+
+    /// Returns the name of the primary key field (e.g., "id").
+    fn pk_field_name() -> &'static str {
+        "id"
+    }
+
     /// Returns all field name-value pairs for this instance.
     fn field_values(&self) -> Vec<(&'static str, Value)>;
+
+    /// Returns field name-value pairs excluding the primary key.
+    /// Used for INSERT operations where the PK is auto-generated.
+    fn non_pk_field_values(&self) -> Vec<(&'static str, Value)> {
+        let pk_name = Self::pk_field_name();
+        self.field_values()
+            .into_iter()
+            .filter(|(name, _)| *name != pk_name)
+            .collect()
+    }
 
     /// Constructs a model instance from a database row.
     fn from_row(row: &Row) -> Result<Self, DjangoError>
@@ -172,7 +193,17 @@ mod tests {
         }
 
         fn pk(&self) -> Option<&Value> {
-            None
+            if self.id == 0 {
+                None
+            } else {
+                Some(&Value::Int(0)) // placeholder; real impl would store Value
+            }
+        }
+
+        fn set_pk(&mut self, value: Value) {
+            if let Value::Int(id) = value {
+                self.id = id;
+            }
         }
 
         fn field_values(&self) -> Vec<(&'static str, Value)> {

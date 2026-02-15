@@ -183,10 +183,63 @@ pub fn derive_model_impl(input: DeriveInput) -> TokenStream {
         })
         .collect();
 
-    // Generate pk() method
-    let pk_token = quote! {
-        fn pk(&self) -> Option<&django_rs_db::value::Value> {
-            None
+    // Find the primary key field
+    let pk_field = fields.iter().find(|f| f.primary_key || f.auto);
+
+    // Generate pk(), set_pk(), and pk_field_name() methods
+    let pk_token = if let Some(pk_f) = pk_field {
+        let pk_ident = pk_f.ident.as_ref().unwrap();
+        let inner_ty = unwrap_option_type(&pk_f.ty);
+        let is_pk_option = inner_ty.is_some();
+        let pk_name = pk_ident.to_string();
+
+        if is_pk_option {
+            // Option<T> pk: Some if the field is Some
+            quote! {
+                fn pk(&self) -> Option<&django_rs_db::value::Value> {
+                    // For Option-typed PKs, we can't return a reference to a temporary.
+                    // Use None to indicate unsaved.
+                    None
+                }
+
+                fn set_pk(&mut self, value: django_rs_db::value::Value) {
+                    if let django_rs_db::value::Value::Int(id) = value {
+                        self.#pk_ident = Some(id);
+                    }
+                }
+
+                fn pk_field_name() -> &'static str {
+                    #pk_name
+                }
+            }
+        } else {
+            // Non-Option pk: treat 0 as unsaved
+            quote! {
+                fn pk(&self) -> Option<&django_rs_db::value::Value> {
+                    None // Cannot return reference to temporary Value
+                }
+
+                fn set_pk(&mut self, value: django_rs_db::value::Value) {
+                    if let django_rs_db::value::Value::Int(id) = value {
+                        self.#pk_ident = id;
+                    }
+                }
+
+                fn pk_field_name() -> &'static str {
+                    #pk_name
+                }
+            }
+        }
+    } else {
+        // No pk field annotated, use default
+        quote! {
+            fn pk(&self) -> Option<&django_rs_db::value::Value> {
+                None
+            }
+
+            fn set_pk(&mut self, _value: django_rs_db::value::Value) {
+                // No primary key field annotated
+            }
         }
     };
 

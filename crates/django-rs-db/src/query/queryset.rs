@@ -19,8 +19,10 @@ use super::compiler::{
 };
 use super::expressions::Expression;
 use super::lookups::Q;
+use crate::executor::DbExecutor;
 use crate::model::Model;
 use crate::value::Value;
+use django_rs_core::{DjangoError, DjangoResult};
 use std::marker::PhantomData;
 
 /// The entry point for model-level query operations.
@@ -409,6 +411,152 @@ impl<M: Model> QuerySet<M> {
         agg_query.offset = None;
         SqlCompiler::new(backend).compile_select(&agg_query)
     }
+
+    // ── Async execution methods ───────────────────────────────────────
+
+    /// Executes the query and returns all matching model instances.
+    ///
+    /// Compiles the query to SQL using the backend's dialect, sends it,
+    /// and maps the returned rows to model instances via `M::from_row()`.
+    pub async fn execute_query(&self, db: &dyn DbExecutor) -> DjangoResult<Vec<M>> {
+        if self.is_none {
+            return Ok(Vec::new());
+        }
+
+        let (sql, params) = self.to_sql(db.backend_type());
+        let rows = db.query(&sql, &params).await?;
+        rows.iter().map(M::from_row).collect()
+    }
+
+    /// Returns the count of matching records.
+    ///
+    /// Runs a `SELECT COUNT(*)` query.
+    pub async fn count_exec(&self, db: &dyn DbExecutor) -> DjangoResult<i64> {
+        if self.is_none {
+            return Ok(0);
+        }
+
+        let (sql, params) = self.count_sql(db.backend_type());
+        let rows = db.query(&sql, &params).await?;
+        if let Some(row) = rows.into_iter().next() {
+            row.get_by_index::<i64>(0)
+        } else {
+            Ok(0)
+        }
+    }
+
+    /// Returns whether any records match the query.
+    pub async fn exists_exec(&self, db: &dyn DbExecutor) -> DjangoResult<bool> {
+        if self.is_none {
+            return Ok(false);
+        }
+
+        let mut first_query = self.query.clone();
+        first_query.select = vec![SelectColumn::Expression(
+            Expression::value(1),
+            "__exists__".to_string(),
+        )];
+        first_query.order_by.clear();
+        first_query.limit = Some(1);
+
+        let (sql, params) = SqlCompiler::new(db.backend_type()).compile_select(&first_query);
+        let rows = db.query(&sql, &params).await?;
+        Ok(!rows.is_empty())
+    }
+
+    /// Returns the first matching record, or `None` if no records match.
+    pub async fn first_exec(&self, db: &dyn DbExecutor) -> DjangoResult<Option<M>> {
+        if self.is_none {
+            return Ok(None);
+        }
+
+        let (sql, params) = self.first_sql(db.backend_type());
+        let rows = db.query(&sql, &params).await?;
+        match rows.into_iter().next() {
+            Some(row) => Ok(Some(M::from_row(&row)?)),
+            None => Ok(None),
+        }
+    }
+
+    /// Returns a single matching record.
+    ///
+    /// Returns `DoesNotExist` if no records match, or
+    /// `MultipleObjectsReturned` if more than one record matches.
+    pub async fn get_exec(&self, db: &dyn DbExecutor) -> DjangoResult<M> {
+        if self.is_none {
+            return Err(DjangoError::DoesNotExist(format!(
+                "{} matching query does not exist.",
+                M::table_name()
+            )));
+        }
+
+        let (sql, params) = self.get_sql(db.backend_type());
+        let rows = db.query(&sql, &params).await?;
+        match rows.len() {
+            0 => Err(DjangoError::DoesNotExist(format!(
+                "{} matching query does not exist.",
+                M::table_name()
+            ))),
+            1 => M::from_row(&rows[0]),
+            _ => Err(DjangoError::MultipleObjectsReturned(format!(
+                "get() returned more than one {} -- it returned {}!",
+                M::table_name(),
+                rows.len()
+            ))),
+        }
+    }
+
+    /// Runs an UPDATE and returns the number of rows affected.
+    ///
+    /// The queryset must have been prepared with `.update(fields)`.
+    pub async fn update_exec(&self, db: &dyn DbExecutor) -> DjangoResult<u64> {
+        if self.is_none {
+            return Ok(0);
+        }
+
+        if self.pending_update.is_none() {
+            return Err(DjangoError::DatabaseError(
+                "No pending update fields. Call .update(fields) before .update_exec()".to_string(),
+            ));
+        }
+
+        let (sql, params) = self.to_sql(db.backend_type());
+        db.execute_sql(&sql, &params).await
+    }
+
+    /// Runs a DELETE and returns the number of rows affected.
+    ///
+    /// The queryset must have been prepared with `.delete()`.
+    pub async fn delete_exec(&self, db: &dyn DbExecutor) -> DjangoResult<u64> {
+        if self.is_none {
+            return Ok(0);
+        }
+
+        if !self.pending_delete {
+            return Err(DjangoError::DatabaseError(
+                "QuerySet is not marked for deletion. Call .delete() before .delete_exec()"
+                    .to_string(),
+            ));
+        }
+
+        let (sql, params) = self.to_sql(db.backend_type());
+        db.execute_sql(&sql, &params).await
+    }
+
+    /// Runs a CREATE (INSERT) and returns the inserted row ID.
+    ///
+    /// The queryset must have been prepared via `Manager::create(fields)`.
+    pub async fn create_exec(&self, db: &dyn DbExecutor) -> DjangoResult<Value> {
+        if self.pending_create.is_none() {
+            return Err(DjangoError::DatabaseError(
+                "No pending create fields. Call Manager::create(fields) before .create_exec()"
+                    .to_string(),
+            ));
+        }
+
+        let (sql, params) = self.to_sql(db.backend_type());
+        db.insert_returning_id(&sql, &params).await
+    }
 }
 
 #[cfg(test)]
@@ -455,7 +603,16 @@ mod tests {
             "auth"
         }
         fn pk(&self) -> Option<&Value> {
-            None
+            if self.id == 0 {
+                None
+            } else {
+                Some(&Value::Int(0)) // placeholder
+            }
+        }
+        fn set_pk(&mut self, value: Value) {
+            if let Value::Int(id) = value {
+                self.id = id;
+            }
         }
         fn field_values(&self) -> Vec<(&'static str, Value)> {
             vec![

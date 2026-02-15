@@ -50,6 +50,7 @@ pub mod postgresql;
 pub mod sqlite;
 
 pub use base::{DatabaseBackend, DatabaseConfig, Transaction};
+pub use django_rs_db::DbExecutor;
 pub use mysql::MySqlBackend;
 pub use postgresql::PostgresBackend;
 pub use sqlite::SqliteBackend;
