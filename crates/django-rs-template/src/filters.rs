@@ -128,6 +128,15 @@ fn register_all(r: &mut FilterRegistry) {
 
     // Additional useful filters
     r.register(Box::new(LengthIsFilter));
+
+    // Missing Django filters (Wave 10A)
+    r.register(Box::new(IriencodeFilter));
+    r.register(Box::new(JsonScriptFilter));
+    r.register(Box::new(LinenumbersFilter));
+    r.register(Box::new(Phone2numericFilter));
+    r.register(Box::new(StringformatFilter));
+    r.register(Box::new(TruncatecharsHtmlFilter));
+    r.register(Box::new(TruncatewordsHtmlFilter));
 }
 
 // ============================================================
@@ -871,6 +880,447 @@ impl Filter for PluralizeFilter {
     }
 }
 
+// ============================================================
+// Missing Django filters (Wave 10A)
+// ============================================================
+
+struct IriencodeFilter;
+impl Filter for IriencodeFilter {
+    fn name(&self) -> &'static str { "iriencode" }
+    fn apply(&self, value: &ContextValue, _args: &[ContextValue]) -> Result<ContextValue, DjangoError> {
+        let s = value.to_display_string();
+        let encoded = percent_encoding::utf8_percent_encode(
+            &s,
+            percent_encoding::NON_ALPHANUMERIC,
+        ).to_string();
+        Ok(ContextValue::SafeString(encoded))
+    }
+}
+
+struct JsonScriptFilter;
+impl Filter for JsonScriptFilter {
+    fn name(&self) -> &'static str { "json_script" }
+    fn apply(&self, value: &ContextValue, args: &[ContextValue]) -> Result<ContextValue, DjangoError> {
+        let element_id = args.first().map(|a| a.to_display_string()).unwrap_or_default();
+
+        // Convert ContextValue to a JSON representation
+        let json_str = context_value_to_json_string(value);
+
+        // Escape the JSON string for safe embedding in HTML <script> tags.
+        // Django escapes: < > & to prevent XSS through embedded JSON.
+        let safe_json = json_str
+            .replace('&', "\\u0026")
+            .replace('<', "\\u003C")
+            .replace('>', "\\u003E");
+
+        let result = if element_id.is_empty() {
+            format!(r#"<script type="application/json">{safe_json}</script>"#)
+        } else {
+            format!(
+                r#"<script id="{}" type="application/json">{}</script>"#,
+                escape_html(&element_id),
+                safe_json
+            )
+        };
+
+        Ok(ContextValue::SafeString(result))
+    }
+}
+
+struct LinenumbersFilter;
+impl Filter for LinenumbersFilter {
+    fn name(&self) -> &'static str { "linenumbers" }
+    fn apply(&self, value: &ContextValue, _args: &[ContextValue]) -> Result<ContextValue, DjangoError> {
+        let s = value.to_display_string();
+        let lines: Vec<&str> = s.split('\n').collect();
+        let width = lines.len().to_string().len();
+        let result: Vec<String> = lines
+            .iter()
+            .enumerate()
+            .map(|(i, line)| format!("{:>width$}. {line}", i + 1, width = width))
+            .collect();
+        Ok(ContextValue::String(result.join("\n")))
+    }
+}
+
+struct Phone2numericFilter;
+impl Filter for Phone2numericFilter {
+    fn name(&self) -> &'static str { "phone2numeric" }
+    fn apply(&self, value: &ContextValue, _args: &[ContextValue]) -> Result<ContextValue, DjangoError> {
+        let s = value.to_display_string();
+        let result: String = s.chars().map(|c| {
+            match c.to_ascii_uppercase() {
+                'A' | 'B' | 'C' => '2',
+                'D' | 'E' | 'F' => '3',
+                'G' | 'H' | 'I' => '4',
+                'J' | 'K' | 'L' => '5',
+                'M' | 'N' | 'O' => '6',
+                'P' | 'Q' | 'R' | 'S' => '7',
+                'T' | 'U' | 'V' => '8',
+                'W' | 'X' | 'Y' | 'Z' => '9',
+                other => other,
+            }
+        }).collect();
+        Ok(ContextValue::String(result))
+    }
+}
+
+struct StringformatFilter;
+impl Filter for StringformatFilter {
+    fn name(&self) -> &'static str { "stringformat" }
+    fn apply(&self, value: &ContextValue, args: &[ContextValue]) -> Result<ContextValue, DjangoError> {
+        let fmt_str = args.first().map(|a| a.to_display_string()).unwrap_or_default();
+
+        // Django's stringformat uses Python's % formatting, e.g. stringformat:"02d" means "%02d".
+        // We support a subset of common format specifiers.
+        //
+        // Check the actual ContextValue type first to distinguish Integer from Float,
+        // since as_integer() also succeeds for Float values.
+        let result = match value {
+            ContextValue::Integer(int_val) => {
+                let int_val = *int_val;
+                if fmt_str.ends_with('d') || fmt_str.ends_with('i') {
+                    python_format_int(&fmt_str, int_val)
+                } else if fmt_str.ends_with('f') || fmt_str.ends_with('F') {
+                    python_format_float(&fmt_str, int_val as f64)
+                } else if fmt_str.ends_with('s') {
+                    python_format_string(&fmt_str, &int_val.to_string())
+                } else if fmt_str.ends_with('x') {
+                    format!("{int_val:x}")
+                } else if fmt_str.ends_with('X') {
+                    format!("{int_val:X}")
+                } else if fmt_str.ends_with('o') {
+                    format!("{int_val:o}")
+                } else if fmt_str.ends_with('e') || fmt_str.ends_with('E') {
+                    format!("{:e}", int_val as f64)
+                } else {
+                    value.to_display_string()
+                }
+            }
+            ContextValue::Float(float_val) => {
+                let float_val = *float_val;
+                if fmt_str.ends_with('f') || fmt_str.ends_with('F') {
+                    python_format_float(&fmt_str, float_val)
+                } else if fmt_str.ends_with('d') || fmt_str.ends_with('i') {
+                    python_format_int(&fmt_str, float_val as i64)
+                } else if fmt_str.ends_with('e') || fmt_str.ends_with('E') {
+                    format!("{float_val:e}")
+                } else if fmt_str.ends_with('s') {
+                    python_format_string(&fmt_str, &float_val.to_string())
+                } else {
+                    value.to_display_string()
+                }
+            }
+            _ => {
+                // String (or other) formatting
+                let s = value.to_display_string();
+                if fmt_str.ends_with('s') {
+                    python_format_string(&fmt_str, &s)
+                } else if let Ok(int_val) = s.parse::<i64>() {
+                    if fmt_str.ends_with('d') || fmt_str.ends_with('i') {
+                        python_format_int(&fmt_str, int_val)
+                    } else {
+                        s
+                    }
+                } else {
+                    s
+                }
+            }
+        };
+
+        Ok(ContextValue::String(result))
+    }
+}
+
+/// Formats an integer using a Python-like format spec ending in 'd' or 'i'.
+fn python_format_int(fmt: &str, val: i64) -> String {
+    // Strip the trailing format character
+    let spec = &fmt[..fmt.len() - 1];
+
+    if spec.is_empty() {
+        return val.to_string();
+    }
+
+    // Check for zero-padding and width
+    if let Some(stripped) = spec.strip_prefix('0') {
+        let width: usize = stripped.parse().unwrap_or(0);
+        if val < 0 {
+            let w = width.saturating_sub(1);
+            format!("-{:0>w$}", -val)
+        } else {
+            format!("{val:0>width$}")
+        }
+    } else {
+        let width: usize = spec.parse().unwrap_or(0);
+        format!("{val:>width$}")
+    }
+}
+
+/// Formats a float using a Python-like format spec ending in 'f'.
+fn python_format_float(fmt: &str, val: f64) -> String {
+    // The full format string is something like ".2f" or "10.2f" or "f".
+    // We strip the trailing 'f'/'F'.
+    let spec = fmt.trim_end_matches(['f', 'F']);
+
+    if spec.is_empty() {
+        return format!("{val:.6}");
+    }
+
+    // Look for .N precision
+    if let Some(dot_pos) = spec.find('.') {
+        let prec: usize = spec[dot_pos + 1..].parse().unwrap_or(6);
+        let width_str = &spec[..dot_pos];
+        let width: usize = width_str.parse().unwrap_or(0);
+        if width > 0 {
+            format!("{val:>width$.prec$}")
+        } else {
+            format!("{val:.prec$}")
+        }
+    } else {
+        let width: usize = spec.parse().unwrap_or(0);
+        if width > 0 {
+            format!("{val:>width$.6}")
+        } else {
+            format!("{val:.6}")
+        }
+    }
+}
+
+/// Formats a string using a Python-like format spec ending in 's'.
+fn python_format_string(fmt: &str, val: &str) -> String {
+    let spec = &fmt[..fmt.len() - 1];
+
+    if spec.is_empty() {
+        return val.to_string();
+    }
+
+    let width: usize = spec.parse().unwrap_or(0);
+    if width > val.len() {
+        format!("{val:>width$}")
+    } else {
+        val.to_string()
+    }
+}
+
+struct TruncatecharsHtmlFilter;
+impl Filter for TruncatecharsHtmlFilter {
+    fn name(&self) -> &'static str { "truncatechars_html" }
+    fn apply(&self, value: &ContextValue, args: &[ContextValue]) -> Result<ContextValue, DjangoError> {
+        let s = value.to_display_string();
+        let max_len = args.first().and_then(|a| a.as_integer()).unwrap_or(0) as usize;
+
+        if max_len == 0 {
+            return Ok(ContextValue::SafeString(s));
+        }
+
+        let result = truncate_html_chars(&s, max_len);
+        Ok(ContextValue::SafeString(result))
+    }
+}
+
+struct TruncatewordsHtmlFilter;
+impl Filter for TruncatewordsHtmlFilter {
+    fn name(&self) -> &'static str { "truncatewords_html" }
+    fn apply(&self, value: &ContextValue, args: &[ContextValue]) -> Result<ContextValue, DjangoError> {
+        let s = value.to_display_string();
+        let max_words = args.first().and_then(|a| a.as_integer()).unwrap_or(0) as usize;
+
+        if max_words == 0 {
+            return Ok(ContextValue::SafeString(s));
+        }
+
+        let result = truncate_html_words(&s, max_words);
+        Ok(ContextValue::SafeString(result))
+    }
+}
+
+/// Converts a ContextValue to a JSON string representation.
+fn context_value_to_json_string(value: &ContextValue) -> String {
+    match value {
+        ContextValue::String(s) | ContextValue::SafeString(s) => {
+            serde_json::to_string(s).unwrap_or_else(|_| format!("\"{s}\""))
+        }
+        ContextValue::Integer(i) => i.to_string(),
+        ContextValue::Float(f) => {
+            if f.fract() == 0.0 {
+                format!("{f:.1}")
+            } else {
+                f.to_string()
+            }
+        }
+        ContextValue::Bool(b) => {
+            if *b { "true".to_string() } else { "false".to_string() }
+        }
+        ContextValue::None => "null".to_string(),
+        ContextValue::List(items) => {
+            let inner: Vec<String> = items.iter().map(context_value_to_json_string).collect();
+            format!("[{}]", inner.join(", "))
+        }
+        ContextValue::Dict(map) => {
+            let inner: Vec<String> = map
+                .iter()
+                .map(|(k, v)| format!("{}: {}", serde_json::to_string(k).unwrap_or_default(), context_value_to_json_string(v)))
+                .collect();
+            format!("{{{}}}", inner.join(", "))
+        }
+    }
+}
+
+/// Truncates HTML content to a maximum number of visible characters,
+/// preserving and properly closing any open HTML tags.
+fn truncate_html_chars(html: &str, max_chars: usize) -> String {
+    let mut result = String::new();
+    let mut visible_count = 0;
+    let mut open_tags: Vec<String> = Vec::new();
+    let mut chars = html.chars().peekable();
+    let ellipsis = " ...";
+
+    while let Some(c) = chars.next() {
+        if visible_count >= max_chars {
+            break;
+        }
+
+        if c == '<' {
+            // Read the entire tag
+            let mut tag = String::from('<');
+            for tc in chars.by_ref() {
+                tag.push(tc);
+                if tc == '>' {
+                    break;
+                }
+            }
+
+            // Determine if it's opening, closing, or self-closing
+            let tag_inner = tag.trim_start_matches('<').trim_end_matches('>').trim();
+            if tag_inner.starts_with('/') {
+                // Closing tag
+                let tag_name = tag_inner.trim_start_matches('/').split_whitespace().next().unwrap_or("");
+                if let Some(pos) = open_tags.iter().rposition(|t| t == tag_name) {
+                    open_tags.remove(pos);
+                }
+                result.push_str(&tag);
+            } else if tag_inner.ends_with('/') || is_void_element(tag_inner.split_whitespace().next().unwrap_or("")) {
+                // Self-closing or void element
+                result.push_str(&tag);
+            } else {
+                // Opening tag
+                let tag_name = tag_inner.split_whitespace().next().unwrap_or("").to_string();
+                if !tag_name.is_empty() {
+                    open_tags.push(tag_name);
+                }
+                result.push_str(&tag);
+            }
+        } else {
+            result.push(c);
+            visible_count += 1;
+        }
+    }
+
+    if visible_count >= max_chars && chars.peek().is_some() {
+        result.push_str(ellipsis);
+    }
+
+    // Close any open tags in reverse order
+    for tag in open_tags.iter().rev() {
+        result.push_str(&format!("</{tag}>"));
+    }
+
+    result
+}
+
+/// Truncates HTML content to a maximum number of words,
+/// preserving and properly closing any open HTML tags.
+fn truncate_html_words(html: &str, max_words: usize) -> String {
+    let mut result = String::new();
+    let mut word_count = 0;
+    let mut open_tags: Vec<String> = Vec::new();
+    let mut chars = html.chars().peekable();
+    let mut in_word = false;
+    let ellipsis = " ...";
+    let mut truncated = false;
+
+    while let Some(c) = chars.next() {
+        if c == '<' {
+            // Read the entire tag
+            let mut tag = String::from('<');
+            for tc in chars.by_ref() {
+                tag.push(tc);
+                if tc == '>' {
+                    break;
+                }
+            }
+
+            let tag_inner = tag.trim_start_matches('<').trim_end_matches('>').trim();
+            if tag_inner.starts_with('/') {
+                let tag_name = tag_inner.trim_start_matches('/').split_whitespace().next().unwrap_or("");
+                if let Some(pos) = open_tags.iter().rposition(|t| t == tag_name) {
+                    open_tags.remove(pos);
+                }
+                result.push_str(&tag);
+            } else if tag_inner.ends_with('/') || is_void_element(tag_inner.split_whitespace().next().unwrap_or("")) {
+                result.push_str(&tag);
+            } else {
+                let tag_name = tag_inner.split_whitespace().next().unwrap_or("").to_string();
+                if !tag_name.is_empty() {
+                    open_tags.push(tag_name);
+                }
+                result.push_str(&tag);
+            }
+            in_word = false;
+        } else if c.is_whitespace() {
+            if in_word {
+                in_word = false;
+            }
+            // Only add whitespace if we haven't hit the limit
+            if word_count < max_words {
+                result.push(c);
+            }
+        } else {
+            if !in_word {
+                word_count += 1;
+                in_word = true;
+                if word_count > max_words {
+                    // We've started a new word past the limit; stop
+                    truncated = true;
+                    break;
+                }
+            }
+            result.push(c);
+        }
+    }
+
+    // Check if there's more content we didn't consume
+    if !truncated && chars.peek().is_none() {
+        // We consumed everything; no truncation needed, but close open tags
+        let trimmed = result.trim_end().to_string();
+        let mut final_result = trimmed;
+        for tag in open_tags.iter().rev() {
+            final_result.push_str(&format!("</{tag}>"));
+        }
+        return final_result;
+    }
+
+    // Trim trailing whitespace before adding ellipsis
+    let trimmed = result.trim_end().to_string();
+    let mut final_result = trimmed;
+    final_result.push_str(ellipsis);
+
+    // Close any open tags
+    for tag in open_tags.iter().rev() {
+        final_result.push_str(&format!("</{tag}>"));
+    }
+    final_result
+}
+
+/// Returns true if the given tag name is an HTML void element (self-closing).
+fn is_void_element(tag: &str) -> bool {
+    matches!(
+        tag.to_lowercase().as_str(),
+        "area" | "base" | "br" | "col" | "embed" | "hr" | "img" | "input"
+            | "link" | "meta" | "param" | "source" | "track" | "wbr"
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1275,5 +1725,253 @@ mod tests {
     fn test_last_string() {
         let result = apply_filter("last", ContextValue::from("hello"), vec![]);
         assert_eq!(result.to_display_string(), "o");
+    }
+
+    // ── Wave 10A: New filters ───────────────────────────────────────
+
+    #[test]
+    fn test_iriencode() {
+        let result = apply_filter("iriencode", ContextValue::from("hello world"), vec![]);
+        assert_eq!(result.to_display_string(), "hello%20world");
+    }
+
+    #[test]
+    fn test_iriencode_special_chars() {
+        let result = apply_filter("iriencode", ContextValue::from("foo/bar?baz=1&x=2"), vec![]);
+        // All non-alphanumeric should be percent-encoded
+        assert!(result.to_display_string().contains("%2F"));
+        assert!(result.to_display_string().contains("%3F"));
+    }
+
+    #[test]
+    fn test_iriencode_unicode() {
+        let result = apply_filter("iriencode", ContextValue::from("caf\u{00e9}"), vec![]);
+        assert!(result.to_display_string().contains("%C3%A9")); // UTF-8 encoding of e-acute
+    }
+
+    #[test]
+    fn test_json_script_basic() {
+        let result = apply_filter(
+            "json_script",
+            ContextValue::from("hello"),
+            vec![ContextValue::from("my-data")],
+        );
+        let s = result.to_display_string();
+        assert!(s.contains(r#"<script id="my-data" type="application/json">"#));
+        assert!(s.contains("</script>"));
+        assert!(s.contains("\"hello\""));
+    }
+
+    #[test]
+    fn test_json_script_no_id() {
+        let result = apply_filter("json_script", ContextValue::Integer(42), vec![]);
+        let s = result.to_display_string();
+        assert!(s.contains(r#"<script type="application/json">42</script>"#));
+    }
+
+    #[test]
+    fn test_json_script_dict() {
+        let mut map = std::collections::HashMap::new();
+        map.insert("key".to_string(), ContextValue::from("value"));
+        let result = apply_filter("json_script", ContextValue::Dict(map), vec![ContextValue::from("data")]);
+        let s = result.to_display_string();
+        assert!(s.contains(r#""key""#));
+        assert!(s.contains(r#""value""#));
+    }
+
+    #[test]
+    fn test_json_script_xss_safe() {
+        let result = apply_filter(
+            "json_script",
+            ContextValue::from("<script>alert('xss')</script>"),
+            vec![ContextValue::from("data")],
+        );
+        let s = result.to_display_string();
+        // The inner content should have < and > escaped
+        assert!(!s.contains("<script>alert"));
+        assert!(s.contains("\\u003C"));
+    }
+
+    #[test]
+    fn test_linenumbers() {
+        let result = apply_filter("linenumbers", ContextValue::from("one\ntwo\nthree"), vec![]);
+        let s = result.to_display_string();
+        assert!(s.contains("1. one"));
+        assert!(s.contains("2. two"));
+        assert!(s.contains("3. three"));
+    }
+
+    #[test]
+    fn test_linenumbers_single_line() {
+        let result = apply_filter("linenumbers", ContextValue::from("only"), vec![]);
+        assert_eq!(result.to_display_string(), "1. only");
+    }
+
+    #[test]
+    fn test_linenumbers_padding() {
+        // 10+ lines should pad to 2 digits
+        let input = (1..=12).map(|i| format!("line{i}")).collect::<Vec<_>>().join("\n");
+        let result = apply_filter("linenumbers", ContextValue::from(input.as_str()), vec![]);
+        let s = result.to_display_string();
+        assert!(s.contains(" 1. line1"));
+        assert!(s.contains("12. line12"));
+    }
+
+    #[test]
+    fn test_phone2numeric() {
+        let result = apply_filter("phone2numeric", ContextValue::from("800-COLLECT"), vec![]);
+        assert_eq!(result.to_display_string(), "800-2655328");
+    }
+
+    #[test]
+    fn test_phone2numeric_lowercase() {
+        let result = apply_filter("phone2numeric", ContextValue::from("abc"), vec![]);
+        assert_eq!(result.to_display_string(), "222");
+    }
+
+    #[test]
+    fn test_phone2numeric_digits_preserved() {
+        let result = apply_filter("phone2numeric", ContextValue::from("123-456"), vec![]);
+        assert_eq!(result.to_display_string(), "123-456");
+    }
+
+    #[test]
+    fn test_stringformat_int() {
+        let result = apply_filter("stringformat", ContextValue::Integer(42), vec![ContextValue::from("03d")]);
+        assert_eq!(result.to_display_string(), "042");
+    }
+
+    #[test]
+    fn test_stringformat_float() {
+        let result = apply_filter("stringformat", ContextValue::Float(3.14159), vec![ContextValue::from(".2f")]);
+        assert_eq!(result.to_display_string(), "3.14");
+    }
+
+    #[test]
+    fn test_stringformat_string() {
+        let result = apply_filter("stringformat", ContextValue::from("hi"), vec![ContextValue::from("10s")]);
+        assert_eq!(result.to_display_string(), "        hi");
+    }
+
+    #[test]
+    fn test_stringformat_hex() {
+        let result = apply_filter("stringformat", ContextValue::Integer(255), vec![ContextValue::from("x")]);
+        assert_eq!(result.to_display_string(), "ff");
+    }
+
+    #[test]
+    fn test_stringformat_octal() {
+        let result = apply_filter("stringformat", ContextValue::Integer(8), vec![ContextValue::from("o")]);
+        assert_eq!(result.to_display_string(), "10");
+    }
+
+    #[test]
+    fn test_truncatechars_html_no_tags() {
+        let result = apply_filter(
+            "truncatechars_html",
+            ContextValue::from("Hello World"),
+            vec![ContextValue::Integer(5)],
+        );
+        assert_eq!(result.to_display_string(), "Hello ...");
+    }
+
+    #[test]
+    fn test_truncatechars_html_with_tags() {
+        let result = apply_filter(
+            "truncatechars_html",
+            ContextValue::from("<p>Hello World</p>"),
+            vec![ContextValue::Integer(5)],
+        );
+        let s = result.to_display_string();
+        assert!(s.contains("Hello"));
+        assert!(s.contains("</p>"));
+        assert!(s.contains(" ..."));
+    }
+
+    #[test]
+    fn test_truncatechars_html_short() {
+        let result = apply_filter(
+            "truncatechars_html",
+            ContextValue::from("<b>Hi</b>"),
+            vec![ContextValue::Integer(10)],
+        );
+        // Not truncated
+        assert_eq!(result.to_display_string(), "<b>Hi</b>");
+    }
+
+    #[test]
+    fn test_truncatewords_html_no_tags() {
+        let result = apply_filter(
+            "truncatewords_html",
+            ContextValue::from("one two three four five"),
+            vec![ContextValue::Integer(3)],
+        );
+        assert_eq!(result.to_display_string(), "one two three ...");
+    }
+
+    #[test]
+    fn test_truncatewords_html_with_tags() {
+        let result = apply_filter(
+            "truncatewords_html",
+            ContextValue::from("<p>one two three four five</p>"),
+            vec![ContextValue::Integer(3)],
+        );
+        let s = result.to_display_string();
+        assert!(s.contains("one two three"));
+        assert!(s.contains("</p>"));
+        assert!(s.contains(" ..."));
+    }
+
+    #[test]
+    fn test_truncatewords_html_short() {
+        let result = apply_filter(
+            "truncatewords_html",
+            ContextValue::from("<b>one two</b>"),
+            vec![ContextValue::Integer(5)],
+        );
+        // Not truncated
+        assert_eq!(result.to_display_string(), "<b>one two</b>");
+    }
+
+    #[test]
+    fn test_truncatechars_html_void_elements() {
+        let result = apply_filter(
+            "truncatechars_html",
+            ContextValue::from("Hello<br>World is long text"),
+            vec![ContextValue::Integer(5)],
+        );
+        let s = result.to_display_string();
+        assert!(s.contains("Hello"));
+    }
+
+    #[test]
+    fn test_json_script_bool() {
+        let result = apply_filter("json_script", ContextValue::Bool(true), vec![ContextValue::from("d")]);
+        assert!(result.to_display_string().contains("true"));
+    }
+
+    #[test]
+    fn test_json_script_null() {
+        let result = apply_filter("json_script", ContextValue::None, vec![ContextValue::from("d")]);
+        assert!(result.to_display_string().contains("null"));
+    }
+
+    #[test]
+    fn test_json_script_list() {
+        let result = apply_filter(
+            "json_script",
+            ContextValue::List(vec![ContextValue::Integer(1), ContextValue::Integer(2)]),
+            vec![ContextValue::from("d")],
+        );
+        let s = result.to_display_string();
+        assert!(s.contains("[1, 2]"));
+    }
+
+    #[test]
+    fn test_context_value_to_json_string() {
+        assert_eq!(context_value_to_json_string(&ContextValue::Integer(42)), "42");
+        assert_eq!(context_value_to_json_string(&ContextValue::Bool(true)), "true");
+        assert_eq!(context_value_to_json_string(&ContextValue::None), "null");
+        assert_eq!(context_value_to_json_string(&ContextValue::from("hello")), "\"hello\"");
     }
 }
