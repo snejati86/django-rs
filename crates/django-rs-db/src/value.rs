@@ -23,7 +23,8 @@ use std::fmt;
 /// let v = Value::from("hello");
 /// assert_eq!(v, Value::String("hello".to_string()));
 /// ```
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "type", content = "value")]
 pub enum Value {
     /// SQL NULL.
     Null,

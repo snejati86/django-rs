@@ -3,10 +3,19 @@
 //! The [`MigrationExecutor`] takes a [`MigrationPlan`] and applies or reverts
 //! migrations in the correct order. The [`MigrationRecorder`] tracks which
 //! migrations have been applied in the `django_migrations` table.
+//!
+//! ## Async Execution
+//!
+//! The executor can run SQL against a real database via
+//! [`MigrationExecutor::execute_against_db`], which takes a
+//! [`DatabaseBackend`](django_rs_db_backends::DatabaseBackend) and executes
+//! each generated SQL statement. The recorder persists applied migrations
+//! to the `django_migrations` table.
 
 use std::collections::HashSet;
 
 use django_rs_core::DjangoError;
+use django_rs_db_backends::DatabaseBackend;
 
 use crate::autodetect::ProjectState;
 use crate::migration::MigrationGraph;
@@ -244,12 +253,105 @@ impl MigrationExecutor {
     pub fn recorder(&self) -> &MigrationRecorder {
         &self.recorder
     }
+
+    /// Returns a mutable reference to the recorder.
+    pub fn recorder_mut(&mut self) -> &mut MigrationRecorder {
+        &mut self.recorder
+    }
+
+    /// Executes a migration plan against a real database.
+    ///
+    /// For each step in the plan, generates SQL via the schema editor, executes
+    /// each statement against the backend, and records the migration in the
+    /// `django_migrations` table.
+    ///
+    /// If `fake` is `true`, the migration is recorded as applied without
+    /// executing the SQL statements.
+    pub async fn execute_against_db(
+        &mut self,
+        plan: &MigrationPlan,
+        operations: &std::collections::HashMap<(String, String), Vec<Box<dyn Operation>>>,
+        initial_state: &ProjectState,
+        backend: &dyn DatabaseBackend,
+        fake: bool,
+    ) -> Result<Vec<String>, DjangoError> {
+        // Ensure the django_migrations table exists
+        self.recorder.ensure_table(backend).await?;
+
+        let mut all_sql = Vec::new();
+        let mut state = initial_state.clone();
+
+        for step in &plan.steps {
+            let ops = operations.get(&step.migration).ok_or_else(|| {
+                DjangoError::DatabaseError(format!(
+                    "Operations for migration {:?} not found",
+                    step.migration
+                ))
+            })?;
+
+            let from_state = state.clone();
+            let mut step_sql = Vec::new();
+
+            if step.backwards {
+                // Generate backwards SQL
+                for op in ops.iter().rev() {
+                    let sql = op.database_backwards(
+                        &step.migration.0,
+                        &*self.schema_editor,
+                        &from_state,
+                        &state,
+                    )?;
+                    step_sql.extend(sql);
+                }
+            } else {
+                // Generate forwards SQL
+                for op in ops {
+                    op.state_forwards(&step.migration.0, &mut state);
+                    let sql = op.database_forwards(
+                        &step.migration.0,
+                        &*self.schema_editor,
+                        &from_state,
+                        &state,
+                    )?;
+                    step_sql.extend(sql);
+                }
+            }
+
+            // Execute unless faking
+            if !fake {
+                for sql in &step_sql {
+                    // Skip SQL comment lines (e.g. SQLite recreation hints)
+                    if sql.starts_with("--") {
+                        continue;
+                    }
+                    backend.execute(sql, &[]).await?;
+                }
+            }
+            all_sql.extend(step_sql);
+
+            // Update in-memory state and database record
+            if step.backwards {
+                self.recorder.unapply(&step.migration);
+                self.recorder
+                    .unrecord_from_db(backend, &step.migration.0, &step.migration.1)
+                    .await?;
+            } else {
+                self.recorder.apply(step.migration.clone());
+                self.recorder
+                    .record_to_db(backend, &step.migration.0, &step.migration.1)
+                    .await?;
+            }
+        }
+
+        Ok(all_sql)
+    }
 }
 
 /// Tracks which migrations have been applied.
 ///
-/// In a real system this reads from and writes to the `django_migrations`
-/// database table. For now it operates in-memory.
+/// Operates both in-memory and against the `django_migrations` database table.
+/// The in-memory set is the source of truth for plan building; the database
+/// table provides persistence across runs.
 #[derive(Debug, Clone, Default)]
 pub struct MigrationRecorder {
     /// Set of applied migration keys.
@@ -265,6 +367,9 @@ impl MigrationRecorder {
     }
 
     /// Returns the SQL to create the `django_migrations` table.
+    ///
+    /// Uses SQLite-compatible syntax (INTEGER PRIMARY KEY AUTOINCREMENT).
+    /// For PostgreSQL, use `ensure_schema_sql_pg()`.
     pub fn ensure_schema_sql() -> Vec<String> {
         vec![
             "CREATE TABLE IF NOT EXISTS \"django_migrations\" (\
@@ -277,12 +382,22 @@ impl MigrationRecorder {
         ]
     }
 
-    /// Records a migration as applied.
+    /// Returns the SQLite-compatible SQL to create the `django_migrations` table.
+    pub fn ensure_schema_sql_sqlite() -> &'static str {
+        "CREATE TABLE IF NOT EXISTS \"django_migrations\" (\
+            \"id\" INTEGER PRIMARY KEY AUTOINCREMENT, \
+            \"app\" TEXT NOT NULL, \
+            \"name\" TEXT NOT NULL, \
+            \"applied\" TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP\
+        )"
+    }
+
+    /// Records a migration as applied (in-memory only).
     pub fn apply(&mut self, key: (String, String)) {
         self.applied_migrations.insert(key);
     }
 
-    /// Records a migration as unapplied.
+    /// Records a migration as unapplied (in-memory only).
     pub fn unapply(&mut self, key: &(String, String)) {
         self.applied_migrations.remove(key);
     }
@@ -311,6 +426,78 @@ impl MigrationRecorder {
             "DELETE FROM \"django_migrations\" \
              WHERE \"app\" = '{app_label}' AND \"name\" = '{name}'"
         )
+    }
+
+    // ── Async database operations ────────────────────────────────────
+
+    /// Ensures the `django_migrations` table exists in the database.
+    ///
+    /// Detects the backend type and uses the appropriate DDL syntax.
+    pub async fn ensure_table(
+        &self,
+        backend: &dyn DatabaseBackend,
+    ) -> Result<(), DjangoError> {
+        let sql = match backend.vendor() {
+            "sqlite" => Self::ensure_schema_sql_sqlite().to_string(),
+            _ => Self::ensure_schema_sql()[0].clone(),
+        };
+        backend.execute(&sql, &[]).await?;
+        Ok(())
+    }
+
+    /// Loads applied migrations from the database into the in-memory set.
+    ///
+    /// Reads all rows from `django_migrations` and populates the applied set.
+    /// If the table does not exist, it is created first.
+    pub async fn load_from_db(
+        &mut self,
+        backend: &dyn DatabaseBackend,
+    ) -> Result<(), DjangoError> {
+        self.ensure_table(backend).await?;
+
+        let rows = backend
+            .query(
+                "SELECT \"app\", \"name\" FROM \"django_migrations\"",
+                &[],
+            )
+            .await?;
+
+        self.applied_migrations.clear();
+        for row in &rows {
+            let app: String = row.get("app").map_err(|_| {
+                DjangoError::DatabaseError("Missing 'app' column".into())
+            })?;
+            let name: String = row.get("name").map_err(|_| {
+                DjangoError::DatabaseError("Missing 'name' column".into())
+            })?;
+            self.applied_migrations.insert((app, name));
+        }
+
+        Ok(())
+    }
+
+    /// Records a migration as applied in the database.
+    pub async fn record_to_db(
+        &self,
+        backend: &dyn DatabaseBackend,
+        app_label: &str,
+        name: &str,
+    ) -> Result<(), DjangoError> {
+        let sql = Self::record_applied_sql(app_label, name);
+        backend.execute(&sql, &[]).await?;
+        Ok(())
+    }
+
+    /// Removes a migration record from the database.
+    pub async fn unrecord_from_db(
+        &self,
+        backend: &dyn DatabaseBackend,
+        app_label: &str,
+        name: &str,
+    ) -> Result<(), DjangoError> {
+        let sql = Self::record_unapplied_sql(app_label, name);
+        backend.execute(&sql, &[]).await?;
+        Ok(())
     }
 }
 

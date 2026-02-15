@@ -13,6 +13,12 @@ workspace = true
 [dependencies]
 django-rs-core.workspace = true
 django-rs-db.workspace = true
+django-rs-db-backends.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 chrono.workspace = true
+async-trait = "0.1"
+tokio.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full"] }
