@@ -5,18 +5,26 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Auto-generated admin panel for django-rs: model registration, CRUD interface, and dashboards"
+description = "Auto-generated admin panel for django-rs: model registration, CRUD API, and contrib utilities"
 
 [lints]
 workspace = true
 
 [dependencies]
 django-rs-core.workspace = true
-django-rs-http.workspace = true
 django-rs-db.workspace = true
-django-rs-views.workspace = true
-django-rs-forms.workspace = true
+django-rs-http.workspace = true
 django-rs-auth.workspace = true
-django-rs-template.workspace = true
+django-rs-views.workspace = true
+axum.workspace = true
+tower.workspace = true
+tower-http.workspace = true
+http.workspace = true
+tokio.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+chrono.workspace = true
+async-trait.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full"] }
