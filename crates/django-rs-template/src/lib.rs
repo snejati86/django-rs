@@ -93,6 +93,7 @@ pub mod filters;
 pub mod include;
 pub mod inheritance;
 pub mod lexer;
+pub mod library;
 pub mod loaders;
 pub mod parser;
 pub mod tags;
@@ -100,3 +101,4 @@ pub mod tags;
 // Re-export the most commonly used types.
 pub use context::{Context, ContextValue};
 pub use engine::Engine;
+pub use library::{Library, LibraryRegistry};
