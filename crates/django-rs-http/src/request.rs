@@ -7,7 +7,9 @@ use std::collections::HashMap;
 
 use http::{HeaderMap, Method};
 
+use crate::cookies::{self, CookieError};
 use crate::querydict::QueryDict;
+use crate::upload::UploadedFile;
 use crate::urls::resolver::ResolverMatch;
 
 /// An HTTP request, modeled after Django's `HttpRequest`.
@@ -45,6 +47,8 @@ pub struct HttpRequest {
     body: Vec<u8>,
     resolver_match: Option<ResolverMatch>,
     scheme: String,
+    cached_cookies: std::sync::OnceLock<HashMap<String, String>>,
+    files: HashMap<String, Vec<UploadedFile>>,
 }
 
 impl HttpRequest {
@@ -126,6 +130,31 @@ impl HttpRequest {
             "http".to_string()
         };
 
+        // Parse multipart data if content type is multipart/form-data
+        let (post, files) = if content_type
+            .as_deref()
+            .is_some_and(|ct| ct.starts_with("multipart/form-data"))
+        {
+            if let Some(boundary) = content_type.as_deref().and_then(crate::upload::extract_boundary) {
+                match crate::upload::parse_multipart(&body, boundary) {
+                    Ok(multipart) => {
+                        let mut post_dict = QueryDict::new_mutable();
+                        for (name, values) in &multipart.fields {
+                            for value in values {
+                                let _ = post_dict.append(name, value);
+                            }
+                        }
+                        (post_dict, multipart.files)
+                    }
+                    Err(_) => (post, HashMap::new()),
+                }
+            } else {
+                (post, HashMap::new())
+            }
+        } else {
+            (post, HashMap::new())
+        };
+
         Self {
             method,
             path,
@@ -139,6 +168,8 @@ impl HttpRequest {
             body,
             resolver_match: None,
             scheme,
+            cached_cookies: std::sync::OnceLock::new(),
+            files,
         }
     }
 
@@ -289,6 +320,45 @@ impl HttpRequest {
     pub fn scheme(&self) -> &str {
         &self.scheme
     }
+
+    /// Parses cookies from the `Cookie` header and returns them as a map.
+    ///
+    /// The result is cached after the first call. Cookie header format
+    /// is `name1=value1; name2=value2`.
+    pub fn cookies(&self) -> &HashMap<String, String> {
+        self.cached_cookies.get_or_init(|| {
+            self.headers
+                .get(http::header::COOKIE)
+                .and_then(|v| v.to_str().ok())
+                .map_or_else(HashMap::new, cookies::parse_cookie_header)
+        })
+    }
+
+    /// Gets a specific cookie value by name.
+    pub fn cookie(&self, name: &str) -> Option<&str> {
+        self.cookies().get(name).map(String::as_str)
+    }
+
+    /// Gets and verifies a signed cookie (HMAC-SHA256).
+    ///
+    /// The cookie value must have been set with `set_signed_cookie` on the
+    /// response. The `max_age` parameter (in seconds) is optional; if provided,
+    /// the cookie is rejected if it was signed more than `max_age` seconds ago.
+    pub fn get_signed_cookie(
+        &self,
+        name: &str,
+        salt: &str,
+        secret_key: &str,
+        max_age: Option<u64>,
+    ) -> Result<String, CookieError> {
+        let value = self.cookie(name).ok_or(CookieError::NotFound)?;
+        cookies::verify_signed_cookie(value, secret_key, salt, max_age)
+    }
+
+    /// Returns the uploaded files parsed from a multipart request body.
+    pub const fn files(&self) -> &HashMap<String, Vec<UploadedFile>> {
+        &self.files
+    }
 }
 
 /// Builder for constructing [`HttpRequest`] instances in tests.
@@ -409,6 +479,32 @@ impl HttpRequestBuilder {
         meta.entry("QUERY_STRING".to_string())
             .or_insert_with(|| self.query_string.clone());
 
+        // Parse multipart data if content type is multipart/form-data
+        let (post, files) = if self
+            .content_type
+            .as_deref()
+            .is_some_and(|ct| ct.starts_with("multipart/form-data"))
+        {
+            if let Some(boundary) = self.content_type.as_deref().and_then(crate::upload::extract_boundary) {
+                match crate::upload::parse_multipart(&self.body, boundary) {
+                    Ok(multipart) => {
+                        let mut post_dict = QueryDict::new_mutable();
+                        for (name, values) in &multipart.fields {
+                            for value in values {
+                                let _ = post_dict.append(name, value);
+                            }
+                        }
+                        (post_dict, multipart.files)
+                    }
+                    Err(_) => (post, HashMap::new()),
+                }
+            } else {
+                (post, HashMap::new())
+            }
+        } else {
+            (post, HashMap::new())
+        };
+
         HttpRequest {
             method: self.method,
             path: self.path,
@@ -422,6 +518,8 @@ impl HttpRequestBuilder {
             body: self.body,
             resolver_match: None,
             scheme: self.scheme,
+            cached_cookies: std::sync::OnceLock::new(),
+            files,
         }
     }
 }
@@ -691,5 +789,121 @@ mod tests {
             req.build_absolute_uri(Some("path/")),
             "http://example.com/path/"
         );
+    }
+
+    // ── Cookie integration tests ────────────────────────────────────
+
+    #[test]
+    fn test_cookies_from_header() {
+        let req = HttpRequest::builder()
+            .header("cookie", "session=abc123; theme=dark")
+            .build();
+        let cookies = req.cookies();
+        assert_eq!(cookies.get("session"), Some(&"abc123".to_string()));
+        assert_eq!(cookies.get("theme"), Some(&"dark".to_string()));
+    }
+
+    #[test]
+    fn test_cookie_specific() {
+        let req = HttpRequest::builder()
+            .header("cookie", "token=xyz789")
+            .build();
+        assert_eq!(req.cookie("token"), Some("xyz789"));
+        assert_eq!(req.cookie("missing"), None);
+    }
+
+    #[test]
+    fn test_cookies_empty_when_no_header() {
+        let req = HttpRequest::builder().build();
+        assert!(req.cookies().is_empty());
+        assert_eq!(req.cookie("anything"), None);
+    }
+
+    #[test]
+    fn test_signed_cookie_round_trip() {
+        use crate::cookies;
+        let signed = cookies::sign_cookie_value("my-data", "secret", "salt");
+        let req = HttpRequest::builder()
+            .header("cookie", &format!("signed={signed}"))
+            .build();
+        let result = req.get_signed_cookie("signed", "salt", "secret", None);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "my-data");
+    }
+
+    #[test]
+    fn test_signed_cookie_not_found() {
+        let req = HttpRequest::builder().build();
+        let result = req.get_signed_cookie("missing", "salt", "secret", None);
+        assert!(matches!(result, Err(CookieError::NotFound)));
+    }
+
+    // ── File upload integration tests ───────────────────────────────
+
+    #[test]
+    fn test_files_empty_for_non_multipart() {
+        let req = HttpRequest::builder()
+            .method(Method::POST)
+            .content_type("application/x-www-form-urlencoded")
+            .body(b"key=value".to_vec())
+            .build();
+        assert!(req.files().is_empty());
+    }
+
+    #[test]
+    fn test_files_from_multipart() {
+        let boundary = "boundary123";
+        let body = format!(
+            "--{boundary}\r\n\
+             Content-Disposition: form-data; name=\"field1\"\r\n\
+             \r\n\
+             value1\r\n\
+             --{boundary}\r\n\
+             Content-Disposition: form-data; name=\"myfile\"; filename=\"test.txt\"\r\n\
+             Content-Type: text/plain\r\n\
+             \r\n\
+             file content here\r\n\
+             --{boundary}--\r\n"
+        );
+        let req = HttpRequest::builder()
+            .method(Method::POST)
+            .content_type(&format!("multipart/form-data; boundary={boundary}"))
+            .body(body.into_bytes())
+            .build();
+
+        // Files should be parsed
+        assert!(!req.files().is_empty());
+        let files = req.files().get("myfile").unwrap();
+        assert_eq!(files[0].name, "test.txt");
+        assert_eq!(files[0].content_type, "text/plain");
+
+        // Form fields should be in POST data
+        assert_eq!(req.post().get("field1"), Some("value1"));
+    }
+
+    #[test]
+    fn test_files_multiple() {
+        let boundary = "boundary456";
+        let body = format!(
+            "--{boundary}\r\n\
+             Content-Disposition: form-data; name=\"files\"; filename=\"a.txt\"\r\n\
+             Content-Type: text/plain\r\n\
+             \r\n\
+             A content\r\n\
+             --{boundary}\r\n\
+             Content-Disposition: form-data; name=\"files\"; filename=\"b.txt\"\r\n\
+             Content-Type: text/plain\r\n\
+             \r\n\
+             B content\r\n\
+             --{boundary}--\r\n"
+        );
+        let req = HttpRequest::builder()
+            .method(Method::POST)
+            .content_type(&format!("multipart/form-data; boundary={boundary}"))
+            .body(body.into_bytes())
+            .build();
+
+        let files = req.files().get("files").unwrap();
+        assert_eq!(files.len(), 2);
     }
 }

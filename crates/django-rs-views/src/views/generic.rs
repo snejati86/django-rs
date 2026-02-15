@@ -25,6 +25,7 @@ use django_rs_template::context::{Context, ContextValue};
 use django_rs_template::engine::Engine;
 
 use super::class_based::{ContextMixin, View};
+use crate::pagination::Paginator;
 
 /// Renders a template with the given name and serde_json context using the engine.
 ///
@@ -96,20 +97,64 @@ pub trait ListView: View + ContextMixin + Send + Sync {
     async fn get_queryset(&self) -> Result<Vec<serde_json::Value>, DjangoError>;
 
     /// Handles GET requests for the list view.
-    async fn list(&self, _request: HttpRequest) -> HttpResponse {
+    ///
+    /// When `paginate_by` is set, uses `Paginator` to split the queryset
+    /// into pages and adds `page_obj`, `paginator`, and `is_paginated`
+    /// to the template context.
+    async fn list(&self, request: HttpRequest) -> HttpResponse {
         match self.get_queryset().await {
             Ok(objects) => {
-                let paginated = if let Some(per_page) = self.paginate_by() {
-                    objects.into_iter().take(per_page).collect()
-                } else {
-                    objects
-                };
-
                 let mut context = self.get_context_data(&HashMap::new());
-                context.insert(
-                    "object_list".to_string(),
-                    serde_json::Value::Array(paginated),
-                );
+
+                if let Some(per_page) = self.paginate_by() {
+                    let paginator = Paginator::new(objects, per_page);
+
+                    // Get page number from query string
+                    let page_number = request
+                        .get()
+                        .get("page")
+                        .and_then(|p| p.parse::<usize>().ok())
+                        .unwrap_or(1);
+
+                    let page = paginator.get_page(page_number);
+
+                    context.insert(
+                        "object_list".to_string(),
+                        serde_json::Value::Array(page.object_list().to_vec()),
+                    );
+                    context.insert(
+                        "page_obj".to_string(),
+                        serde_json::json!({
+                            "number": page.number(),
+                            "has_next": page.has_next(),
+                            "has_previous": page.has_previous(),
+                            "has_other_pages": page.has_other_pages(),
+                            "start_index": page.start_index(),
+                            "end_index": page.end_index(),
+                        }),
+                    );
+                    context.insert(
+                        "paginator".to_string(),
+                        serde_json::json!({
+                            "count": paginator.count(),
+                            "num_pages": paginator.num_pages(),
+                            "per_page": per_page,
+                        }),
+                    );
+                    context.insert(
+                        "is_paginated".to_string(),
+                        serde_json::Value::Bool(paginator.num_pages() > 1),
+                    );
+                } else {
+                    context.insert(
+                        "object_list".to_string(),
+                        serde_json::Value::Array(objects),
+                    );
+                    context.insert(
+                        "is_paginated".to_string(),
+                        serde_json::Value::Bool(false),
+                    );
+                }
 
                 let template = self.template_name();
                 render_with_engine(&template, &context, self.engine())
@@ -850,5 +895,148 @@ mod tests {
         errors.insert("title".to_string(), vec!["Too long".to_string()]);
         let response = view.form_invalid(errors).await;
         assert_eq!(response.status(), http::StatusCode::BAD_REQUEST);
+    }
+
+    // ── ListView with pagination tests ──────────────────────────────
+
+    #[tokio::test]
+    async fn test_list_view_pagination_page_1() {
+        let view = TestListView {
+            items: (1..=5)
+                .map(|i| serde_json::json!({"title": format!("Item {i}")}))
+                .collect(),
+        };
+        let request = HttpRequest::builder()
+            .method(http::Method::GET)
+            .query_string("page=1")
+            .build();
+        let response = view.dispatch(request).await;
+        assert_eq!(response.status(), http::StatusCode::OK);
+        let body = String::from_utf8(response.content_bytes().unwrap()).unwrap();
+        assert!(body.contains("Item 1"));
+        assert!(body.contains("Item 2"));
+        assert!(!body.contains("Item 3")); // per_page=2
+    }
+
+    #[tokio::test]
+    async fn test_list_view_pagination_page_2() {
+        let view = TestListView {
+            items: (1..=5)
+                .map(|i| serde_json::json!({"title": format!("Item {i}")}))
+                .collect(),
+        };
+        let request = HttpRequest::builder()
+            .method(http::Method::GET)
+            .query_string("page=2")
+            .build();
+        let response = view.dispatch(request).await;
+        let body = String::from_utf8(response.content_bytes().unwrap()).unwrap();
+        assert!(body.contains("Item 3"));
+        assert!(body.contains("Item 4"));
+    }
+
+    #[tokio::test]
+    async fn test_list_view_pagination_last_page() {
+        let view = TestListView {
+            items: (1..=5)
+                .map(|i| serde_json::json!({"title": format!("Item {i}")}))
+                .collect(),
+        };
+        let request = HttpRequest::builder()
+            .method(http::Method::GET)
+            .query_string("page=3")
+            .build();
+        let response = view.dispatch(request).await;
+        let body = String::from_utf8(response.content_bytes().unwrap()).unwrap();
+        assert!(body.contains("Item 5"));
+    }
+
+    #[tokio::test]
+    async fn test_list_view_pagination_context() {
+        let view = TestListView {
+            items: (1..=5)
+                .map(|i| serde_json::json!({"title": format!("Item {i}")}))
+                .collect(),
+        };
+        let request = HttpRequest::builder()
+            .method(http::Method::GET)
+            .query_string("page=2")
+            .build();
+        let response = view.dispatch(request).await;
+        let body = String::from_utf8(response.content_bytes().unwrap()).unwrap();
+        // Context should include paginator and page_obj info
+        assert!(body.contains("page_obj"));
+        assert!(body.contains("paginator"));
+        assert!(body.contains("is_paginated"));
+    }
+
+    #[tokio::test]
+    async fn test_list_view_pagination_out_of_range() {
+        let view = TestListView {
+            items: (1..=5)
+                .map(|i| serde_json::json!({"title": format!("Item {i}")}))
+                .collect(),
+        };
+        let request = HttpRequest::builder()
+            .method(http::Method::GET)
+            .query_string("page=999")
+            .build();
+        let response = view.dispatch(request).await;
+        // get_page returns last page when out of range
+        assert_eq!(response.status(), http::StatusCode::OK);
+        let body = String::from_utf8(response.content_bytes().unwrap()).unwrap();
+        assert!(body.contains("Item 5"));
+    }
+
+    // ── Unpaginated ListView ────────────────────────────────────────
+
+    struct UnpaginatedListView {
+        items: Vec<serde_json::Value>,
+    }
+
+    impl ContextMixin for UnpaginatedListView {
+        fn get_context_data(
+            &self,
+            _kwargs: &HashMap<String, String>,
+        ) -> HashMap<String, serde_json::Value> {
+            HashMap::new()
+        }
+    }
+
+    #[async_trait]
+    impl View for UnpaginatedListView {
+        async fn get(&self, request: HttpRequest) -> HttpResponse {
+            self.list(request).await
+        }
+    }
+
+    #[async_trait]
+    impl ListView for UnpaginatedListView {
+        fn model_name(&self) -> &str {
+            "item"
+        }
+
+        async fn get_queryset(&self) -> Result<Vec<serde_json::Value>, DjangoError> {
+            Ok(self.items.clone())
+        }
+    }
+
+    #[tokio::test]
+    async fn test_list_view_no_pagination() {
+        let view = UnpaginatedListView {
+            items: (1..=10)
+                .map(|i| serde_json::json!({"title": format!("Item {i}")}))
+                .collect(),
+        };
+        let request = HttpRequest::builder()
+            .method(http::Method::GET)
+            .build();
+        let response = view.dispatch(request).await;
+        let body = String::from_utf8(response.content_bytes().unwrap()).unwrap();
+        // All items should be present
+        assert!(body.contains("Item 1"));
+        assert!(body.contains("Item 10"));
+        // is_paginated should be false
+        assert!(body.contains("is_paginated"));
     }
 }
