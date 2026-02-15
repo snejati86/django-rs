@@ -1,0 +1,18 @@
+[package]
+name = "django-rs-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Management commands CLI for django-rs: runserver, migrate, shell, and custom commands"
+
+[lints]
+workspace = true
+
+[dependencies]
+django-rs-core.workspace = true
+django-rs-db.workspace = true
+django-rs-http.workspace = true
+clap.workspace = true
+tokio.workspace = true

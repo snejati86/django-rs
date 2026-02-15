@@ -1,0 +1,24 @@
+[package]
+name = "django-rs-auth"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Authentication and authorization for django-rs: Users, Permissions, Groups, Sessions"
+
+[lints]
+workspace = true
+
+[dependencies]
+django-rs-core.workspace = true
+django-rs-http.workspace = true
+django-rs-db.workspace = true
+django-rs-views.workspace = true
+argon2.workspace = true
+bcrypt.workspace = true
+sha2.workspace = true
+hmac.workspace = true
+rand.workspace = true
+base64.workspace = true
+tokio.workspace = true

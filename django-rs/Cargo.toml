@@ -1,0 +1,27 @@
+[package]
+name = "django-rs"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "A full-featured Django equivalent web framework for Rust — meta-crate that re-exports all sub-crates"
+
+[lints]
+workspace = true
+
+[dependencies]
+django-rs-core.workspace = true
+django-rs-macros.workspace = true
+django-rs-db.workspace = true
+django-rs-db-backends.workspace = true
+django-rs-db-migrations.workspace = true
+django-rs-http.workspace = true
+django-rs-views.workspace = true
+django-rs-forms.workspace = true
+django-rs-template.workspace = true
+django-rs-auth.workspace = true
+django-rs-admin.workspace = true
+django-rs-signals.workspace = true
+django-rs-cli.workspace = true
+django-rs-test.workspace = true

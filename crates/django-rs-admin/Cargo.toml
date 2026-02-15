@@ -1,0 +1,22 @@
+[package]
+name = "django-rs-admin"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Auto-generated admin panel for django-rs: model registration, CRUD interface, and dashboards"
+
+[lints]
+workspace = true
+
+[dependencies]
+django-rs-core.workspace = true
+django-rs-http.workspace = true
+django-rs-db.workspace = true
+django-rs-views.workspace = true
+django-rs-forms.workspace = true
+django-rs-auth.workspace = true
+django-rs-template.workspace = true
+serde.workspace = true
+serde_json.workspace = true

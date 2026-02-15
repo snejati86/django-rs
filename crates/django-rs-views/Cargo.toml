@@ -1,0 +1,23 @@
+[package]
+name = "django-rs-views"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "View layer for django-rs: class-based views, generic views, and middleware"
+
+[lints]
+workspace = true
+
+[dependencies]
+django-rs-core.workspace = true
+django-rs-http.workspace = true
+django-rs-template.workspace = true
+django-rs-db.workspace = true
+axum.workspace = true
+tower.workspace = true
+tower-http.workspace = true
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true

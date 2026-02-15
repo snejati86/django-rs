@@ -1,0 +1,20 @@
+[package]
+name = "django-rs-db-backends"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Database backends for django-rs: PostgreSQL, MySQL, and SQLite drivers"
+
+[lints]
+workspace = true
+
+[dependencies]
+django-rs-core.workspace = true
+django-rs-db.workspace = true
+tokio.workspace = true
+tokio-postgres.workspace = true
+deadpool-postgres.workspace = true
+rusqlite.workspace = true
+mysql_async.workspace = true

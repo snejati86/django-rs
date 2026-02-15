@@ -1,0 +1,16 @@
+[package]
+name = "django-rs-signals"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Signal dispatcher for django-rs: decoupled event handling and pub/sub"
+
+[lints]
+workspace = true
+
+[dependencies]
+django-rs-core.workspace = true
+tokio.workspace = true
+once_cell.workspace = true

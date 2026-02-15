@@ -1,0 +1,25 @@
+[package]
+name = "django-rs-http"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "HTTP layer for django-rs: Request, Response, URL routing, and middleware pipeline"
+
+[lints]
+workspace = true
+
+[dependencies]
+django-rs-core.workspace = true
+axum.workspace = true
+hyper.workspace = true
+tower.workspace = true
+tower-http.workspace = true
+http.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+url.workspace = true
+percent-encoding.workspace = true
+regex.workspace = true
+uuid.workspace = true
