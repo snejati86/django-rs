@@ -13,7 +13,17 @@ workspace = true
 [dependencies]
 django-rs-core.workspace = true
 django-rs-http.workspace = true
-django-rs-db.workspace = true
 django-rs-views.workspace = true
+axum.workspace = true
+hyper.workspace = true
+http.workspace = true
+http-body-util.workspace = true
+tower.workspace = true
 tokio.workspace = true
-tokio-test.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+async-trait.workspace = true
+bytes = "1"
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full"] }
