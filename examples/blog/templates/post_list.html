@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} - django-rs Blog{% endblock %}
+
+{% block content %}
+<h1>{{ title }}</h1>
+
+{% for post in posts %}
+<article class="post">
+    <h2><a href="/posts/{{ post.id }}/">{{ post.title }}</a></h2>
+    <p class="meta">By {{ post.author }} on {{ post.created_at }}</p>
+    <p>{{ post.summary }}</p>
+</article>
+{% empty %}
+<p>No posts yet. <a href="/posts/create/">Create one!</a></p>
+{% endfor %}
+{% endblock %}

@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}{{ post.title }} - django-rs Blog{% endblock %}
+
+{% block content %}
+<article>
+    <h1>{{ post.title }}</h1>
+    <p class="meta">By {{ post.author }} on {{ post.created_at }}</p>
+    <div class="content">
+        {{ post.content }}
+    </div>
+</article>
+
+<section class="comments">
+    <h2>Comments</h2>
+    {% if comments %}
+    {% for comment in comments %}
+    <div class="comment">
+        <strong>{{ comment.author }}</strong>
+        <span class="meta">{{ comment.created_at }}</span>
+        <p>{{ comment.content }}</p>
+    </div>
+    {% endfor %}
+    {% else %}
+    <p>No comments yet.</p>
+    {% endif %}
+</section>
+
+<p><a href="/posts/">Back to all posts</a></p>
+{% endblock %}

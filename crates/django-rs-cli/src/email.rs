@@ -19,10 +19,39 @@ use tokio::sync::RwLock;
 
 use django_rs_core::DjangoError;
 
+/// An email attachment.
+///
+/// Contains the filename, content bytes, and MIME type for a file
+/// to be attached to an email message.
+#[derive(Debug, Clone)]
+pub struct Attachment {
+    /// The filename to present in the email.
+    pub filename: String,
+    /// The raw content of the attachment.
+    pub content: Vec<u8>,
+    /// The MIME content type (e.g. "application/pdf", "image/png").
+    pub mimetype: String,
+}
+
+impl Attachment {
+    /// Creates a new attachment.
+    pub fn new(
+        filename: impl Into<String>,
+        content: Vec<u8>,
+        mimetype: impl Into<String>,
+    ) -> Self {
+        Self {
+            filename: filename.into(),
+            content,
+            mimetype: mimetype.into(),
+        }
+    }
+}
+
 /// An email message, mirroring Django's `EmailMessage`.
 ///
 /// Contains all the components of an email: subject, body, recipients,
-/// headers, and optional HTML content.
+/// headers, optional HTML content, and attachments.
 #[derive(Debug, Clone)]
 pub struct EmailMessage {
     /// The email subject line.
@@ -43,6 +72,8 @@ pub struct EmailMessage {
     pub headers: HashMap<String, String>,
     /// Optional HTML body. When set, the email is sent as multipart.
     pub html_body: Option<String>,
+    /// File attachments.
+    pub attachments: Vec<Attachment>,
 }
 
 impl EmailMessage {
@@ -63,7 +94,22 @@ impl EmailMessage {
             reply_to: Vec::new(),
             headers: HashMap::new(),
             html_body: None,
+            attachments: Vec::new(),
         }
+    }
+
+    /// Adds an attachment to this email message.
+    #[must_use]
+    pub fn with_attachment(mut self, attachment: Attachment) -> Self {
+        self.attachments.push(attachment);
+        self
+    }
+
+    /// Sets the HTML body for this email message.
+    #[must_use]
+    pub fn with_html_body(mut self, html: impl Into<String>) -> Self {
+        self.html_body = Some(html.into());
+        self
     }
 
     /// Returns all recipients (to + cc + bcc).
@@ -102,6 +148,19 @@ impl EmailMessage {
 
         if let Some(html) = &self.html_body {
             let _ = writeln!(output, "\n--- HTML ---\n{html}");
+        }
+
+        if !self.attachments.is_empty() {
+            let _ = writeln!(output, "\n--- Attachments ---");
+            for att in &self.attachments {
+                let _ = writeln!(
+                    output,
+                    "  {} ({}, {} bytes)",
+                    att.filename,
+                    att.mimetype,
+                    att.content.len()
+                );
+            }
         }
 
         output
@@ -310,6 +369,65 @@ impl EmailBackend for InMemoryBackend {
         self.messages.write().await.push(message.clone());
         Ok(())
     }
+}
+
+/// Sends a single email message via the given backend.
+///
+/// This is the primary convenience function for sending email, mirroring
+/// Django's `send_mail()`. It constructs an `EmailMessage` from the given
+/// parameters and sends it through the provided backend.
+///
+/// # Examples
+///
+/// ```rust,no_run
+/// # use django_rs_cli::email::{send_mail, InMemoryBackend};
+/// # async fn example() {
+/// let backend = InMemoryBackend::new();
+/// send_mail(
+///     "Welcome!",
+///     "Thanks for signing up.",
+///     "noreply@example.com",
+///     &["user@example.com".to_string()],
+///     &backend,
+/// ).await.unwrap();
+/// # }
+/// ```
+pub async fn send_mail(
+    subject: impl Into<String>,
+    message: impl Into<String>,
+    from_email: impl Into<String>,
+    recipient_list: &[String],
+    backend: &dyn EmailBackend,
+) -> Result<(), DjangoError> {
+    let msg = EmailMessage::new(subject, message, from_email, recipient_list.to_vec());
+    backend.send(&msg).await
+}
+
+/// Sends multiple email messages via the given backend.
+///
+/// Each tuple in `datatuple` contains `(subject, message, from_email, recipient_list)`.
+/// Returns the number of successfully sent messages. Mirrors Django's `send_mass_mail()`.
+pub async fn send_mass_mail(
+    datatuple: &[(String, String, String, Vec<String>)],
+    backend: &dyn EmailBackend,
+) -> Result<usize, DjangoError> {
+    let messages: Vec<EmailMessage> = datatuple
+        .iter()
+        .map(|(subject, body, from_email, to)| {
+            EmailMessage::new(subject.clone(), body.clone(), from_email.clone(), to.clone())
+        })
+        .collect();
+
+    backend.send_many(&messages).await
+}
+
+/// Creates an `SmtpBackend` from the framework's email settings.
+///
+/// Reads `email_host` and `email_port` from the settings to construct
+/// the backend. This is the factory function used by the framework
+/// to create the default email backend.
+pub fn get_connection(settings: &django_rs_core::Settings) -> SmtpBackend {
+    SmtpBackend::new(&settings.email_host, settings.email_port)
 }
 
 #[cfg(test)]
@@ -533,5 +651,114 @@ mod tests {
 
         let count = backend.send_many(&[good, bad]).await.unwrap();
         assert_eq!(count, 1);
+    }
+
+    // ── Attachment tests ─────────────────────────────────────────────
+
+    #[test]
+    fn test_attachment_new() {
+        let att = Attachment::new("report.pdf", vec![1, 2, 3], "application/pdf");
+        assert_eq!(att.filename, "report.pdf");
+        assert_eq!(att.content, vec![1, 2, 3]);
+        assert_eq!(att.mimetype, "application/pdf");
+    }
+
+    #[test]
+    fn test_email_with_attachment() {
+        let msg = sample_email()
+            .with_attachment(Attachment::new("file.txt", b"hello".to_vec(), "text/plain"));
+        assert_eq!(msg.attachments.len(), 1);
+        assert_eq!(msg.attachments[0].filename, "file.txt");
+    }
+
+    #[test]
+    fn test_email_with_html_body() {
+        let msg = sample_email().with_html_body("<h1>Hello</h1>");
+        assert_eq!(msg.html_body.as_deref(), Some("<h1>Hello</h1>"));
+    }
+
+    #[test]
+    fn test_format_message_with_attachments() {
+        let msg = sample_email()
+            .with_attachment(Attachment::new("doc.pdf", vec![0; 1024], "application/pdf"));
+        let formatted = msg.format_message();
+        assert!(formatted.contains("--- Attachments ---"));
+        assert!(formatted.contains("doc.pdf"));
+        assert!(formatted.contains("1024 bytes"));
+    }
+
+    // ── send_mail tests ─────────────────────────────────────────────
+
+    #[tokio::test]
+    async fn test_send_mail() {
+        let backend = InMemoryBackend::new();
+        send_mail(
+            "Hello",
+            "World",
+            "from@test.com",
+            &["to@test.com".to_string()],
+            &backend,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(backend.message_count().await, 1);
+        let messages = backend.get_messages().await;
+        assert_eq!(messages[0].subject, "Hello");
+        assert_eq!(messages[0].body, "World");
+    }
+
+    #[tokio::test]
+    async fn test_send_mail_no_recipients() {
+        let backend = InMemoryBackend::new();
+        let result = send_mail("Hello", "World", "from@test.com", &[], &backend).await;
+        assert!(result.is_err());
+    }
+
+    // ── send_mass_mail tests ────────────────────────────────────────
+
+    #[tokio::test]
+    async fn test_send_mass_mail() {
+        let backend = InMemoryBackend::new();
+        let data = vec![
+            (
+                "Subject 1".to_string(),
+                "Body 1".to_string(),
+                "from@test.com".to_string(),
+                vec!["to1@test.com".to_string()],
+            ),
+            (
+                "Subject 2".to_string(),
+                "Body 2".to_string(),
+                "from@test.com".to_string(),
+                vec!["to2@test.com".to_string()],
+            ),
+        ];
+
+        let count = send_mass_mail(&data, &backend).await.unwrap();
+        assert_eq!(count, 2);
+        assert_eq!(backend.message_count().await, 2);
+    }
+
+    #[tokio::test]
+    async fn test_send_mass_mail_empty() {
+        let backend = InMemoryBackend::new();
+        let count = send_mass_mail(&[], &backend).await.unwrap();
+        assert_eq!(count, 0);
+    }
+
+    // ── get_connection tests ────────────────────────────────────────
+
+    #[test]
+    fn test_get_connection() {
+        let settings = django_rs_core::Settings {
+            email_host: "smtp.example.com".to_string(),
+            email_port: 587,
+            ..django_rs_core::Settings::default()
+        };
+
+        let backend = get_connection(&settings);
+        assert_eq!(backend.host, "smtp.example.com");
+        assert_eq!(backend.port, 587);
     }
 }
