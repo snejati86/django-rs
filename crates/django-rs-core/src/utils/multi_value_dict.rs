@@ -182,11 +182,9 @@ mod tests {
         d.set("x", 10);
         d.set("y", 20);
 
-        let keys: Vec<_> = d.keys().collect();
-        assert_eq!(keys.len(), 2);
+        assert_eq!(d.keys().count(), 2);
 
-        let values: Vec<_> = d.values().collect();
-        assert_eq!(values.len(), 2);
+        assert_eq!(d.values().count(), 2);
     }
 
     #[test]

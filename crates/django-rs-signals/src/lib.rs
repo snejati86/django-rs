@@ -278,8 +278,8 @@ mod tests {
     fn test_signal_disconnect() {
         let signal: Signal<()> = Signal::new();
 
-        signal.connect("a", Arc::new(|_: &()| None));
-        signal.connect("b", Arc::new(|_: &()| None));
+        signal.connect("a", Arc::new(|(): &()| None));
+        signal.connect("b", Arc::new(|(): &()| None));
         assert_eq!(signal.receiver_count(), 2);
 
         assert!(signal.disconnect("a"));
@@ -295,10 +295,10 @@ mod tests {
         let count = Arc::new(AtomicUsize::new(0));
         let count_clone = count.clone();
 
-        signal.connect("handler", Arc::new(|_: &()| None));
+        signal.connect("handler", Arc::new(|(): &()| None));
         signal.connect(
             "handler",
-            Arc::new(move |_: &()| {
+            Arc::new(move |(): &()| {
                 count_clone.fetch_add(1, Ordering::SeqCst);
                 None
             }),

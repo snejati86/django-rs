@@ -408,9 +408,11 @@ mod tests {
         let lazy = LazySettings::new();
         assert!(!lazy.is_configured());
 
-        let mut settings = Settings::default();
-        settings.debug = false;
-        settings.secret_key = "test-secret".to_string();
+        let settings = Settings {
+            debug: false,
+            secret_key: "test-secret".to_string(),
+            ..Settings::default()
+        };
 
         lazy.configure(settings);
         assert!(lazy.is_configured());
