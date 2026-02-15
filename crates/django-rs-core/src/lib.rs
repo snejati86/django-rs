@@ -13,6 +13,7 @@
 //! - [`logging`] - Tracing-based logging integration
 //! - [`signing`] - Cryptographic signing (HMAC-SHA256, timestamps, serialization)
 //! - [`checks`] - System check framework for configuration validation
+//! - [`i18n`] - Internationalization and localization (translation catalogs, timezone)
 
 // Allow large error type (DjangoError is shared across the project).
 #![allow(clippy::result_large_err)]
@@ -20,6 +21,7 @@
 pub mod apps;
 pub mod checks;
 pub mod error;
+pub mod i18n;
 pub mod logging;
 pub mod settings;
 pub mod settings_loader;

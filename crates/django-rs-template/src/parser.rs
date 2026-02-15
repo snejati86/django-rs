@@ -290,6 +290,16 @@ pub enum Node {
         /// Body nodes.
         body: Vec<Node>,
     },
+    /// `{% trans "text" %}` — translates a string using i18n.
+    TransNode {
+        /// The message to translate (literal string or variable).
+        message: Expression,
+    },
+    /// `{% blocktrans %}...{% endblocktrans %}` — translates a block of text.
+    BlockTransNode {
+        /// The literal text content to translate.
+        content: String,
+    },
 }
 
 /// A condition in an `{% if %}` branch.
@@ -471,6 +481,7 @@ impl<'a> ParserState<'a> {
         Ok(nodes)
     }
 
+    #[allow(clippy::too_many_lines)]
     fn parse_block_tag(
         &mut self,
         tag_name: &str,
@@ -550,6 +561,35 @@ impl<'a> ParserState<'a> {
                 Ok(Some(Node::DebugNode))
             }
             "autoescape" => self.parse_autoescape(args),
+            "trans" => {
+                let msg = if let Some(arg) = args.first() {
+                    parse_expression(arg)?
+                } else {
+                    return Err(DjangoError::TemplateSyntaxError(
+                        "{% trans %} requires a message argument".to_string(),
+                    ));
+                };
+                self.pos += 1;
+                Ok(Some(Node::TransNode { message: msg }))
+            }
+            "blocktrans" => {
+                self.pos += 1;
+                // Collect all text between blocktrans and endblocktrans
+                let body = self.parse_nodes(&["endblocktrans"])?;
+                self.pos += 1; // skip endblocktrans
+                // Flatten body nodes into a single text string
+                let mut content = String::new();
+                for node in &body {
+                    match node {
+                        Node::Text(t) => content.push_str(t),
+                        Node::Variable { expression: Expression::Variable(name), .. } => {
+                            content.push_str(&format!("%({name})"));
+                        }
+                        _ => {}
+                    }
+                }
+                Ok(Some(Node::BlockTransNode { content }))
+            }
             _ => Err(DjangoError::TemplateSyntaxError(format!(
                 "Unknown tag: '{tag_name}'"
             ))),
@@ -1230,6 +1270,34 @@ fn render_node(
             context.set_auto_escape(prev);
             Ok(result)
         }
+        Node::TransNode { message } => {
+            let msg = message.resolve(context).to_display_string();
+            Ok(django_rs_core::i18n::gettext(&msg))
+        }
+        Node::BlockTransNode { content } => {
+            // Translate the content string using i18n
+            let translated = django_rs_core::i18n::gettext(content);
+
+            // Replace %(varname) placeholders with context values
+            let mut result = translated;
+            let mut search_from = 0;
+            while let Some(start) = result[search_from..].find("%(") {
+                let abs_start = search_from + start;
+                if let Some(end) = result[abs_start + 2..].find(')') {
+                    let abs_end = abs_start + 2 + end;
+                    let var_name = &result[abs_start + 2..abs_end];
+                    let replacement = context
+                        .get(var_name)
+                        .map(|v| v.to_display_string())
+                        .unwrap_or_default();
+                    result = format!("{}{}{}", &result[..abs_start], replacement, &result[abs_end + 1..]);
+                    search_from = abs_start + replacement.len();
+                } else {
+                    break;
+                }
+            }
+            Ok(result)
+        }
     }
 }
 
@@ -1681,5 +1749,79 @@ mod tests {
             ContextValue::List(vec![ContextValue::from("a"), ContextValue::from("b")]),
         );
         assert!(cond.evaluate(&ctx));
+    }
+
+    // ── i18n template tag tests ─────────────────────────────────────
+
+    #[test]
+    fn test_trans_tag_no_translation() {
+        django_rs_core::i18n::deactivate();
+        let engine = crate::engine::Engine::new();
+        engine.add_string_template("test.html", r#"{% trans "Hello" %}"#);
+        let mut ctx = Context::new();
+        let result = engine.render_to_string("test.html", &mut ctx).unwrap();
+        assert_eq!(result, "Hello");
+    }
+
+    #[test]
+    fn test_trans_tag_with_translation() {
+        django_rs_core::i18n::catalog::register_translations("trans_test_lang", vec![
+            ("Welcome", "Bienvenue"),
+        ]);
+        django_rs_core::i18n::activate("trans_test_lang");
+
+        let engine = crate::engine::Engine::new();
+        engine.add_string_template("test.html", r#"{% trans "Welcome" %}"#);
+        let mut ctx = Context::new();
+        let result = engine.render_to_string("test.html", &mut ctx).unwrap();
+        assert_eq!(result, "Bienvenue");
+
+        django_rs_core::i18n::deactivate();
+    }
+
+    #[test]
+    fn test_trans_tag_with_variable() {
+        django_rs_core::i18n::deactivate();
+        let engine = crate::engine::Engine::new();
+        engine.add_string_template("test.html", "{% trans msg %}");
+        let mut ctx = Context::new();
+        ctx.set("msg", ContextValue::from("Dynamic message"));
+        let result = engine.render_to_string("test.html", &mut ctx).unwrap();
+        assert_eq!(result, "Dynamic message");
+    }
+
+    #[test]
+    fn test_blocktrans_tag_no_translation() {
+        django_rs_core::i18n::deactivate();
+        let engine = crate::engine::Engine::new();
+        engine.add_string_template("test.html", "{% blocktrans %}Hello World{% endblocktrans %}");
+        let mut ctx = Context::new();
+        let result = engine.render_to_string("test.html", &mut ctx).unwrap();
+        assert_eq!(result, "Hello World");
+    }
+
+    #[test]
+    fn test_blocktrans_tag_with_translation() {
+        django_rs_core::i18n::catalog::register_translations("blocktrans_test_lang", vec![
+            ("Good morning", "Buenos días"),
+        ]);
+        django_rs_core::i18n::activate("blocktrans_test_lang");
+
+        let engine = crate::engine::Engine::new();
+        engine.add_string_template("test.html", "{% blocktrans %}Good morning{% endblocktrans %}");
+        let mut ctx = Context::new();
+        let result = engine.render_to_string("test.html", &mut ctx).unwrap();
+        assert_eq!(result, "Buenos días");
+
+        django_rs_core::i18n::deactivate();
+    }
+
+    #[test]
+    fn test_trans_tag_error_no_args() {
+        let engine = crate::engine::Engine::new();
+        engine.add_string_template("bad.html", "{% trans %}");
+        let mut ctx = Context::new();
+        let result = engine.render_to_string("bad.html", &mut ctx);
+        assert!(result.is_err());
     }
 }

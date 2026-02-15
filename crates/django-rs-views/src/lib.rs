@@ -10,6 +10,7 @@
 //! - [`views`] - Function-based views, class-based views, and generic CRUD views
 //! - [`session`] - Session framework with pluggable backends
 //! - [`server`] - HTTP server integration via Axum
+//! - [`contrib`] - Sites, Redirects, Flatpages, and Syndication frameworks
 //!
 //! ## Quick Start
 //!
@@ -43,6 +44,7 @@
 #![allow(clippy::implicit_hasher)]
 #![allow(clippy::option_if_let_else)]
 
+pub mod contrib;
 pub mod middleware;
 pub mod pagination;
 pub mod server;
