@@ -62,8 +62,10 @@ pub use session::{
     SessionBackend, SessionData, SessionMiddleware, SignedCookieSessionBackend,
 };
 pub use views::{
-    ContextMixin, CreateView, DeleteView, DetailView, FormView, ListView, RedirectView,
-    TemplateView, TemplateResponseMixin, UpdateView, View, ViewFunction,
+    ArchiveIndexView, ContextMixin, CreateView, DateDetailView, DateMixin, DayArchiveView,
+    DeleteView, DetailView, FormView, ListView, MonthArchiveView, RedirectView,
+    TemplateView, TemplateResponseMixin, TodayArchiveView, UpdateView, View, ViewFunction,
+    YearArchiveView,
     bind_form_from_request, cleaned_data_as_strings, extract_post_data, form_context_to_json,
     form_errors, login_required_redirect, permission_required,
     LoginRequiredMixin, PermissionRequiredMixin,
