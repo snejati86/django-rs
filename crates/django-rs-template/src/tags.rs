@@ -34,6 +34,10 @@
 //! - `{% load %}` — load a template tag library (no-op)
 //! - `{% autoescape on|off %}` / `{% endautoescape %}` — toggle auto-escaping
 //!
+//! ### Internationalization
+//! - `{% trans "text" %}` — translate a string using i18n
+//! - `{% blocktrans %}...{% endblocktrans %}` — translate a block of text
+//!
 //! ### Logic (deprecated)
 //! - `{% ifequal %}` / `{% endifequal %}` — compare two values for equality
 //!
@@ -88,6 +92,9 @@ pub fn builtin_tag_names() -> Vec<&'static str> {
         "endifchanged",
         "autoescape",
         "endautoescape",
+        "trans",
+        "blocktrans",
+        "endblocktrans",
     ]
 }
 
@@ -114,12 +121,15 @@ mod tests {
         assert!(names.contains(&"debug"));
         assert!(names.contains(&"load"));
         assert!(names.contains(&"autoescape"));
+        assert!(names.contains(&"trans"));
+        assert!(names.contains(&"blocktrans"));
+        assert!(names.contains(&"endblocktrans"));
     }
 
     #[test]
     fn test_tag_count() {
         let names = builtin_tag_names();
-        // We should have a good number of tags
-        assert!(names.len() >= 30);
+        // We should have a good number of tags (30 base + 3 i18n)
+        assert!(names.len() >= 33);
     }
 }
