@@ -13,6 +13,9 @@ workspace = true
 [dependencies]
 django-rs-core.workspace = true
 django-rs-http.workspace = true
-tera.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+chrono.workspace = true
+regex.workspace = true
+percent-encoding.workspace = true
+rand.workspace = true
