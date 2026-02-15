@@ -21,8 +21,42 @@ use async_trait::async_trait;
 
 use django_rs_core::DjangoError;
 use django_rs_http::{HttpRequest, HttpResponse, HttpResponseRedirect};
+use django_rs_template::context::{Context, ContextValue};
+use django_rs_template::engine::Engine;
 
 use super::class_based::{ContextMixin, View};
+
+/// Renders a template with the given name and serde_json context using the engine.
+///
+/// If no engine is provided, falls back to a JSON representation.
+fn render_with_engine(
+    template_name: &str,
+    context: &HashMap<String, serde_json::Value>,
+    engine: Option<&Engine>,
+) -> HttpResponse {
+    if let Some(engine) = engine {
+        let mut template_context = Context::new();
+        for (key, value) in context {
+            template_context.set(key.clone(), ContextValue::from(value.clone()));
+        }
+        match engine.render_to_string(template_name, &mut template_context) {
+            Ok(html) => {
+                let mut response = HttpResponse::ok(html);
+                response.set_content_type("text/html");
+                response
+            }
+            Err(e) => HttpResponse::server_error(format!("Template error: {e}")),
+        }
+    } else {
+        let body = serde_json::to_string_pretty(context).unwrap_or_default();
+        let html = format!(
+            "<!-- Template: {template_name} -->\n<html><body><pre>{body}</pre></body></html>"
+        );
+        let mut response = HttpResponse::ok(html);
+        response.set_content_type("text/html");
+        response
+    }
+}
 
 /// A view for displaying a list of objects. Equivalent to Django's `ListView`.
 ///
@@ -53,6 +87,11 @@ pub trait ListView: View + ContextMixin + Send + Sync {
         None
     }
 
+    /// Returns an optional template engine for rendering.
+    fn engine(&self) -> Option<&Engine> {
+        None
+    }
+
     /// Retrieves the list of objects to display.
     async fn get_queryset(&self) -> Result<Vec<serde_json::Value>, DjangoError>;
 
@@ -72,14 +111,8 @@ pub trait ListView: View + ContextMixin + Send + Sync {
                     serde_json::Value::Array(paginated),
                 );
 
-                let body = serde_json::to_string_pretty(&context).unwrap_or_default();
                 let template = self.template_name();
-                let html = format!(
-                    "<!-- Template: {template} -->\n<html><body><pre>{body}</pre></body></html>"
-                );
-                let mut response = HttpResponse::ok(html);
-                response.set_content_type("text/html");
-                response
+                render_with_engine(&template, &context, self.engine())
             }
             Err(e) => HttpResponse::server_error(format!("Error fetching objects: {e}")),
         }
@@ -115,6 +148,11 @@ pub trait DetailView: View + ContextMixin + Send + Sync {
         "pk"
     }
 
+    /// Returns an optional template engine for rendering.
+    fn engine(&self) -> Option<&Engine> {
+        None
+    }
+
     /// Retrieves the object to display.
     async fn get_object(
         &self,
@@ -128,14 +166,8 @@ pub trait DetailView: View + ContextMixin + Send + Sync {
                 let mut context = self.get_context_data(kwargs);
                 context.insert("object".to_string(), object);
 
-                let body = serde_json::to_string_pretty(&context).unwrap_or_default();
                 let template = self.template_name();
-                let html = format!(
-                    "<!-- Template: {template} -->\n<html><body><pre>{body}</pre></body></html>"
-                );
-                let mut response = HttpResponse::ok(html);
-                response.set_content_type("text/html");
-                response
+                render_with_engine(&template, &context, self.engine())
             }
             Err(DjangoError::NotFound(msg) | DjangoError::DoesNotExist(msg)) => {
                 HttpResponse::not_found(msg)
@@ -148,6 +180,7 @@ pub trait DetailView: View + ContextMixin + Send + Sync {
 /// A view for creating a new object from form data. Equivalent to Django's `CreateView`.
 ///
 /// Implementors provide validation logic and the success URL for after creation.
+/// When an engine is provided, templates are rendered using the full template engine.
 #[async_trait]
 pub trait CreateView: View + ContextMixin + Send + Sync {
     /// Returns the model name for this create view.
@@ -169,6 +202,11 @@ pub trait CreateView: View + ContextMixin + Send + Sync {
     /// Returns the URL to redirect to after successful creation.
     fn success_url(&self) -> &str;
 
+    /// Returns an optional template engine for rendering.
+    fn engine(&self) -> Option<&Engine> {
+        None
+    }
+
     /// Handles valid form data by creating the object.
     async fn form_valid(&self, data: HashMap<String, String>) -> HttpResponse;
 
@@ -178,14 +216,20 @@ pub trait CreateView: View + ContextMixin + Send + Sync {
     /// Handles GET requests by rendering the empty form.
     async fn render_form(&self) -> HttpResponse {
         let context = self.get_context_data(&HashMap::new());
-        let body = serde_json::to_string_pretty(&context).unwrap_or_default();
         let template = self.template_name();
-        let html = format!(
-            "<!-- Template: {template} -->\n<html><body><pre>{body}</pre></body></html>"
-        );
-        let mut response = HttpResponse::ok(html);
-        response.set_content_type("text/html");
-        response
+        render_with_engine(&template, &context, self.engine())
+    }
+
+    /// Renders the form with errors after a failed POST.
+    async fn render_form_with_errors(
+        &self,
+        errors: HashMap<String, Vec<String>>,
+    ) -> HttpResponse {
+        let mut context = self.get_context_data(&HashMap::new());
+        let errors_json: serde_json::Value = serde_json::to_value(&errors).unwrap_or_default();
+        context.insert("errors".to_string(), errors_json);
+        let template = self.template_name();
+        render_with_engine(&template, &context, self.engine())
     }
 }
 
@@ -218,6 +262,11 @@ pub trait UpdateView: View + ContextMixin + Send + Sync {
         "pk"
     }
 
+    /// Returns an optional template engine for rendering.
+    fn engine(&self) -> Option<&Engine> {
+        None
+    }
+
     /// Retrieves the object to update.
     async fn get_object(
         &self,
@@ -229,6 +278,35 @@ pub trait UpdateView: View + ContextMixin + Send + Sync {
 
     /// Handles invalid form data by returning error information.
     async fn form_invalid(&self, errors: HashMap<String, Vec<String>>) -> HttpResponse;
+
+    /// Renders the update form for a GET request.
+    async fn render_form(
+        &self,
+        kwargs: &HashMap<String, String>,
+    ) -> HttpResponse {
+        match self.get_object(kwargs).await {
+            Ok(object) => {
+                let mut context = self.get_context_data(kwargs);
+                context.insert("object".to_string(), object);
+                let template = self.template_name();
+                render_with_engine(&template, &context, self.engine())
+            }
+            Err(e) => HttpResponse::server_error(format!("Error fetching object: {e}")),
+        }
+    }
+
+    /// Renders the update form with errors after a failed POST.
+    async fn render_form_with_errors(
+        &self,
+        kwargs: &HashMap<String, String>,
+        errors: HashMap<String, Vec<String>>,
+    ) -> HttpResponse {
+        let mut context = self.get_context_data(kwargs);
+        let errors_json: serde_json::Value = serde_json::to_value(&errors).unwrap_or_default();
+        context.insert("errors".to_string(), errors_json);
+        let template = self.template_name();
+        render_with_engine(&template, &context, self.engine())
+    }
 }
 
 /// A view for deleting an existing object. Equivalent to Django's `DeleteView`.
@@ -257,6 +335,11 @@ pub trait DeleteView: View + ContextMixin + Send + Sync {
         "pk"
     }
 
+    /// Returns an optional template engine for rendering.
+    fn engine(&self) -> Option<&Engine> {
+        None
+    }
+
     /// Retrieves the object to delete.
     async fn get_object(
         &self,
@@ -277,6 +360,22 @@ pub trait DeleteView: View + ContextMixin + Send + Sync {
         match self.perform_delete(kwargs).await {
             Ok(()) => HttpResponseRedirect::new(self.success_url()),
             Err(e) => HttpResponse::server_error(format!("Error deleting object: {e}")),
+        }
+    }
+
+    /// Renders the delete confirmation page.
+    async fn render_confirm_delete(
+        &self,
+        kwargs: &HashMap<String, String>,
+    ) -> HttpResponse {
+        match self.get_object(kwargs).await {
+            Ok(object) => {
+                let mut context = self.get_context_data(kwargs);
+                context.insert("object".to_string(), object);
+                let template = self.template_name();
+                render_with_engine(&template, &context, self.engine())
+            }
+            Err(e) => HttpResponse::server_error(format!("Error fetching object: {e}")),
         }
     }
 }

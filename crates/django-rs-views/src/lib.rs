@@ -40,6 +40,8 @@
 #![allow(clippy::unnecessary_literal_bound)]
 #![allow(clippy::significant_drop_tightening)]
 #![allow(clippy::return_self_not_must_use)]
+#![allow(clippy::implicit_hasher)]
+#![allow(clippy::option_if_let_else)]
 
 pub mod middleware;
 pub mod server;
@@ -55,4 +57,6 @@ pub use session::{
 pub use views::{
     ContextMixin, CreateView, DeleteView, DetailView, ListView, RedirectView, TemplateView,
     TemplateResponseMixin, UpdateView, View, ViewFunction,
+    bind_form_from_request, cleaned_data_as_strings, extract_post_data, form_context_to_json,
+    form_errors,
 };

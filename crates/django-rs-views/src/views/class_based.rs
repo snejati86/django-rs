@@ -8,17 +8,20 @@
 //!
 //! - [`View`] - The base trait for all class-based views
 //! - [`ContextMixin`] - Provides template context data
-//! - [`TemplateResponseMixin`] - Renders templates with context
+//! - [`TemplateResponseMixin`] - Renders templates with context using the template engine
 //! - [`TemplateView`] - A concrete view that renders a template
 //! - [`RedirectView`] - A concrete view that redirects to a URL
 
 use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
+use std::sync::Arc;
 
 use async_trait::async_trait;
 
 use django_rs_http::{HttpRequest, HttpResponse, HttpResponseRedirect};
+use django_rs_template::context::{Context, ContextValue};
+use django_rs_template::engine::Engine;
 
 use super::function::ViewFunction;
 
@@ -160,6 +163,11 @@ pub trait ContextMixin {
 ///
 /// This mirrors Django's `TemplateResponseMixin`. It provides methods to
 /// determine the template name and render the template to a response.
+///
+/// When an `Engine` is provided via `render_to_response_with_engine`, the
+/// template is rendered using the full template engine. When no engine is
+/// available, it falls back to a JSON-based representation for backward
+/// compatibility.
 pub trait TemplateResponseMixin: View {
     /// Returns the primary template name.
     fn template_name(&self) -> &str;
@@ -169,11 +177,40 @@ pub trait TemplateResponseMixin: View {
         vec![self.template_name().to_string()]
     }
 
+    /// Renders the template with the given context using the template engine.
+    ///
+    /// Converts serde_json::Value context into template ContextValues and renders
+    /// through the Engine. Falls back to `render_to_response` if the engine is None.
+    fn render_to_response_with_engine(
+        &self,
+        context: HashMap<String, serde_json::Value>,
+        engine: Option<&Engine>,
+    ) -> HttpResponse {
+        let Some(engine) = engine else {
+            return self.render_to_response(context);
+        };
+
+        let template_name = self.template_name();
+        let mut template_context = Context::new();
+        for (key, value) in context {
+            template_context.set(key, ContextValue::from(value));
+        }
+
+        match engine.render_to_string(template_name, &mut template_context) {
+            Ok(html) => {
+                let mut response = HttpResponse::ok(html);
+                response.set_content_type("text/html");
+                response
+            }
+            Err(e) => HttpResponse::server_error(format!("Template error: {e}")),
+        }
+    }
+
     /// Renders the template with the given context and returns an `HttpResponse`.
     ///
-    /// This is a simplified implementation that serializes the context as JSON
-    /// and wraps it in a basic HTML template. A full implementation would use
-    /// the template engine from `django-rs-template`.
+    /// This is a fallback implementation that serializes the context as JSON
+    /// when no template engine is available. For engine-backed rendering, use
+    /// `render_to_response_with_engine`.
     fn render_to_response(
         &self,
         context: HashMap<String, serde_json::Value>,
@@ -194,6 +231,9 @@ pub trait TemplateResponseMixin: View {
 /// Combines the `View`, `ContextMixin`, and `TemplateResponseMixin` functionality
 /// to render a simple template with optional context data.
 ///
+/// When an `Engine` is attached via `with_engine`, templates are rendered using the
+/// full template engine. Otherwise, a JSON fallback is used.
+///
 /// # Examples
 ///
 /// ```
@@ -204,6 +244,7 @@ pub trait TemplateResponseMixin: View {
 pub struct TemplateView {
     template: String,
     extra_context: HashMap<String, serde_json::Value>,
+    engine: Option<Arc<Engine>>,
 }
 
 impl TemplateView {
@@ -212,7 +253,15 @@ impl TemplateView {
         Self {
             template: template.to_string(),
             extra_context: HashMap::new(),
+            engine: None,
         }
+    }
+
+    /// Attaches a template engine to this view.
+    #[must_use]
+    pub fn with_engine(mut self, engine: Arc<Engine>) -> Self {
+        self.engine = Some(engine);
+        self
     }
 
     /// Adds extra context data to this view.
@@ -247,7 +296,7 @@ impl TemplateResponseMixin for TemplateView {
 impl View for TemplateView {
     async fn get(&self, _request: HttpRequest) -> HttpResponse {
         let context = self.get_context_data(&HashMap::new());
-        self.render_to_response(context)
+        self.render_to_response_with_engine(context, self.engine.as_deref())
     }
 }
 

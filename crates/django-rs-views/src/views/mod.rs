@@ -6,12 +6,18 @@
 //! - [`function`] - Function-based views and decorator patterns
 //! - [`class_based`] - The `View` trait, `TemplateView`, `RedirectView`
 //! - [`generic`] - Generic CRUD views (`ListView`, `DetailView`, `CreateView`, etc.)
+//! - [`form_view`] - Form-view integration helpers
 
 pub mod class_based;
+pub mod form_view;
 pub mod function;
 pub mod generic;
 
 pub use class_based::{ContextMixin, RedirectView, TemplateResponseMixin, TemplateView, View};
+pub use form_view::{
+    bind_form_from_request, cleaned_data_as_strings, extract_post_data, form_context_to_json,
+    form_errors,
+};
 pub use function::{
     login_required, require_get, require_http_methods, require_post, ViewFunction,
 };
