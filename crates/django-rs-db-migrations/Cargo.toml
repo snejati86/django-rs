@@ -13,7 +13,6 @@ workspace = true
 [dependencies]
 django-rs-core.workspace = true
 django-rs-db.workspace = true
-django-rs-db-backends.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-tokio.workspace = true
+chrono.workspace = true
