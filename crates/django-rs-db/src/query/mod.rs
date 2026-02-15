@@ -14,5 +14,9 @@ pub mod queryset;
 
 pub use compiler::{DatabaseBackendType, OrderBy, Query, Row, SelectColumn, SqlCompiler, WhereNode};
 pub use expressions::{AggregateFunc, Expression, When};
+pub use expressions::{
+    Exists, OuterRef, SubqueryExpression, WindowExpression, WindowFrame, WindowFrameBound,
+    WindowFrameType, WindowFunction,
+};
 pub use lookups::{Lookup, Q};
 pub use queryset::{Manager, QuerySet};

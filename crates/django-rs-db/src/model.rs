@@ -52,6 +52,7 @@ pub use crate::query::compiler::Row;
 ///             indexes: vec![],
 ///             abstract_model: false,
 ///             fields: vec![],
+///             constraints: vec![],
 ///         });
 ///         &META
 ///     }
@@ -140,6 +141,8 @@ pub struct ModelMeta {
     pub abstract_model: bool,
     /// Field definitions for this model.
     pub fields: Vec<FieldDef>,
+    /// Database constraints (CHECK, UNIQUE).
+    pub constraints: Vec<crate::constraints::BoxedConstraint>,
 }
 
 /// A database index definition.
@@ -180,6 +183,7 @@ mod tests {
                     FieldDef::new("id", FieldType::BigAutoField).primary_key(),
                     FieldDef::new("name", FieldType::CharField).max_length(100),
                 ],
+                constraints: vec![],
             });
             &META
         }

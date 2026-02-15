@@ -17,10 +17,12 @@
 //! let count = Expression::aggregate(AggregateFunc::Count, Expression::col("id"));
 //! ```
 
-use super::compiler::Query;
-use super::lookups::Q;
+use crate::query::compiler::Query;
+use crate::query::lookups::Q;
 use crate::value::Value;
 use std::ops;
+
+use super::window::WindowExpression;
 
 /// A query expression that produces a value in the context of a SQL query.
 ///
@@ -62,6 +64,45 @@ pub enum Expression {
     },
     /// A subquery expression.
     Subquery(Box<Query>),
+    /// An outer reference used inside a subquery to reference the enclosing query's column.
+    OuterRef(String),
+    /// An EXISTS (or NOT EXISTS) subquery expression.
+    Exists {
+        /// The inner query for the EXISTS check.
+        query: Box<Query>,
+        /// Whether this is NOT EXISTS.
+        negated: bool,
+    },
+    /// A window expression: function OVER (PARTITION BY ... ORDER BY ... frame).
+    Window(Box<WindowExpression>),
+    /// EXTRACT(part FROM expr) - extracts a component from a date/time value.
+    Extract {
+        /// The part to extract (e.g., "YEAR", "MONTH", "DAY").
+        part: String,
+        /// The expression to extract from.
+        expr: Box<Expression>,
+    },
+    /// DATE_TRUNC(precision, expr) - truncates a timestamp.
+    DateTrunc {
+        /// The precision to truncate to (e.g., "YEAR", "MONTH").
+        precision: String,
+        /// The expression to truncate.
+        expr: Box<Expression>,
+    },
+    /// CAST(expr AS type) - type conversion.
+    Cast {
+        /// The expression to cast.
+        expr: Box<Expression>,
+        /// The target data type.
+        data_type: String,
+    },
+    /// expr COLLATE collation - applies a collation.
+    Collate {
+        /// The expression.
+        expr: Box<Expression>,
+        /// The collation name.
+        collation: String,
+    },
     /// Raw SQL with parameters.
     RawSQL(String, Vec<Value>),
     /// Addition.

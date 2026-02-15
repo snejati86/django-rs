@@ -259,6 +259,7 @@ mod tests {
                 .nullable(),
             FieldDef::new("slug", FieldType::SlugField),
         ],
+        constraints: vec![],
     });
 
     fn get_test_meta() -> &'static ModelMeta {
