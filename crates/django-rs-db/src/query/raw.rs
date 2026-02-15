@@ -259,6 +259,7 @@ mod tests {
                     FieldDef::new("id", FieldType::BigAutoField).primary_key(),
                     FieldDef::new("name", FieldType::CharField).max_length(100),
                 ],
+                constraints: vec![],
             });
             &META
         }
