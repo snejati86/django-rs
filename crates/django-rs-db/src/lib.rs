@@ -56,6 +56,7 @@ pub mod executor;
 pub mod fields;
 pub mod model;
 pub mod query;
+pub mod router;
 pub mod transactions;
 pub mod validators;
 pub mod value;
@@ -74,6 +75,13 @@ pub use query::{
     Query, QuerySet, Row, SelectColumn, SelectRelatedField, SqlCompiler, SubqueryExpression, When,
     WhereNode, WindowExpression, WindowFrame, WindowFrameBound, WindowFrameType, WindowFunction,
 };
+pub use model::{
+    BloomIndex, BrinIndex, GinIndex, GistIndex, Index, IndexType, SpGistIndex,
+};
+pub use query::expressions::search::{
+    SearchQuery, SearchQueryType, SearchRank, SearchVector, TrigramSimilarity,
+};
+pub use router::{DatabaseEntry, DatabaseRouter, DatabasesConfig, RouterChain};
 pub use validators::Validator;
 pub use value::Value;
 

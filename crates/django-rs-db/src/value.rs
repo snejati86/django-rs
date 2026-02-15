@@ -54,6 +54,20 @@ pub enum Value {
     Json(serde_json::Value),
     /// A list of values (for IN clauses, array fields, etc.).
     List(Vec<Value>),
+    /// A key-value map (for PostgreSQL hstore fields).
+    HStore(std::collections::HashMap<String, String>),
+    /// A range value with optional lower and upper bounds (for PostgreSQL range fields).
+    /// The booleans indicate whether each bound is inclusive (true) or exclusive (false).
+    Range {
+        /// The lower bound, or `None` for unbounded.
+        lower: Option<Box<Value>>,
+        /// Whether the lower bound is inclusive.
+        lower_inclusive: bool,
+        /// The upper bound, or `None` for unbounded.
+        upper: Option<Box<Value>>,
+        /// Whether the upper bound is inclusive.
+        upper_inclusive: bool,
+    },
 }
 
 impl fmt::Display for Value {
@@ -81,6 +95,34 @@ impl fmt::Display for Value {
                     write!(f, "{v}")?;
                 }
                 write!(f, "]")
+            }
+            Self::HStore(map) => {
+                write!(f, "{{")?;
+                for (i, (k, v)) in map.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{k} => {v}")?;
+                }
+                write!(f, "}}")
+            }
+            Self::Range {
+                lower,
+                lower_inclusive,
+                upper,
+                upper_inclusive,
+            } => {
+                let lb = if *lower_inclusive { "[" } else { "(" };
+                let ub = if *upper_inclusive { "]" } else { ")" };
+                let l = match lower {
+                    Some(v) => format!("{v}"),
+                    None => String::new(),
+                };
+                let u = match upper {
+                    Some(v) => format!("{v}"),
+                    None => String::new(),
+                };
+                write!(f, "{lb}{l}, {u}{ub}")
             }
         }
     }
@@ -190,6 +232,12 @@ impl From<Vec<Value>> for Value {
     }
 }
 
+impl From<std::collections::HashMap<String, String>> for Value {
+    fn from(v: std::collections::HashMap<String, String>) -> Self {
+        Self::HStore(v)
+    }
+}
+
 impl<T: Into<Value>> From<Option<T>> for Value {
     fn from(v: Option<T>) -> Self {
         match v {
@@ -234,6 +282,48 @@ impl Value {
         match self {
             Self::String(s) => Some(s),
             _ => None,
+        }
+    }
+
+    /// Attempts to extract an hstore map reference.
+    pub fn as_hstore(&self) -> Option<&std::collections::HashMap<String, String>> {
+        match self {
+            Self::HStore(m) => Some(m),
+            _ => None,
+        }
+    }
+
+    /// Attempts to extract a list reference.
+    pub fn as_list(&self) -> Option<&[Value]> {
+        match self {
+            Self::List(v) => Some(v),
+            _ => None,
+        }
+    }
+
+    /// Creates a range value with inclusive lower and exclusive upper bounds
+    /// (the standard `[lower, upper)` convention used by PostgreSQL).
+    pub fn range(lower: impl Into<Value>, upper: impl Into<Value>) -> Self {
+        Self::Range {
+            lower: Some(Box::new(lower.into())),
+            lower_inclusive: true,
+            upper: Some(Box::new(upper.into())),
+            upper_inclusive: false,
+        }
+    }
+
+    /// Creates a range value with custom bound inclusivity.
+    pub fn range_with_bounds(
+        lower: Option<Value>,
+        lower_inclusive: bool,
+        upper: Option<Value>,
+        upper_inclusive: bool,
+    ) -> Self {
+        Self::Range {
+            lower: lower.map(Box::new),
+            lower_inclusive,
+            upper: upper.map(Box::new),
+            upper_inclusive,
         }
     }
 }
@@ -403,5 +493,94 @@ mod tests {
             Value::Uuid(u).to_string(),
             "00000000-0000-0000-0000-000000000000"
         );
+    }
+
+    #[test]
+    fn test_hstore_value() {
+        let mut map = std::collections::HashMap::new();
+        map.insert("key1".to_string(), "val1".to_string());
+        let v = Value::from(map.clone());
+        assert_eq!(v.as_hstore(), Some(&map));
+    }
+
+    #[test]
+    fn test_display_hstore() {
+        let mut map = std::collections::HashMap::new();
+        map.insert("a".to_string(), "1".to_string());
+        let v = Value::HStore(map);
+        let s = v.to_string();
+        assert!(s.contains("a => 1"));
+    }
+
+    #[test]
+    fn test_range_value() {
+        let v = Value::range(1, 10);
+        match &v {
+            Value::Range {
+                lower,
+                lower_inclusive,
+                upper,
+                upper_inclusive,
+            } => {
+                assert_eq!(**lower.as_ref().unwrap(), Value::Int(1));
+                assert!(*lower_inclusive);
+                assert_eq!(**upper.as_ref().unwrap(), Value::Int(10));
+                assert!(!*upper_inclusive);
+            }
+            _ => panic!("Expected Range"),
+        }
+    }
+
+    #[test]
+    fn test_range_with_bounds() {
+        let v = Value::range_with_bounds(
+            Some(Value::Int(5)),
+            false,
+            Some(Value::Int(15)),
+            true,
+        );
+        match &v {
+            Value::Range {
+                lower,
+                lower_inclusive,
+                upper,
+                upper_inclusive,
+            } => {
+                assert_eq!(**lower.as_ref().unwrap(), Value::Int(5));
+                assert!(!*lower_inclusive);
+                assert_eq!(**upper.as_ref().unwrap(), Value::Int(15));
+                assert!(*upper_inclusive);
+            }
+            _ => panic!("Expected Range"),
+        }
+    }
+
+    #[test]
+    fn test_display_range() {
+        let v = Value::range(1, 10);
+        assert_eq!(v.to_string(), "[1, 10)");
+    }
+
+    #[test]
+    fn test_display_range_inclusive() {
+        let v = Value::range_with_bounds(
+            Some(Value::Int(1)),
+            true,
+            Some(Value::Int(10)),
+            true,
+        );
+        assert_eq!(v.to_string(), "[1, 10]");
+    }
+
+    #[test]
+    fn test_as_list() {
+        let v = Value::List(vec![Value::Int(1), Value::Int(2)]);
+        assert_eq!(v.as_list().unwrap().len(), 2);
+        assert_eq!(Value::Int(1).as_list(), None);
+    }
+
+    #[test]
+    fn test_as_hstore_none() {
+        assert_eq!(Value::Int(1).as_hstore(), None);
     }
 }

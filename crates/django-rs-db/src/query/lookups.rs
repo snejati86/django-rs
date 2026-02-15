@@ -67,6 +67,40 @@ pub enum Lookup {
     Regex(String),
     /// Case-insensitive regular expression match.
     IRegex(String),
+
+    // ── PostgreSQL array lookups ─────────────────────────────────────
+    /// Array contains all of the given values (`@>` operator).
+    ArrayContains(Vec<Value>),
+    /// Array is contained by the given values (`<@` operator).
+    ArrayContainedBy(Vec<Value>),
+    /// Array overlaps with the given values (`&&` operator).
+    ArrayOverlap(Vec<Value>),
+    /// Array has the given length (`array_length(col, 1) = n`).
+    ArrayLen(usize),
+
+    // ── PostgreSQL hstore lookups ────────────────────────────────────
+    /// Hstore has a specific key (`?` operator).
+    HasKey(String),
+    /// Hstore has all of the given keys (`?&` operator).
+    HasKeys(Vec<String>),
+    /// Hstore has any of the given keys (`?|` operator).
+    HasAnyKeys(Vec<String>),
+
+    // ── PostgreSQL range lookups ─────────────────────────────────────
+    /// Range contains the given value or range (`@>` operator).
+    RangeContains(Value),
+    /// Range is contained by the given range (`<@` operator).
+    RangeContainedBy(Value),
+    /// Range overlaps with the given range (`&&` operator).
+    RangeOverlap(Value),
+    /// Range is fully less than the given range (`<<` operator).
+    FullyLt(Value),
+    /// Range is fully greater than the given range (`>>` operator).
+    FullyGt(Value),
+
+    // ── PostgreSQL full-text search lookup ───────────────────────────
+    /// Full-text search: matches the column against a tsquery string.
+    Search(String),
 }
 
 /// A composable query filter, equivalent to Django's `Q` object.
@@ -304,5 +338,166 @@ mod tests {
             Q::And(children) => assert_eq!(children.len(), 2),
             _ => panic!("Expected And"),
         }
+    }
+
+    // ── PostgreSQL lookup variant tests ──────────────────────────────
+
+    #[test]
+    fn test_array_contains_lookup() {
+        let q = Q::filter(
+            "tags",
+            Lookup::ArrayContains(vec![Value::from("rust"), Value::from("python")]),
+        );
+        match &q {
+            Q::Filter { field, lookup } => {
+                assert_eq!(field, "tags");
+                assert!(matches!(lookup, Lookup::ArrayContains(_)));
+            }
+            _ => panic!("Expected Filter"),
+        }
+    }
+
+    #[test]
+    fn test_array_contained_by_lookup() {
+        let q = Q::filter(
+            "tags",
+            Lookup::ArrayContainedBy(vec![Value::from("a"), Value::from("b"), Value::from("c")]),
+        );
+        assert!(matches!(
+            q,
+            Q::Filter {
+                lookup: Lookup::ArrayContainedBy(_),
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn test_array_overlap_lookup() {
+        let q = Q::filter(
+            "tags",
+            Lookup::ArrayOverlap(vec![Value::from("x")]),
+        );
+        assert!(matches!(
+            q,
+            Q::Filter {
+                lookup: Lookup::ArrayOverlap(_),
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn test_array_len_lookup() {
+        let q = Q::filter("items", Lookup::ArrayLen(5));
+        assert!(matches!(
+            q,
+            Q::Filter {
+                lookup: Lookup::ArrayLen(5),
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn test_has_key_lookup() {
+        let q = Q::filter("metadata", Lookup::HasKey("color".to_string()));
+        assert!(matches!(
+            q,
+            Q::Filter {
+                lookup: Lookup::HasKey(_),
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn test_has_keys_lookup() {
+        let q = Q::filter(
+            "metadata",
+            Lookup::HasKeys(vec!["color".to_string(), "size".to_string()]),
+        );
+        assert!(matches!(
+            q,
+            Q::Filter {
+                lookup: Lookup::HasKeys(_),
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn test_has_any_keys_lookup() {
+        let q = Q::filter(
+            "metadata",
+            Lookup::HasAnyKeys(vec!["color".to_string(), "weight".to_string()]),
+        );
+        assert!(matches!(
+            q,
+            Q::Filter {
+                lookup: Lookup::HasAnyKeys(_),
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn test_range_contains_lookup() {
+        let q = Q::filter("age_range", Lookup::RangeContains(Value::from(25)));
+        assert!(matches!(
+            q,
+            Q::Filter {
+                lookup: Lookup::RangeContains(_),
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn test_range_overlap_lookup() {
+        let q = Q::filter("period", Lookup::RangeOverlap(Value::range(1, 5)));
+        assert!(matches!(
+            q,
+            Q::Filter {
+                lookup: Lookup::RangeOverlap(_),
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn test_fully_lt_lookup() {
+        let q = Q::filter("period", Lookup::FullyLt(Value::range(10, 20)));
+        assert!(matches!(
+            q,
+            Q::Filter {
+                lookup: Lookup::FullyLt(_),
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn test_fully_gt_lookup() {
+        let q = Q::filter("period", Lookup::FullyGt(Value::range(1, 5)));
+        assert!(matches!(
+            q,
+            Q::Filter {
+                lookup: Lookup::FullyGt(_),
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn test_search_lookup() {
+        let q = Q::filter("body", Lookup::Search("django & rust".to_string()));
+        assert!(matches!(
+            q,
+            Q::Filter {
+                lookup: Lookup::Search(_),
+                ..
+            }
+        ));
     }
 }

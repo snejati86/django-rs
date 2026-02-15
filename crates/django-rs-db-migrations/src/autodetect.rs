@@ -448,6 +448,7 @@ fn fields_differ(a: &MigrationFieldDef, b: &MigrationFieldDef) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use django_rs_db::model::IndexType;
 
     fn make_field(name: &str, ft: FieldType) -> MigrationFieldDef {
         MigrationFieldDef::new(name, ft)
@@ -757,6 +758,7 @@ mod tests {
                     name: Some("idx_title".into()),
                     fields: vec!["title".into()],
                     unique: false,
+                    index_type: IndexType::default(),
                 }],
                 ..ModelOptions::default()
             }),
@@ -777,6 +779,7 @@ mod tests {
                     name: Some("idx_title".into()),
                     fields: vec!["title".into()],
                     unique: false,
+                    index_type: IndexType::default(),
                 }],
                 ..ModelOptions::default()
             }),

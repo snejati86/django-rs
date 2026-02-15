@@ -180,6 +180,229 @@ pub struct Index {
     pub fields: Vec<String>,
     /// Whether this is a unique index.
     pub unique: bool,
+    /// The index type (B-tree by default; PostgreSQL supports additional types).
+    #[serde(default)]
+    pub index_type: IndexType,
+}
+
+impl Index {
+    /// Generates the CREATE INDEX DDL statement for this index.
+    pub fn create_sql(&self, table: &str) -> String {
+        let unique_str = if self.unique { "UNIQUE " } else { "" };
+        let idx_name = self.name.as_deref().unwrap_or("idx");
+        let cols: Vec<String> = self.fields.iter().map(|f| format!("\"{f}\"")).collect();
+        let using = self.index_type.sql_using_clause();
+        format!(
+            "CREATE {unique_str}INDEX \"{idx_name}\" ON \"{table}\" {using} ({})",
+            cols.join(", ")
+        )
+    }
+}
+
+/// The type of database index.
+///
+/// PostgreSQL supports several index types beyond the standard B-tree.
+/// Each type is optimized for different query patterns.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+pub enum IndexType {
+    /// Standard B-tree index (default for all backends).
+    #[default]
+    BTree,
+    /// PostgreSQL GIN (Generalized Inverted Index).
+    /// Optimal for array fields, full-text search, JSONB, and hstore.
+    Gin,
+    /// PostgreSQL GiST (Generalized Search Tree).
+    /// Supports range types, geometric types, and full-text search.
+    Gist,
+    /// PostgreSQL BRIN (Block Range Index).
+    /// Space-efficient for large, naturally ordered tables.
+    Brin,
+    /// PostgreSQL SP-GiST (Space-Partitioned Generalized Search Tree).
+    /// For non-balanced data structures like radix trees and quad-trees.
+    SpGist,
+    /// PostgreSQL Bloom index.
+    /// Probabilistic index for multi-column equality queries.
+    Bloom,
+}
+
+impl IndexType {
+    /// Returns the SQL USING clause for this index type.
+    pub const fn sql_using_clause(&self) -> &'static str {
+        match self {
+            Self::BTree => "USING btree",
+            Self::Gin => "USING gin",
+            Self::Gist => "USING gist",
+            Self::Brin => "USING brin",
+            Self::SpGist => "USING spgist",
+            Self::Bloom => "USING bloom",
+        }
+    }
+}
+
+/// A PostgreSQL GIN index definition.
+///
+/// GIN indexes are optimized for values that contain multiple elements,
+/// such as arrays, JSONB, hstore, and full-text search tsvectors.
+#[derive(Debug, Clone)]
+pub struct GinIndex {
+    /// The index name.
+    pub name: String,
+    /// The columns to index.
+    pub fields: Vec<String>,
+}
+
+impl GinIndex {
+    /// Creates a new GIN index.
+    pub fn new(name: impl Into<String>, fields: Vec<&str>) -> Self {
+        Self {
+            name: name.into(),
+            fields: fields.into_iter().map(String::from).collect(),
+        }
+    }
+}
+
+impl From<GinIndex> for Index {
+    fn from(gin: GinIndex) -> Self {
+        Self {
+            name: Some(gin.name),
+            fields: gin.fields,
+            unique: false,
+            index_type: IndexType::Gin,
+        }
+    }
+}
+
+/// A PostgreSQL GiST index definition.
+///
+/// GiST indexes support range types, geometric data, and can be used
+/// for full-text search.
+#[derive(Debug, Clone)]
+pub struct GistIndex {
+    /// The index name.
+    pub name: String,
+    /// The columns to index.
+    pub fields: Vec<String>,
+}
+
+impl GistIndex {
+    /// Creates a new GiST index.
+    pub fn new(name: impl Into<String>, fields: Vec<&str>) -> Self {
+        Self {
+            name: name.into(),
+            fields: fields.into_iter().map(String::from).collect(),
+        }
+    }
+}
+
+impl From<GistIndex> for Index {
+    fn from(gist: GistIndex) -> Self {
+        Self {
+            name: Some(gist.name),
+            fields: gist.fields,
+            unique: false,
+            index_type: IndexType::Gist,
+        }
+    }
+}
+
+/// A PostgreSQL BRIN index definition.
+///
+/// BRIN indexes are compact and efficient for very large tables where the
+/// physical ordering of rows correlates with column values.
+#[derive(Debug, Clone)]
+pub struct BrinIndex {
+    /// The index name.
+    pub name: String,
+    /// The columns to index.
+    pub fields: Vec<String>,
+}
+
+impl BrinIndex {
+    /// Creates a new BRIN index.
+    pub fn new(name: impl Into<String>, fields: Vec<&str>) -> Self {
+        Self {
+            name: name.into(),
+            fields: fields.into_iter().map(String::from).collect(),
+        }
+    }
+}
+
+impl From<BrinIndex> for Index {
+    fn from(brin: BrinIndex) -> Self {
+        Self {
+            name: Some(brin.name),
+            fields: brin.fields,
+            unique: false,
+            index_type: IndexType::Brin,
+        }
+    }
+}
+
+/// A PostgreSQL SP-GiST index definition.
+///
+/// SP-GiST indexes are for non-balanced data structures such as
+/// radix trees and quad-trees.
+#[derive(Debug, Clone)]
+pub struct SpGistIndex {
+    /// The index name.
+    pub name: String,
+    /// The columns to index.
+    pub fields: Vec<String>,
+}
+
+impl SpGistIndex {
+    /// Creates a new SP-GiST index.
+    pub fn new(name: impl Into<String>, fields: Vec<&str>) -> Self {
+        Self {
+            name: name.into(),
+            fields: fields.into_iter().map(String::from).collect(),
+        }
+    }
+}
+
+impl From<SpGistIndex> for Index {
+    fn from(spgist: SpGistIndex) -> Self {
+        Self {
+            name: Some(spgist.name),
+            fields: spgist.fields,
+            unique: false,
+            index_type: IndexType::SpGist,
+        }
+    }
+}
+
+/// A PostgreSQL Bloom index definition.
+///
+/// Bloom indexes use a probabilistic data structure (Bloom filter) to
+/// efficiently handle equality queries on many columns simultaneously.
+/// Requires the `bloom` extension.
+#[derive(Debug, Clone)]
+pub struct BloomIndex {
+    /// The index name.
+    pub name: String,
+    /// The columns to index.
+    pub fields: Vec<String>,
+}
+
+impl BloomIndex {
+    /// Creates a new Bloom index.
+    pub fn new(name: impl Into<String>, fields: Vec<&str>) -> Self {
+        Self {
+            name: name.into(),
+            fields: fields.into_iter().map(String::from).collect(),
+        }
+    }
+}
+
+impl From<BloomIndex> for Index {
+    fn from(bloom: BloomIndex) -> Self {
+        Self {
+            name: Some(bloom.name),
+            fields: bloom.fields,
+            unique: false,
+            index_type: IndexType::Bloom,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -301,8 +524,118 @@ mod tests {
             name: Some("idx_name".to_string()),
             fields: vec!["name".to_string()],
             unique: false,
+            index_type: IndexType::BTree,
         };
         assert_eq!(idx.name.as_deref(), Some("idx_name"));
         assert!(!idx.unique);
+        assert_eq!(idx.index_type, IndexType::BTree);
+    }
+
+    #[test]
+    fn test_index_create_sql_btree() {
+        let idx = Index {
+            name: Some("idx_name".to_string()),
+            fields: vec!["name".to_string()],
+            unique: false,
+            index_type: IndexType::BTree,
+        };
+        let sql = idx.create_sql("users");
+        assert_eq!(
+            sql,
+            "CREATE INDEX \"idx_name\" ON \"users\" USING btree (\"name\")"
+        );
+    }
+
+    #[test]
+    fn test_index_create_sql_unique() {
+        let idx = Index {
+            name: Some("idx_email_unique".to_string()),
+            fields: vec!["email".to_string()],
+            unique: true,
+            index_type: IndexType::BTree,
+        };
+        let sql = idx.create_sql("users");
+        assert!(sql.starts_with("CREATE UNIQUE INDEX"));
+    }
+
+    #[test]
+    fn test_gin_index() {
+        let gin = GinIndex::new("idx_tags_gin", vec!["tags"]);
+        let idx: Index = gin.into();
+        assert_eq!(idx.index_type, IndexType::Gin);
+        assert_eq!(idx.name.as_deref(), Some("idx_tags_gin"));
+        let sql = idx.create_sql("posts");
+        assert!(sql.contains("USING gin"));
+    }
+
+    #[test]
+    fn test_gist_index() {
+        let gist = GistIndex::new("idx_location_gist", vec!["location"]);
+        let idx: Index = gist.into();
+        assert_eq!(idx.index_type, IndexType::Gist);
+        let sql = idx.create_sql("venues");
+        assert!(sql.contains("USING gist"));
+    }
+
+    #[test]
+    fn test_brin_index() {
+        let brin = BrinIndex::new("idx_created_brin", vec!["created_at"]);
+        let idx: Index = brin.into();
+        assert_eq!(idx.index_type, IndexType::Brin);
+        let sql = idx.create_sql("events");
+        assert!(sql.contains("USING brin"));
+    }
+
+    #[test]
+    fn test_spgist_index() {
+        let spgist = SpGistIndex::new("idx_ip_spgist", vec!["ip_addr"]);
+        let idx: Index = spgist.into();
+        assert_eq!(idx.index_type, IndexType::SpGist);
+        let sql = idx.create_sql("connections");
+        assert!(sql.contains("USING spgist"));
+    }
+
+    #[test]
+    fn test_bloom_index() {
+        let bloom = BloomIndex::new("idx_multi_bloom", vec!["col1", "col2", "col3"]);
+        let idx: Index = bloom.into();
+        assert_eq!(idx.index_type, IndexType::Bloom);
+        assert_eq!(idx.fields.len(), 3);
+        let sql = idx.create_sql("items");
+        assert!(sql.contains("USING bloom"));
+        assert!(sql.contains("\"col1\""));
+        assert!(sql.contains("\"col2\""));
+        assert!(sql.contains("\"col3\""));
+    }
+
+    #[test]
+    fn test_index_type_sql_using() {
+        assert_eq!(IndexType::BTree.sql_using_clause(), "USING btree");
+        assert_eq!(IndexType::Gin.sql_using_clause(), "USING gin");
+        assert_eq!(IndexType::Gist.sql_using_clause(), "USING gist");
+        assert_eq!(IndexType::Brin.sql_using_clause(), "USING brin");
+        assert_eq!(IndexType::SpGist.sql_using_clause(), "USING spgist");
+        assert_eq!(IndexType::Bloom.sql_using_clause(), "USING bloom");
+    }
+
+    #[test]
+    fn test_index_type_default() {
+        let idx_type: IndexType = Default::default();
+        assert_eq!(idx_type, IndexType::BTree);
+    }
+
+    #[test]
+    fn test_multi_column_index_sql() {
+        let idx = Index {
+            name: Some("idx_user_project".to_string()),
+            fields: vec!["user_id".to_string(), "project_id".to_string()],
+            unique: true,
+            index_type: IndexType::BTree,
+        };
+        let sql = idx.create_sql("memberships");
+        assert_eq!(
+            sql,
+            "CREATE UNIQUE INDEX \"idx_user_project\" ON \"memberships\" USING btree (\"user_id\", \"project_id\")"
+        );
     }
 }

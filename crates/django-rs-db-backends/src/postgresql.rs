@@ -76,6 +76,19 @@ impl PostgresBackend {
                         // Lists need special handling per element type
                         Box::new(Option::<String>::None)
                     }
+                    Value::HStore(map) => {
+                        // Serialize hstore as a string in PostgreSQL hstore format
+                        let hstore_str: String = map
+                            .iter()
+                            .map(|(k, v)| format!("\"{k}\"=>\"{v}\""))
+                            .collect::<Vec<_>>()
+                            .join(", ");
+                        Box::new(hstore_str)
+                    }
+                    Value::Range { .. } => {
+                        // Ranges need to be serialized as strings in PostgreSQL range format
+                        Box::new(v.to_string())
+                    }
                 }
             })
             .collect()

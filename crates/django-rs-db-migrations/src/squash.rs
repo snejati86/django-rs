@@ -376,6 +376,7 @@ impl SquashableOp {
 mod tests {
     use super::*;
     use django_rs_db::fields::FieldType;
+    use django_rs_db::model::IndexType;
 
     fn make_field(name: &str, ft: FieldType) -> MigrationFieldDef {
         MigrationFieldDef::new(name, ft)
@@ -505,6 +506,7 @@ mod tests {
                     name: Some("idx_title".into()),
                     fields: vec!["title".into()],
                     unique: false,
+                    index_type: IndexType::default(),
                 },
             },
             SquashableOp::RemoveIndex {
@@ -687,6 +689,7 @@ mod tests {
                 name: Some("idx".into()),
                 fields: vec!["title".into()],
                 unique: false,
+                    index_type: IndexType::default(),
             },
         };
         let boxed = op.to_operation();

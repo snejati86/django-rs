@@ -214,6 +214,20 @@ fn model_field_to_form_field_type(field_def: &FieldDef) -> FormFieldType {
             min_value: None,
             max_value: None,
         },
+        // PostgreSQL-specific fields: use JSON representation in forms
+        FieldType::ArrayField { .. }
+        | FieldType::HStoreField
+        | FieldType::IntegerRangeField
+        | FieldType::BigIntegerRangeField
+        | FieldType::FloatRangeField
+        | FieldType::DateRangeField
+        | FieldType::DateTimeRangeField => FormFieldType::Json,
+        // Generated fields should not appear in forms (they are computed)
+        FieldType::GeneratedField { .. } => FormFieldType::Char {
+            min_length: None,
+            max_length: None,
+            strip: false,
+        },
     }
 }
 

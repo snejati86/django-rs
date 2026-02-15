@@ -113,6 +113,13 @@ impl SqliteBackend {
                     .unwrap_or_default();
                     stmt.raw_bind_parameter(idx, json.as_str())
                 }
+                Value::HStore(map) => {
+                    let json = serde_json::to_string(map).unwrap_or_default();
+                    stmt.raw_bind_parameter(idx, json.as_str())
+                }
+                Value::Range { .. } => {
+                    stmt.raw_bind_parameter(idx, param.to_string().as_str())
+                }
             }
             .map_err(|e| DjangoError::DatabaseError(format!("Bind error: {e}")))?;
         }

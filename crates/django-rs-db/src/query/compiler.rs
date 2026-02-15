@@ -1063,6 +1063,83 @@ impl SqlCompiler {
                     }
                 }
             }
+
+            // ── PostgreSQL array lookups ─────────────────────────────────
+            Lookup::ArrayContains(vals) => {
+                params.push(Value::List(vals.clone()));
+                let ph = self.placeholder(params.len());
+                sql.push_str(&format!("\"{column}\" @> {ph}"));
+            }
+            Lookup::ArrayContainedBy(vals) => {
+                params.push(Value::List(vals.clone()));
+                let ph = self.placeholder(params.len());
+                sql.push_str(&format!("\"{column}\" <@ {ph}"));
+            }
+            Lookup::ArrayOverlap(vals) => {
+                params.push(Value::List(vals.clone()));
+                let ph = self.placeholder(params.len());
+                sql.push_str(&format!("\"{column}\" && {ph}"));
+            }
+            Lookup::ArrayLen(n) => {
+                sql.push_str(&format!("array_length(\"{column}\", 1) = {n}"));
+            }
+
+            // ── PostgreSQL hstore lookups ────────────────────────────────
+            Lookup::HasKey(key) => {
+                params.push(Value::String(key.clone()));
+                let ph = self.placeholder(params.len());
+                sql.push_str(&format!("\"{column}\" ? {ph}"));
+            }
+            Lookup::HasKeys(keys) => {
+                params.push(Value::List(
+                    keys.iter().map(|k| Value::String(k.clone())).collect(),
+                ));
+                let ph = self.placeholder(params.len());
+                sql.push_str(&format!("\"{column}\" ?& {ph}"));
+            }
+            Lookup::HasAnyKeys(keys) => {
+                params.push(Value::List(
+                    keys.iter().map(|k| Value::String(k.clone())).collect(),
+                ));
+                let ph = self.placeholder(params.len());
+                sql.push_str(&format!("\"{column}\" ?| {ph}"));
+            }
+
+            // ── PostgreSQL range lookups ─────────────────────────────────
+            Lookup::RangeContains(val) => {
+                params.push(val.clone());
+                let ph = self.placeholder(params.len());
+                sql.push_str(&format!("\"{column}\" @> {ph}"));
+            }
+            Lookup::RangeContainedBy(val) => {
+                params.push(val.clone());
+                let ph = self.placeholder(params.len());
+                sql.push_str(&format!("\"{column}\" <@ {ph}"));
+            }
+            Lookup::RangeOverlap(val) => {
+                params.push(val.clone());
+                let ph = self.placeholder(params.len());
+                sql.push_str(&format!("\"{column}\" && {ph}"));
+            }
+            Lookup::FullyLt(val) => {
+                params.push(val.clone());
+                let ph = self.placeholder(params.len());
+                sql.push_str(&format!("\"{column}\" << {ph}"));
+            }
+            Lookup::FullyGt(val) => {
+                params.push(val.clone());
+                let ph = self.placeholder(params.len());
+                sql.push_str(&format!("\"{column}\" >> {ph}"));
+            }
+
+            // ── PostgreSQL full-text search ──────────────────────────────
+            Lookup::Search(query) => {
+                params.push(Value::String(query.clone()));
+                let ph = self.placeholder(params.len());
+                sql.push_str(&format!(
+                    "to_tsvector(\"{column}\") @@ plainto_tsquery({ph})"
+                ));
+            }
         }
     }
 
