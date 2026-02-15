@@ -64,5 +64,6 @@ pub use views::{
     ContextMixin, CreateView, DeleteView, DetailView, ListView, RedirectView, TemplateView,
     TemplateResponseMixin, UpdateView, View, ViewFunction,
     bind_form_from_request, cleaned_data_as_strings, extract_post_data, form_context_to_json,
-    form_errors,
+    form_errors, login_required_redirect, permission_required,
+    LoginRequiredMixin, PermissionRequiredMixin,
 };

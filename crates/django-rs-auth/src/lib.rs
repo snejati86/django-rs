@@ -21,20 +21,29 @@
 
 pub mod backends;
 pub mod csrf;
+pub mod forms;
 pub mod hashers;
 pub mod permissions;
 pub mod security;
+pub mod session_auth;
 pub mod user;
 pub mod views;
 
 // Re-exports for convenience
 pub use backends::{authenticate, login, logout, AuthBackend, Credentials, ModelBackend};
 pub use csrf::{generate_csrf_token, validate_csrf_token, CsrfMiddleware};
+pub use forms::{
+    AuthenticationForm, PasswordChangeForm, PasswordResetForm, SetPasswordForm, UserCreationForm,
+};
 pub use hashers::{check_password, is_password_usable, make_password, PasswordHasher};
 pub use permissions::{has_module_perms, has_perm, has_perms, Group, Permission};
 pub use security::SecurityMiddleware;
+pub use session_auth::{
+    get_user_from_request, get_user_from_session, is_authenticated, login_to_session,
+    logout_from_session,
+};
 pub use user::{AbstractBaseUser, AbstractUser, AnonymousUser};
 pub use views::{
-    DefaultTokenGenerator, LoginConfig, LogoutConfig, PasswordChangeConfig, PasswordResetConfig,
-    TokenGenerator,
+    login_view, logout_view, password_change_view, DefaultTokenGenerator, LoginConfig,
+    LogoutConfig, PasswordChangeConfig, PasswordResetConfig, TokenGenerator,
 };

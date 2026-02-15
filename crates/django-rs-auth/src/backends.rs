@@ -256,12 +256,10 @@ pub fn login(session: &mut SessionData, user: &AbstractUser) {
         SESSION_BACKEND_KEY,
         serde_json::Value::String("django_rs.auth.backends.ModelBackend".to_string()),
     );
-    // Store a portion of the password hash to detect password changes
-    let hash_fragment = if user.base.password.len() > 10 {
-        &user.base.password[..10]
-    } else {
-        &user.base.password
-    };
+    // Store a portion of the password hash to detect password changes.
+    // Uses first 40 chars to capture algorithm + salt for reliable detection.
+    let end = std::cmp::min(user.base.password.len(), 40);
+    let hash_fragment = &user.base.password[..end];
     session.set(
         SESSION_HASH_KEY,
         serde_json::Value::String(hash_fragment.to_string()),

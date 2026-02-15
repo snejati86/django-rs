@@ -14,6 +14,7 @@ workspace = true
 django-rs-core.workspace = true
 django-rs-http.workspace = true
 django-rs-db.workspace = true
+django-rs-forms.workspace = true
 django-rs-views.workspace = true
 argon2.workspace = true
 bcrypt.workspace = true

@@ -19,6 +19,8 @@ pub use form_view::{
     form_errors,
 };
 pub use function::{
-    login_required, require_get, require_http_methods, require_post, ViewFunction,
+    login_required, login_required_redirect, permission_required,
+    require_get, require_http_methods, require_post,
+    LoginRequiredMixin, PermissionRequiredMixin, ViewFunction,
 };
 pub use generic::{CreateView, DeleteView, DetailView, ListView, UpdateView};
