@@ -308,7 +308,7 @@ impl LogEntryStore for InMemoryLogEntryStore {
             .filter(|e| e.content_type == content_type && e.object_id == object_id)
             .cloned()
             .collect();
-        result.sort_by(|a, b| b.action_time.cmp(&a.action_time));
+        result.sort_by(|a, b| b.action_time.cmp(&a.action_time).then_with(|| b.id.cmp(&a.id)));
         result
     }
 
@@ -320,7 +320,7 @@ impl LogEntryStore for InMemoryLogEntryStore {
             .filter(|e| e.user_id == user_id)
             .cloned()
             .collect();
-        result.sort_by(|a, b| b.action_time.cmp(&a.action_time));
+        result.sort_by(|a, b| b.action_time.cmp(&a.action_time).then_with(|| b.id.cmp(&a.id)));
         result
     }
 
@@ -332,7 +332,7 @@ impl LogEntryStore for InMemoryLogEntryStore {
             .filter(|e| e.action_flag == action_flag)
             .cloned()
             .collect();
-        result.sort_by(|a, b| b.action_time.cmp(&a.action_time));
+        result.sort_by(|a, b| b.action_time.cmp(&a.action_time).then_with(|| b.id.cmp(&a.id)));
         result
     }
 
@@ -340,7 +340,7 @@ impl LogEntryStore for InMemoryLogEntryStore {
     fn recent(&self, limit: usize) -> Vec<LogEntry> {
         let entries = self.entries.read().unwrap();
         let mut result: Vec<LogEntry> = entries.to_vec();
-        result.sort_by(|a, b| b.action_time.cmp(&a.action_time));
+        result.sort_by(|a, b| b.action_time.cmp(&a.action_time).then_with(|| b.id.cmp(&a.id)));
         result.truncate(limit);
         result
     }
