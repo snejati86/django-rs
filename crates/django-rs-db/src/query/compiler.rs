@@ -142,6 +142,92 @@ impl JoinType {
     }
 }
 
+/// The type of compound query operation (UNION, INTERSECT, EXCEPT).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CompoundType {
+    /// SQL UNION (deduplicates rows).
+    Union,
+    /// SQL UNION ALL (keeps duplicates).
+    UnionAll,
+    /// SQL INTERSECT.
+    Intersect,
+    /// SQL EXCEPT (MINUS on some backends).
+    Except,
+}
+
+impl CompoundType {
+    /// Returns the SQL keyword for this compound operation.
+    pub fn sql_keyword(&self, backend: DatabaseBackendType) -> &'static str {
+        match self {
+            Self::Union => "UNION",
+            Self::UnionAll => "UNION ALL",
+            Self::Intersect => "INTERSECT",
+            Self::Except => match backend {
+                DatabaseBackendType::MySQL => "EXCEPT",
+                _ => "EXCEPT",
+            },
+        }
+    }
+}
+
+/// A compound query that combines this query with another using a set operation.
+#[derive(Debug, Clone)]
+pub struct CompoundQuery {
+    /// The type of set operation.
+    pub compound_type: CompoundType,
+    /// The other query to combine with.
+    pub other: Box<Query>,
+}
+
+/// A `select_related` field descriptor indicating a relation to eagerly load via JOIN.
+#[derive(Debug, Clone)]
+pub struct SelectRelatedField {
+    /// The field name on the current model (e.g., "author").
+    pub field_name: String,
+    /// The related table to join.
+    pub related_table: String,
+    /// The column on the current table that references the related table (e.g., "author_id").
+    pub fk_column: String,
+    /// The column on the related table being referenced (usually "id").
+    pub related_column: String,
+    /// An alias for the joined table to avoid conflicts.
+    pub alias: String,
+}
+
+/// A `prefetch_related` field descriptor for batch-querying related objects.
+#[derive(Debug, Clone)]
+pub struct PrefetchRelatedField {
+    /// The field name on the current model.
+    pub field_name: String,
+    /// The related table to query.
+    pub related_table: String,
+    /// The column on the current table (e.g., "id").
+    pub source_column: String,
+    /// The column on the related table referencing back (e.g., "author_id").
+    pub related_column: String,
+}
+
+/// Describes the type of model inheritance for query generation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum InheritanceType {
+    /// No inheritance -- standalone model.
+    None,
+    /// Multi-table inheritance: child has its own table with a FK to parent.
+    MultiTable {
+        /// The parent table name.
+        parent_table: String,
+        /// The FK column on the child table pointing to the parent's PK.
+        parent_link_column: String,
+        /// The PK column on the parent table.
+        parent_pk_column: String,
+    },
+    /// Proxy model: uses the parent's table, no additional table.
+    Proxy {
+        /// The parent table name (this is the table actually used for queries).
+        parent_table: String,
+    },
+}
+
 /// The complete query AST representing a SELECT statement.
 #[derive(Debug, Clone)]
 pub struct Query {
@@ -169,6 +255,14 @@ pub struct Query {
     pub annotations: HashMap<String, Expression>,
     /// Named aggregates.
     pub aggregates: HashMap<String, Expression>,
+    /// Compound queries (UNION, INTERSECT, EXCEPT).
+    pub compound_queries: Vec<CompoundQuery>,
+    /// Fields to eagerly load via JOINs (select_related).
+    pub select_related: Vec<SelectRelatedField>,
+    /// Fields to batch-query after the main query (prefetch_related).
+    pub prefetch_related: Vec<PrefetchRelatedField>,
+    /// Model inheritance configuration.
+    pub inheritance: InheritanceType,
 }
 
 impl Query {
@@ -187,6 +281,10 @@ impl Query {
             distinct: false,
             annotations: HashMap::new(),
             aggregates: HashMap::new(),
+            compound_queries: Vec::new(),
+            select_related: Vec::new(),
+            prefetch_related: Vec::new(),
+            inheritance: InheritanceType::None,
         }
     }
 }
@@ -387,9 +485,23 @@ impl SqlCompiler {
     }
 
     /// Compiles a SELECT query into SQL and parameters.
+    ///
+    /// Handles select_related JOINs, multi-table inheritance JOINs,
+    /// proxy model table rewriting, and compound queries (UNION/INTERSECT/EXCEPT).
     pub fn compile_select(&self, query: &Query) -> (String, Vec<Value>) {
+        // If there are compound queries, compile as a compound statement
+        if !query.compound_queries.is_empty() {
+            return self.compile_compound_select(query);
+        }
+
         let mut params: Vec<Value> = Vec::new();
         let mut sql = String::from("SELECT ");
+
+        // Determine the effective table name (proxy models use parent table)
+        let effective_table = match &query.inheritance {
+            InheritanceType::Proxy { parent_table } => parent_table.as_str(),
+            _ => query.table.as_str(),
+        };
 
         if query.distinct {
             sql.push_str("DISTINCT ");
@@ -417,6 +529,11 @@ impl SqlCompiler {
         };
         sql.push_str(&select_parts.join(", "));
 
+        // Add select_related columns (columns from joined tables)
+        for sr in &query.select_related {
+            sql.push_str(&format!(", \"{}\".* ", sr.alias));
+        }
+
         // Add annotations as selected columns
         for (alias, expr) in &query.annotations {
             let expr_sql = self.compile_expression(expr, &mut params);
@@ -424,9 +541,34 @@ impl SqlCompiler {
         }
 
         // FROM
-        sql.push_str(&format!(" FROM \"{}\"", query.table));
+        sql.push_str(&format!(" FROM \"{effective_table}\""));
 
-        // JOINs
+        // Multi-table inheritance JOIN (child joins parent)
+        if let InheritanceType::MultiTable {
+            parent_table,
+            parent_link_column,
+            parent_pk_column,
+        } = &query.inheritance
+        {
+            sql.push_str(&format!(
+                " INNER JOIN \"{parent_table}\" ON \"{effective_table}\".\"{parent_link_column}\" = \"{parent_table}\".\"{parent_pk_column}\""
+            ));
+        }
+
+        // select_related JOINs (LEFT OUTER JOIN for each related field)
+        for sr in &query.select_related {
+            sql.push_str(&format!(
+                " LEFT JOIN \"{}\" AS \"{}\" ON \"{}\".\"{}\" = \"{}\".\"{}\"",
+                sr.related_table,
+                sr.alias,
+                effective_table,
+                sr.fk_column,
+                sr.alias,
+                sr.related_column,
+            ));
+        }
+
+        // Explicit JOINs
         for join in &query.joins {
             let alias = join
                 .alias
@@ -447,9 +589,14 @@ impl SqlCompiler {
             self.compile_where_node(where_clause, &mut sql, &mut params);
         }
 
-        // GROUP BY
-        if !query.group_by.is_empty() {
-            let cols: Vec<String> = query.group_by.iter().map(|c| format!("\"{c}\"")).collect();
+        // GROUP BY (only real group_by columns, not the __select_related__ hack)
+        let real_group_by: Vec<&String> = query
+            .group_by
+            .iter()
+            .filter(|c| !c.starts_with("__select_related__") && !c.starts_with("__prefetch_related__"))
+            .collect();
+        if !real_group_by.is_empty() {
+            let cols: Vec<String> = real_group_by.iter().map(|c| format!("\"{c}\"")).collect();
             sql.push_str(&format!(" GROUP BY {}", cols.join(", ")));
         }
 
@@ -488,6 +635,153 @@ impl SqlCompiler {
         }
 
         (sql, params)
+    }
+
+    /// Compiles a compound SELECT (UNION, INTERSECT, EXCEPT) query.
+    fn compile_compound_select(&self, query: &Query) -> (String, Vec<Value>) {
+        // Compile the base query without compound parts
+        let base_query = Query {
+            table: query.table.clone(),
+            select: query.select.clone(),
+            where_clause: query.where_clause.clone(),
+            order_by: Vec::new(), // ORDER BY goes on the outer query
+            group_by: query.group_by.clone(),
+            having: query.having.clone(),
+            joins: query.joins.clone(),
+            limit: None, // LIMIT/OFFSET go on the outer query
+            offset: None,
+            distinct: query.distinct,
+            annotations: query.annotations.clone(),
+            aggregates: query.aggregates.clone(),
+            compound_queries: Vec::new(),
+            select_related: query.select_related.clone(),
+            prefetch_related: query.prefetch_related.clone(),
+            inheritance: query.inheritance.clone(),
+        };
+
+        let (mut sql, mut params) = self.compile_select(&base_query);
+
+        // Append each compound query
+        for cq in &query.compound_queries {
+            let keyword = cq.compound_type.sql_keyword(self.backend);
+            let (other_sql, other_params) = self.compile_select(&cq.other);
+
+            // For PostgreSQL, re-number the placeholders ($1, $2, ...) so they
+            // continue from where the previous query left off.
+            let renumbered_sql = if self.backend == DatabaseBackendType::PostgreSQL
+                && !other_params.is_empty()
+            {
+                let offset = params.len();
+                let mut result_sql = other_sql;
+                // Replace from highest to lowest to avoid $1 -> $11 collisions
+                for i in (1..=other_params.len()).rev() {
+                    let old = format!("${i}");
+                    let new = format!("${}", i + offset);
+                    result_sql = result_sql.replace(&old, &new);
+                }
+                result_sql
+            } else {
+                other_sql
+            };
+
+            sql.push_str(&format!(" {keyword} {renumbered_sql}"));
+            params.extend(other_params);
+        }
+
+        // ORDER BY on the compound result
+        if !query.order_by.is_empty() {
+            let orders: Vec<String> = query
+                .order_by
+                .iter()
+                .map(|o| {
+                    let dir = if o.descending { " DESC" } else { " ASC" };
+                    let nulls = match o.nulls_first {
+                        Some(true) => " NULLS FIRST",
+                        Some(false) => " NULLS LAST",
+                        None => "",
+                    };
+                    format!("\"{}\"{dir}{nulls}", o.column)
+                })
+                .collect();
+            sql.push_str(&format!(" ORDER BY {}", orders.join(", ")));
+        }
+
+        // LIMIT on the compound result
+        if let Some(limit) = query.limit {
+            sql.push_str(&format!(" LIMIT {limit}"));
+        }
+
+        // OFFSET on the compound result
+        if let Some(offset) = query.offset {
+            sql.push_str(&format!(" OFFSET {offset}"));
+        }
+
+        (sql, params)
+    }
+
+    /// Compiles the prefetch queries for a set of prefetch_related fields.
+    ///
+    /// Given the primary key values from the main query result, generates
+    /// batch SELECT queries to fetch related objects.
+    ///
+    /// Returns a Vec of (field_name, sql, params) tuples.
+    pub fn compile_prefetch_queries(
+        &self,
+        prefetch_fields: &[PrefetchRelatedField],
+        pk_values: &[Value],
+    ) -> Vec<(String, String, Vec<Value>)> {
+        let mut result = Vec::new();
+
+        for pf in prefetch_fields {
+            if pk_values.is_empty() {
+                continue;
+            }
+
+            let mut params = Vec::new();
+            let placeholders: Vec<String> = pk_values
+                .iter()
+                .map(|v| {
+                    params.push(v.clone());
+                    self.placeholder(params.len())
+                })
+                .collect();
+
+            let sql = format!(
+                "SELECT * FROM \"{}\" WHERE \"{}\" IN ({})",
+                pf.related_table,
+                pf.related_column,
+                placeholders.join(", ")
+            );
+
+            result.push((pf.field_name.clone(), sql, params));
+        }
+
+        result
+    }
+
+    /// Compiles an INSERT for a multi-table inheritance parent record.
+    ///
+    /// When inserting a child model with multi-table inheritance, we need to
+    /// first insert the parent record and then the child record.
+    pub fn compile_parent_insert(
+        &self,
+        parent_table: &str,
+        fields: &[(&str, Value)],
+    ) -> (String, Vec<Value>) {
+        self.compile_insert(parent_table, fields)
+    }
+
+    /// Compiles an UPDATE for a multi-table inheritance parent record.
+    ///
+    /// When updating a child model with multi-table inheritance, we need to
+    /// update both the parent and child tables.
+    pub fn compile_parent_update(
+        &self,
+        parent_table: &str,
+        fields: &[(&str, Value)],
+        where_clause: &WhereNode,
+    ) -> (String, Vec<Value>) {
+        self.compile_update(parent_table, fields, where_clause)
     }
 
     /// Compiles an INSERT statement.
@@ -1793,5 +2087,566 @@ mod tests {
         });
         let (sql, _) = pg().compile_select(&query);
         assert!(sql.contains("ILIKE"));
+    }
+
+    // ── UNION / INTERSECT / EXCEPT tests ─────────────────────────────
+
+    #[test]
+    fn test_union_pg() {
+        let mut query = Query::new("users");
+        query.where_clause = Some(WhereNode::Condition {
+            column: "age".to_string(),
+            lookup: Lookup::Lt(Value::from(25)),
+        });
+
+        let mut other = Query::new("users");
+        other.where_clause = Some(WhereNode::Condition {
+            column: "age".to_string(),
+            lookup: Lookup::Gt(Value::from(60)),
+        });
+
+        query.compound_queries.push(CompoundQuery {
+            compound_type: CompoundType::Union,
+            other: Box::new(other),
+        });
+
+        let (sql, params) = pg().compile_select(&query);
+        assert!(sql.contains("UNION"));
+        assert!(!sql.contains("UNION ALL"));
+        assert!(sql.contains("\"age\" < $1"));
+        assert!(sql.contains("\"age\" > $2"));
+        assert_eq!(params.len(), 2);
+    }
+
+    #[test]
+    fn test_union_all_pg() {
+        let mut query = Query::new("users");
+        let other = Query::new("users");
+
+        query.compound_queries.push(CompoundQuery {
+            compound_type: CompoundType::UnionAll,
+            other: Box::new(other),
+        });
+
+        let (sql, _) = pg().compile_select(&query);
+        assert!(sql.contains("UNION ALL"));
+    }
+
+    #[test]
+    fn test_intersect_pg() {
+        let mut query = Query::new("active_users");
+        query.where_clause = Some(WhereNode::Condition {
+            column: "active".to_string(),
+            lookup: Lookup::Exact(Value::from(true)),
+        });
+
+        let mut other = Query::new("premium_users");
+        other.where_clause = Some(WhereNode::Condition {
+            column: "premium".to_string(),
+            lookup: Lookup::Exact(Value::from(true)),
+        });
+
+        query.compound_queries.push(CompoundQuery {
+            compound_type: CompoundType::Intersect,
+            other: Box::new(other),
+        });
+
+        let (sql, params) = pg().compile_select(&query);
+        assert!(sql.contains("INTERSECT"));
+        assert_eq!(params.len(), 2);
+    }
+
+    #[test]
+    fn test_except_pg() {
+        let mut query = Query::new("all_users");
+        let mut other = Query::new("banned_users");
+        other.where_clause = Some(WhereNode::Condition {
+            column: "banned".to_string(),
+            lookup: Lookup::Exact(Value::from(true)),
+        });
+
+        query.compound_queries.push(CompoundQuery {
+            compound_type: CompoundType::Except,
+            other: Box::new(other),
+        });
+
+        let (sql, _) = pg().compile_select(&query);
+        assert!(sql.contains("EXCEPT"));
+    }
+
+    #[test]
+    fn test_union_with_order_by() {
+        let mut query = Query::new("users");
+        query.where_clause = Some(WhereNode::Condition {
+            column: "age".to_string(),
+            lookup: Lookup::Lt(Value::from(25)),
+        });
+
+        let other = Query::new("users");
+        query.compound_queries.push(CompoundQuery {
+            compound_type: CompoundType::Union,
+            other: Box::new(other),
+        });
+        query.order_by = vec![OrderBy::asc("name")];
+
+        let (sql, _) = pg().compile_select(&query);
+        // ORDER BY should come after UNION
+        let union_pos = sql.find("UNION").unwrap();
+        let order_pos = sql.find("ORDER BY").unwrap();
+        assert!(order_pos > union_pos);
+    }
+
+    #[test]
+    fn test_union_with_limit_offset() {
+        let mut query = Query::new("users");
+        let other = Query::new("admins");
+
+        query.compound_queries.push(CompoundQuery {
+            compound_type: CompoundType::Union,
+            other: Box::new(other),
+        });
+        query.limit = Some(10);
+        query.offset = Some(5);
+
+        let (sql, _) = pg().compile_select(&query);
+        let union_pos = sql.find("UNION").unwrap();
+        let limit_pos = sql.find("LIMIT 10").unwrap();
+        let offset_pos = sql.find("OFFSET 5").unwrap();
+        assert!(limit_pos > union_pos);
+        assert!(offset_pos > union_pos);
+    }
+
+    #[test]
+    fn test_union_sqlite_uses_question_marks() {
+        let mut query = Query::new("users");
+        query.where_clause = Some(WhereNode::Condition {
+            column: "age".to_string(),
+            lookup: Lookup::Lt(Value::from(25)),
+        });
+        let mut other = Query::new("users");
+        other.where_clause = Some(WhereNode::Condition {
+            column: "age".to_string(),
+            lookup: Lookup::Gt(Value::from(60)),
+        });
+        query.compound_queries.push(CompoundQuery {
+            compound_type: CompoundType::Union,
+            other: Box::new(other),
+        });
+
+        let (sql, params) = sqlite().compile_select(&query);
+        assert!(sql.contains("UNION"));
+        assert!(!sql.contains('$'));
+        assert_eq!(sql.matches('?').count(), 2);
+        assert_eq!(params.len(), 2);
+    }
+
+    #[test]
+    fn test_multiple_unions() {
+        let mut query = Query::new("table_a");
+        let other1 = Query::new("table_b");
+        let other2 = Query::new("table_c");
+
+        query.compound_queries.push(CompoundQuery {
+            compound_type: CompoundType::Union,
+            other: Box::new(other1),
+        });
+        query.compound_queries.push(CompoundQuery {
+            compound_type: CompoundType::Union,
+            other: Box::new(other2),
+        });
+
+        let (sql, _) = pg().compile_select(&query);
+        assert_eq!(sql.matches("UNION").count(), 2);
+        assert!(sql.contains("\"table_a\""));
+        assert!(sql.contains("\"table_b\""));
+        assert!(sql.contains("\"table_c\""));
+    }
+
+    #[test]
+    fn test_compound_type_sql_keywords() {
+        assert_eq!(CompoundType::Union.sql_keyword(DatabaseBackendType::PostgreSQL), "UNION");
+        assert_eq!(CompoundType::UnionAll.sql_keyword(DatabaseBackendType::PostgreSQL), "UNION ALL");
+        assert_eq!(CompoundType::Intersect.sql_keyword(DatabaseBackendType::PostgreSQL), "INTERSECT");
+        assert_eq!(CompoundType::Except.sql_keyword(DatabaseBackendType::PostgreSQL), "EXCEPT");
+        assert_eq!(CompoundType::Except.sql_keyword(DatabaseBackendType::MySQL), "EXCEPT");
+    }
+
+    // ── select_related JOIN tests ────────────────────────────────────
+
+    #[test]
+    fn test_select_related_single_field() {
+        let mut query = Query::new("blog_post");
+        query.select_related.push(SelectRelatedField {
+            field_name: "author".to_string(),
+            related_table: "auth_user".to_string(),
+            fk_column: "author_id".to_string(),
+            related_column: "id".to_string(),
+            alias: "author".to_string(),
+        });
+
+        let (sql, _) = pg().compile_select(&query);
+        assert!(sql.contains("LEFT JOIN \"auth_user\" AS \"author\""));
+        assert!(sql.contains("\"blog_post\".\"author_id\" = \"author\".\"id\""));
+        assert!(sql.contains("\"author\".*"));
+    }
+
+    #[test]
+    fn test_select_related_multiple_fields() {
+        let mut query = Query::new("blog_post");
+        query.select_related.push(SelectRelatedField {
+            field_name: "author".to_string(),
+            related_table: "auth_user".to_string(),
+            fk_column: "author_id".to_string(),
+            related_column: "id".to_string(),
+            alias: "author".to_string(),
+        });
+        query.select_related.push(SelectRelatedField {
+            field_name: "category".to_string(),
+            related_table: "blog_category".to_string(),
+            fk_column: "category_id".to_string(),
+            related_column: "id".to_string(),
+            alias: "category".to_string(),
+        });
+
+        let (sql, _) = pg().compile_select(&query);
+        assert!(sql.contains("LEFT JOIN \"auth_user\" AS \"author\""));
+        assert!(sql.contains("LEFT JOIN \"blog_category\" AS \"category\""));
+        assert!(sql.contains("\"author\".*"));
+        assert!(sql.contains("\"category\".*"));
+    }
+
+    #[test]
+    fn test_select_related_with_where() {
+        let mut query = Query::new("blog_post");
+        query.select_related.push(SelectRelatedField {
+            field_name: "author".to_string(),
+            related_table: "auth_user".to_string(),
+            fk_column: "author_id".to_string(),
+            related_column: "id".to_string(),
+            alias: "author".to_string(),
+        });
+        query.where_clause = Some(WhereNode::Condition {
+            column: "published".to_string(),
+            lookup: Lookup::Exact(Value::from(true)),
+        });
+
+        let (sql, params) = pg().compile_select(&query);
+        assert!(sql.contains("LEFT JOIN"));
+        assert!(sql.contains("WHERE \"published\" = $1"));
+        assert_eq!(params.len(), 1);
+    }
+
+    #[test]
+    fn test_select_related_sqlite() {
+        let mut query = Query::new("blog_post");
+        query.select_related.push(SelectRelatedField {
+            field_name: "author".to_string(),
+            related_table: "auth_user".to_string(),
+            fk_column: "author_id".to_string(),
+            related_column: "id".to_string(),
+            alias: "author".to_string(),
+        });
+        query.where_clause = Some(WhereNode::Condition {
+            column: "id".to_string(),
+            lookup: Lookup::Exact(Value::from(1)),
+        });
+
+        let (sql, _) = sqlite().compile_select(&query);
+        assert!(sql.contains("LEFT JOIN"));
+        assert!(sql.contains("?"));
+        assert!(!sql.contains('$'));
+    }
+
+    // ── prefetch_related query compilation tests ─────────────────────
+
+    #[test]
+    fn test_compile_prefetch_queries_pg() {
+        let compiler = pg();
+        let fields = vec![PrefetchRelatedField {
+            field_name: "comments".to_string(),
+            related_table: "blog_comment".to_string(),
+            source_column: "id".to_string(),
+            related_column: "post_id".to_string(),
+        }];
+        let pk_values = vec![Value::Int(1), Value::Int(2), Value::Int(3)];
+
+        let queries = compiler.compile_prefetch_queries(&fields, &pk_values);
+        assert_eq!(queries.len(), 1);
+        let (name, sql, params) = &queries[0];
+        assert_eq!(name, "comments");
+        assert!(sql.contains("SELECT * FROM \"blog_comment\""));
+        assert!(sql.contains("\"post_id\" IN ($1, $2, $3)"));
+        assert_eq!(params.len(), 3);
+    }
+
+    #[test]
+    fn test_compile_prefetch_queries_sqlite() {
+        let compiler = sqlite();
+        let fields = vec![PrefetchRelatedField {
+            field_name: "tags".to_string(),
+            related_table: "blog_tag".to_string(),
+            source_column: "id".to_string(),
+            related_column: "post_id".to_string(),
+        }];
+        let pk_values = vec![Value::Int(10), Value::Int(20)];
+
+        let queries = compiler.compile_prefetch_queries(&fields, &pk_values);
+        assert_eq!(queries.len(), 1);
+        let (_, sql, params) = &queries[0];
+        assert!(sql.contains("\"post_id\" IN (?, ?)"));
+        assert_eq!(params.len(), 2);
+    }
+
+    #[test]
+    fn test_compile_prefetch_queries_empty_pks() {
+        let compiler = pg();
+        let fields = vec![PrefetchRelatedField {
+            field_name: "comments".to_string(),
+            related_table: "blog_comment".to_string(),
+            source_column: "id".to_string(),
+            related_column: "post_id".to_string(),
+        }];
+
+        let queries = compiler.compile_prefetch_queries(&fields, &[]);
+        assert!(queries.is_empty());
+    }
+
+    #[test]
+    fn test_compile_prefetch_queries_multiple_fields() {
+        let compiler = pg();
+        let fields = vec![
+            PrefetchRelatedField {
+                field_name: "comments".to_string(),
+                related_table: "blog_comment".to_string(),
+                source_column: "id".to_string(),
+                related_column: "post_id".to_string(),
+            },
+            PrefetchRelatedField {
+                field_name: "tags".to_string(),
+                related_table: "blog_tag".to_string(),
+                source_column: "id".to_string(),
+                related_column: "post_id".to_string(),
+            },
+        ];
+        let pk_values = vec![Value::Int(1)];
+
+        let queries = compiler.compile_prefetch_queries(&fields, &pk_values);
+        assert_eq!(queries.len(), 2);
+        assert_eq!(queries[0].0, "comments");
+        assert_eq!(queries[1].0, "tags");
+    }
+
+    // ── Model inheritance tests ──────────────────────────────────────
+
+    #[test]
+    fn test_proxy_model_uses_parent_table() {
+        let mut query = Query::new("myapp_proxymodel");
+        query.inheritance = InheritanceType::Proxy {
+            parent_table: "myapp_basemodel".to_string(),
+        };
+
+        let (sql, _) = pg().compile_select(&query);
+        assert!(sql.contains("FROM \"myapp_basemodel\""));
+        assert!(!sql.contains("FROM \"myapp_proxymodel\""));
+    }
+
+    #[test]
+    fn test_proxy_model_with_filter() {
+        let mut query = Query::new("myapp_proxymodel");
+        query.inheritance = InheritanceType::Proxy {
+            parent_table: "myapp_basemodel".to_string(),
+        };
+        query.where_clause = Some(WhereNode::Condition {
+            column: "active".to_string(),
+            lookup: Lookup::Exact(Value::from(true)),
+        });
+
+        let (sql, params) = pg().compile_select(&query);
+        assert!(sql.contains("FROM \"myapp_basemodel\""));
+        assert!(sql.contains("WHERE \"active\" = $1"));
+        assert_eq!(params.len(), 1);
+    }
+
+    #[test]
+    fn test_proxy_model_with_ordering() {
+        let mut query = Query::new("myapp_proxymodel");
+        query.inheritance = InheritanceType::Proxy {
+            parent_table: "myapp_basemodel".to_string(),
+        };
+        query.order_by = vec![OrderBy::desc("created_at")];
+
+        let (sql, _) = pg().compile_select(&query);
+        assert!(sql.contains("FROM \"myapp_basemodel\""));
+        assert!(sql.contains("ORDER BY \"created_at\" DESC"));
+    }
+
+    #[test]
+    fn test_multi_table_inheritance_join() {
+        let mut query = Query::new("restaurant_restaurant");
+        query.inheritance = InheritanceType::MultiTable {
+            parent_table: "myapp_place".to_string(),
+            parent_link_column: "place_ptr_id".to_string(),
+            parent_pk_column: "id".to_string(),
+        };
+
+        let (sql, _) = pg().compile_select(&query);
+        assert!(sql.contains("FROM \"restaurant_restaurant\""));
+        assert!(sql.contains("INNER JOIN \"myapp_place\""));
+        assert!(sql.contains(
+            "\"restaurant_restaurant\".\"place_ptr_id\" = \"myapp_place\".\"id\""
+        ));
+    }
+
+    #[test]
+    fn test_multi_table_inheritance_with_filter() {
+        let mut query = Query::new("restaurant_restaurant");
+        query.inheritance = InheritanceType::MultiTable {
+            parent_table: "myapp_place".to_string(),
+            parent_link_column: "place_ptr_id".to_string(),
+            parent_pk_column: "id".to_string(),
+        };
+        query.where_clause = Some(WhereNode::Condition {
+            column: "serves_pizza".to_string(),
+            lookup: Lookup::Exact(Value::from(true)),
+        });
+
+        let (sql, params) = pg().compile_select(&query);
+        assert!(sql.contains("INNER JOIN \"myapp_place\""));
+        assert!(sql.contains("WHERE \"serves_pizza\" = $1"));
+        assert_eq!(params.len(), 1);
+    }
+
+    #[test]
+    fn test_multi_table_inheritance_with_select_related() {
+        let mut query = Query::new("restaurant_restaurant");
+        query.inheritance = InheritanceType::MultiTable {
+            parent_table: "myapp_place".to_string(),
+            parent_link_column: "place_ptr_id".to_string(),
+            parent_pk_column: "id".to_string(),
+        };
+        query.select_related.push(SelectRelatedField {
+            field_name: "owner".to_string(),
+            related_table: "auth_user".to_string(),
+            fk_column: "owner_id".to_string(),
+            related_column: "id".to_string(),
+            alias: "owner".to_string(),
+        });
+
+        let (sql, _) = pg().compile_select(&query);
+        // Should have INNER JOIN for inheritance AND LEFT JOIN for select_related
+        assert!(sql.contains("INNER JOIN \"myapp_place\""));
+        assert!(sql.contains("LEFT JOIN \"auth_user\" AS \"owner\""));
+    }
+
+    #[test]
+    fn test_multi_table_inheritance_sqlite() {
+        let mut query = Query::new("restaurant_restaurant");
+        query.inheritance = InheritanceType::MultiTable {
+            parent_table: "myapp_place".to_string(),
+            parent_link_column: "place_ptr_id".to_string(),
+            parent_pk_column: "id".to_string(),
+        };
+        query.where_clause = Some(WhereNode::Condition {
+            column: "id".to_string(),
+            lookup: Lookup::Exact(Value::from(1)),
+        });
+
+        let (sql, _) = sqlite().compile_select(&query);
+        assert!(sql.contains("INNER JOIN \"myapp_place\""));
+        assert!(sql.contains("?"));
+        assert!(!sql.contains('$'));
+    }
+
+    #[test]
+    fn test_inheritance_type_none_no_extra_join() {
+        let mut query = Query::new("users");
+        query.inheritance = InheritanceType::None;
+        let (sql, _) = pg().compile_select(&query);
+        assert!(!sql.contains("INNER JOIN"));
+        assert!(!sql.contains("LEFT JOIN"));
+        assert_eq!(sql, "SELECT * FROM \"users\"");
+    }
+
+    #[test]
+    fn test_parent_insert() {
+        let compiler = pg();
+        let fields: Vec<(&str, Value)> = vec![
+            ("name", Value::from("Pizza Palace")),
+            ("address", Value::from("123 Main St")),
+        ];
+        let (sql, params) = compiler.compile_parent_insert("myapp_place", &fields);
+        assert!(sql.contains("INSERT INTO \"myapp_place\""));
+        assert!(sql.contains("\"name\""));
+        assert!(sql.contains("\"address\""));
+        assert_eq!(params.len(), 2);
+    }
+
+    #[test]
+    fn test_parent_update() {
+        let compiler = pg();
+        let fields: Vec<(&str, Value)> = vec![("name", Value::from("Updated Place"))];
+        let where_clause = WhereNode::Condition {
+            column: "id".to_string(),
+            lookup: Lookup::Exact(Value::from(1)),
+        };
+        let (sql, params) = compiler.compile_parent_update("myapp_place", &fields, &where_clause);
+        assert!(sql.contains("UPDATE \"myapp_place\""));
+        assert!(sql.contains("SET \"name\" = $1"));
+        assert!(sql.contains("WHERE \"id\" = $2"));
+        assert_eq!(params.len(), 2);
+    }
+
+    // ── Group by filtering for select_related hints ──────────────────
+
+    #[test]
+    fn test_select_related_hints_not_in_group_by() {
+        let mut query = Query::new("posts");
+        query.group_by = vec![
+            "__select_related__author".to_string(),
+            "status".to_string(),
+            "__prefetch_related__comments".to_string(),
+        ];
+
+        let (sql, _) = pg().compile_select(&query);
+        // Only real group_by columns should appear
+        assert!(sql.contains("GROUP BY \"status\""));
+        assert!(!sql.contains("__select_related__"));
+        assert!(!sql.contains("__prefetch_related__"));
+    }
+
+    #[test]
+    fn test_no_group_by_when_only_hints() {
+        let mut query = Query::new("posts");
+        query.group_by = vec![
+            "__select_related__author".to_string(),
+            "__prefetch_related__comments".to_string(),
+        ];
+
+        let (sql, _) = pg().compile_select(&query);
+        assert!(!sql.contains("GROUP BY"));
+    }
+
+    // ── select_related with proxy inheritance ────────────────────────
+
+    #[test]
+    fn test_proxy_with_select_related() {
+        let mut query = Query::new("myapp_premiumuser");
+        query.inheritance = InheritanceType::Proxy {
+            parent_table: "auth_user".to_string(),
+        };
+        query.select_related.push(SelectRelatedField {
+            field_name: "profile".to_string(),
+            related_table: "myapp_profile".to_string(),
+            fk_column: "profile_id".to_string(),
+            related_column: "id".to_string(),
+            alias: "profile".to_string(),
+        });
+
+        let (sql, _) = pg().compile_select(&query);
+        // Should use parent table
+        assert!(sql.contains("FROM \"auth_user\""));
+        // LEFT JOIN should reference the effective (parent) table
+        assert!(sql.contains("LEFT JOIN \"myapp_profile\" AS \"profile\""));
+        assert!(sql.contains("\"auth_user\".\"profile_id\" = \"profile\".\"id\""));
     }
 }

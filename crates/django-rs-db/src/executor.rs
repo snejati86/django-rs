@@ -278,6 +278,7 @@ mod tests {
                         FieldDef::new("id", FieldType::BigAutoField).primary_key(),
                     ],
                     constraints: vec![],
+                    inheritance_type: crate::query::compiler::InheritanceType::None,
                 });
                 &META
             }

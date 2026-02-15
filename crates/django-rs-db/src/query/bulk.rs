@@ -490,6 +490,7 @@ mod tests {
                     FieldDef::new("price", FieldType::IntegerField),
                 ],
                 constraints: vec![],
+                inheritance_type: crate::query::compiler::InheritanceType::None,
             });
             &META
         }

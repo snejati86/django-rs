@@ -306,6 +306,7 @@ pub fn derive_model_impl(input: DeriveInput) -> TokenStream {
                         abstract_model: #abstract_model,
                         fields: vec![#(#field_def_tokens),*],
                         constraints: vec![],
+                        inheritance_type: django_rs_db::query::compiler::InheritanceType::None,
                     }
                 });
                 &META

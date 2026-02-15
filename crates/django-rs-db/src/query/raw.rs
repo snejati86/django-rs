@@ -260,6 +260,7 @@ mod tests {
                     FieldDef::new("name", FieldType::CharField).max_length(100),
                 ],
                 constraints: vec![],
+                inheritance_type: crate::query::compiler::InheritanceType::None,
             });
             &META
         }

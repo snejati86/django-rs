@@ -69,9 +69,10 @@ pub use executor::{
 pub use fields::{FieldDef, FieldType, OnDelete};
 pub use model::{Model, ModelMeta};
 pub use query::{
-    AggregateFunc, DatabaseBackendType, Exists, Expression, Lookup, Manager, OrderBy, OuterRef, Q,
-    Query, QuerySet, Row, SelectColumn, SqlCompiler, SubqueryExpression, When, WhereNode,
-    WindowExpression, WindowFrame, WindowFrameBound, WindowFrameType, WindowFunction,
+    AggregateFunc, CompoundQuery, CompoundType, DatabaseBackendType, Exists, Expression,
+    InheritanceType, Lookup, Manager, OrderBy, OuterRef, PrefetchRelatedField, PrefetchResult, Q,
+    Query, QuerySet, Row, SelectColumn, SelectRelatedField, SqlCompiler, SubqueryExpression, When,
+    WhereNode, WindowExpression, WindowFrame, WindowFrameBound, WindowFrameType, WindowFunction,
 };
 pub use validators::Validator;
 pub use value::Value;

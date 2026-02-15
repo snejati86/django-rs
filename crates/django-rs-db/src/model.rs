@@ -8,7 +8,7 @@
 //! including table name, ordering, indexes, and constraints.
 
 use crate::fields::FieldDef;
-use crate::query::compiler::OrderBy;
+use crate::query::compiler::{InheritanceType, OrderBy};
 use crate::value::Value;
 use django_rs_core::DjangoError;
 
@@ -30,7 +30,7 @@ pub use crate::query::compiler::Row;
 /// use django_rs_db::model::{Model, ModelMeta};
 /// use django_rs_db::fields::{FieldDef, FieldType};
 /// use django_rs_db::value::Value;
-/// use django_rs_db::query::compiler::{Row, OrderBy};
+/// use django_rs_db::query::compiler::{InheritanceType, Row, OrderBy};
 /// use django_rs_core::DjangoError;
 ///
 /// struct Article {
@@ -53,6 +53,7 @@ pub use crate::query::compiler::Row;
 ///             abstract_model: false,
 ///             fields: vec![],
 ///             constraints: vec![],
+///             inheritance_type: InheritanceType::None,
 ///         });
 ///         &META
 ///     }
@@ -113,6 +114,29 @@ pub trait Model: Send + Sync + 'static {
     fn from_row(row: &Row) -> Result<Self, DjangoError>
     where
         Self: Sized;
+
+    /// Returns the inheritance type for this model.
+    ///
+    /// Override this for models that use multi-table or proxy inheritance.
+    fn inheritance_type() -> InheritanceType {
+        InheritanceType::None
+    }
+
+    /// Returns field name-value pairs that belong to the parent table.
+    ///
+    /// Used for multi-table inheritance INSERT/UPDATE operations.
+    /// Only relevant when `inheritance_type()` returns `MultiTable`.
+    fn parent_field_values(&self) -> Vec<(&'static str, Value)> {
+        Vec::new()
+    }
+
+    /// Returns field name-value pairs that belong to the child table only.
+    ///
+    /// Used for multi-table inheritance INSERT/UPDATE operations.
+    /// Only relevant when `inheritance_type()` returns `MultiTable`.
+    fn child_field_values(&self) -> Vec<(&'static str, Value)> {
+        self.non_pk_field_values()
+    }
 }
 
 /// Metadata about a model, equivalent to Django's `class Meta`.
@@ -143,6 +167,8 @@ pub struct ModelMeta {
     pub fields: Vec<FieldDef>,
     /// Database constraints (CHECK, UNIQUE).
     pub constraints: Vec<crate::constraints::BoxedConstraint>,
+    /// The type of model inheritance.
+    pub inheritance_type: InheritanceType,
 }
 
 /// A database index definition.
@@ -184,6 +210,7 @@ mod tests {
                     FieldDef::new("name", FieldType::CharField).max_length(100),
                 ],
                 constraints: vec![],
+                inheritance_type: InheritanceType::None,
             });
             &META
         }
