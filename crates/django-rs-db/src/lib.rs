@@ -45,11 +45,16 @@
 #![allow(clippy::unnecessary_literal_bound)]
 #![allow(clippy::match_same_arms)]
 #![allow(clippy::single_char_pattern)]
+// literal_string_with_formatting_args: template strings using {column}/{value} are intentional
+#![allow(clippy::literal_string_with_formatting_args)]
+// significant_drop_tightening: false positives with async Mutex guards
+#![allow(clippy::significant_drop_tightening)]
 
 pub mod executor;
 pub mod fields;
 pub mod model;
 pub mod query;
+pub mod transactions;
 pub mod validators;
 pub mod value;
 
@@ -66,3 +71,14 @@ pub use query::{
 };
 pub use validators::Validator;
 pub use value::Value;
+
+// Re-export new modules at the crate root for convenience.
+pub use query::bulk::{
+    bulk_create, bulk_update, get_or_create, update_or_create, BulkCreateOptions,
+    BulkUpdateOptions,
+};
+pub use query::custom_lookups::{CustomLookup, LookupRegistry, Transform, TransformOutput};
+pub use query::raw::{RawQuerySet, RawSql};
+pub use transactions::{
+    atomic, atomic_with_isolation, IsolationLevel, Savepoint, TransactionManager,
+};
