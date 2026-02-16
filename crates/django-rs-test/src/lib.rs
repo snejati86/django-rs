@@ -4,6 +4,17 @@
 //! simulating HTTP requests, assertion helpers for views and responses, and
 //! utilities for structuring tests.
 //!
+//! ## Modules
+//!
+//! - [`client`] - HTTP test client wrapping Axum Router
+//! - [`framework`] - Test case structure and assertion helpers
+//! - [`test_database`] - In-memory SQLite database for ORM tests
+//! - [`request_factory`] - Build `HttpRequest` objects without routing
+//! - [`override_settings`] - Temporarily swap settings in tests
+//! - [`mail_outbox`] - Capture emails sent during tests
+//! - [`assert_queries`] - Assert the number of SQL queries executed
+//! - [`live_server`] - Spawn a real HTTP server for integration tests
+//!
 //! ## Design Principles
 //!
 //! The test framework is built to support parallel test execution. The test client
@@ -35,8 +46,14 @@
 #![allow(clippy::doc_markdown)]
 #![allow(clippy::missing_const_for_fn)]
 
+pub mod assert_queries;
 pub mod client;
 pub mod framework;
+pub mod live_server;
+pub mod mail_outbox;
+pub mod override_settings;
+pub mod request_factory;
+pub mod test_database;
 
 // Re-export primary types at the crate root for convenience.
 pub use client::{TestClient, TestResponse};
@@ -44,3 +61,11 @@ pub use framework::{
     TestCase, assert_contains, assert_form_error, assert_has_header, assert_not_contains,
     assert_not_has_header, assert_redirects, assert_status, assert_template_used,
 };
+
+// Re-export new infrastructure types.
+pub use assert_queries::{assert_max_queries, assert_num_queries};
+pub use live_server::LiveServerTestCase;
+pub use mail_outbox::{EmailMessage, MailOutbox};
+pub use override_settings::{SettingsOverride, get_settings, override_settings};
+pub use request_factory::RequestFactory;
+pub use test_database::TestDatabase;

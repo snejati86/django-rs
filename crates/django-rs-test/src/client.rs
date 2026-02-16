@@ -29,6 +29,7 @@ use http::{HeaderMap, Method, Request, StatusCode};
 use http_body_util::BodyExt;
 use tower::ServiceExt;
 
+use django_rs_auth::user::AbstractUser;
 use django_rs_core::DjangoError;
 use django_rs_views::SessionData;
 
@@ -36,10 +37,22 @@ use django_rs_views::SessionData;
 ///
 /// Maintains cookies across requests and provides convenience methods for
 /// common HTTP methods. All methods are async.
+///
+/// ## Enhanced Features
+///
+/// - **`force_login`** - Simulate an authenticated user without going through login.
+/// - **`enforce_csrf_checks`** - Toggle CSRF enforcement for testing.
+/// - **`cookies`** - Inspect the accumulated cookie jar.
 pub struct TestClient {
     app: Router,
     cookies: HashMap<String, String>,
     session: SessionData,
+    /// Whether CSRF checks should be enforced. Defaults to `false` (Django test
+    /// client behavior). When `true`, a `csrftoken` cookie and
+    /// `X-CSRFToken` header are NOT automatically added.
+    enforce_csrf: bool,
+    /// The currently logged-in user, if any.
+    logged_in_user: Option<AbstractUser>,
 }
 
 impl TestClient {
@@ -49,7 +62,72 @@ impl TestClient {
             app,
             cookies: HashMap::new(),
             session: SessionData::new("test-session".to_string()),
+            enforce_csrf: false,
+            logged_in_user: None,
         }
+    }
+
+    /// Simulates logging in the given user without going through the login form.
+    ///
+    /// Sets the user information in the session data and cookies so that
+    /// subsequent requests appear authenticated. This mirrors Django's
+    /// `Client.force_login()`.
+    pub fn force_login(&mut self, user: &AbstractUser) {
+        self.logged_in_user = Some(user.clone());
+
+        // Store user info in session (mirrors Django session-based auth)
+        self.session.set(
+            "_auth_user_id",
+            serde_json::json!(user.username),
+        );
+        self.session.set(
+            "_auth_user_backend",
+            serde_json::json!("django_rs.auth.backends.ModelBackend"),
+        );
+        self.session.set(
+            "_auth_user_hash",
+            serde_json::json!("test-hash"),
+        );
+
+        // Set a session cookie
+        self.cookies
+            .insert("sessionid".to_string(), self.session.session_key.clone());
+    }
+
+    /// Logs out the current user.
+    ///
+    /// Clears the session authentication data and removes the session cookie.
+    pub fn logout(&mut self) {
+        self.logged_in_user = None;
+        self.session.remove("_auth_user_id");
+        self.session.remove("_auth_user_backend");
+        self.session.remove("_auth_user_hash");
+        self.cookies.remove("sessionid");
+    }
+
+    /// Returns a reference to the currently logged-in user, if any.
+    pub fn logged_in_user(&self) -> Option<&AbstractUser> {
+        self.logged_in_user.as_ref()
+    }
+
+    /// Controls whether CSRF checks should be enforced.
+    ///
+    /// By default, CSRF checks are disabled (like Django's test client). Set to
+    /// `true` to test CSRF protection behavior.
+    pub fn enforce_csrf_checks(&mut self, enforce: bool) {
+        self.enforce_csrf = enforce;
+    }
+
+    /// Returns `true` if CSRF checks are being enforced.
+    pub const fn is_csrf_enforced(&self) -> bool {
+        self.enforce_csrf
+    }
+
+    /// Returns a reference to the cookie jar.
+    ///
+    /// Contains all cookies set manually and those received from responses.
+    pub const fn cookies(&self) -> &HashMap<String, String> {
+        &self.cookies
     }
 
     /// Sends a GET request to the given path.
@@ -554,5 +632,83 @@ mod tests {
         let mut client = TestClient::new(test_app());
         let response = client.get("/nonexistent").await;
         assert_eq!(response.status_code(), 404);
+    }
+
+    // ── force_login tests ────────────────────────────────────────────
+
+    #[test]
+    fn test_force_login() {
+        use django_rs_auth::user::AbstractUser;
+
+        let mut client = TestClient::new(Router::new());
+        assert!(client.logged_in_user().is_none());
+
+        let user = AbstractUser::new("testuser");
+        client.force_login(&user);
+
+        assert!(client.logged_in_user().is_some());
+        assert_eq!(client.logged_in_user().unwrap().username, "testuser");
+        assert_eq!(
+            client.session().get("_auth_user_id"),
+            Some(&serde_json::json!("testuser"))
+        );
+        assert!(client.cookies().contains_key("sessionid"));
+    }
+
+    #[test]
+    fn test_force_login_then_logout() {
+        use django_rs_auth::user::AbstractUser;
+
+        let mut client = TestClient::new(Router::new());
+        let user = AbstractUser::new("testuser");
+        client.force_login(&user);
+
+        assert!(client.logged_in_user().is_some());
+
+        client.logout();
+        assert!(client.logged_in_user().is_none());
+        assert!(client.session().get("_auth_user_id").is_none());
+        assert!(!client.cookies().contains_key("sessionid"));
+    }
+
+    // ── enforce_csrf_checks tests ─────────────────────────────────────
+
+    #[test]
+    fn test_csrf_enforcement_default_off() {
+        let client = TestClient::new(Router::new());
+        assert!(!client.is_csrf_enforced());
+    }
+
+    #[test]
+    fn test_csrf_enforcement_toggle() {
+        let mut client = TestClient::new(Router::new());
+        client.enforce_csrf_checks(true);
+        assert!(client.is_csrf_enforced());
+
+        client.enforce_csrf_checks(false);
+        assert!(!client.is_csrf_enforced());
+    }
+
+    // ── cookies() accessor test ──────────────────────────────────────
+
+    #[test]
+    fn test_cookies_accessor() {
+        let mut client = TestClient::new(Router::new());
+        assert!(client.cookies().is_empty());
+
+        client.set_cookie("token", "abc");
+        assert_eq!(client.cookies().get("token"), Some(&"abc".to_string()));
+        assert_eq!(client.cookies().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_cookies_accessor_after_response() {
+        let mut client = TestClient::new(test_app());
+        let _response = client.get("/set-cookie").await;
+
+        assert_eq!(
+            client.cookies().get("session"),
+            Some(&"abc123".to_string())
+        );
     }
 }
