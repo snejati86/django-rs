@@ -15,8 +15,12 @@ use django_rs_db::fields::FieldType;
 use django_rs_db::value::Value;
 use django_rs_db_backends::{DatabaseBackend, SqliteBackend};
 use django_rs_db_migrations::autodetect::{MigrationFieldDef, ModelOptions, ProjectState};
-use django_rs_db_migrations::executor::{MigrationExecutor, MigrationPlan, MigrationRecorder, MigrationStep};
-use django_rs_db_migrations::operations::{AddField, CreateModel, DeleteModel, RemoveField, RunSQL};
+use django_rs_db_migrations::executor::{
+    MigrationExecutor, MigrationPlan, MigrationRecorder, MigrationStep,
+};
+use django_rs_db_migrations::operations::{
+    AddField, CreateModel, DeleteModel, RemoveField, RunSQL,
+};
 use django_rs_db_migrations::schema_editor::SqliteSchemaEditor;
 use django_rs_db_migrations::serializer::{
     generate_migration_name, migration_file_path, next_migration_number, SerializableMigration,
@@ -553,10 +557,7 @@ fn test_serialization_roundtrip_multiple_operations() {
 
 #[test]
 fn test_file_write_read_roundtrip() {
-    let dir = std::env::temp_dir().join(format!(
-        "django_rs_integ_test_{}",
-        std::process::id()
-    ));
+    let dir = std::env::temp_dir().join(format!("django_rs_integ_test_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
 
     let migration = SerializableMigration {
@@ -564,17 +565,15 @@ fn test_file_write_read_roundtrip() {
         name: "0001_initial".into(),
         dependencies: vec![],
         initial: true,
-        operations: vec![
-            SerializableOperation::CreateModel {
-                name: "product".into(),
-                fields: vec![
-                    make_field("id", FieldType::BigAutoField).primary_key(),
-                    make_field("name", FieldType::CharField).max_length(255),
-                    make_field("price", FieldType::FloatField),
-                ],
-                options: ModelOptions::default(),
-            },
-        ],
+        operations: vec![SerializableOperation::CreateModel {
+            name: "product".into(),
+            fields: vec![
+                make_field("id", FieldType::BigAutoField).primary_key(),
+                make_field("name", FieldType::CharField).max_length(255),
+                make_field("price", FieldType::FloatField),
+            ],
+            options: ModelOptions::default(),
+        }],
     };
 
     let path = migration_file_path(&dir, "shop", "0001_initial");
@@ -613,10 +612,7 @@ fn test_next_migration_number_empty() {
 
 #[test]
 fn test_next_migration_number_sequential() {
-    let dir = std::env::temp_dir().join(format!(
-        "django_rs_integ_num_{}",
-        std::process::id()
-    ));
+    let dir = std::env::temp_dir().join(format!("django_rs_integ_num_{}", std::process::id()));
     let app_dir = dir.join("myapp");
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&app_dir).unwrap();
@@ -903,10 +899,7 @@ fn test_serializable_ops_to_real_operations() {
 
 #[tokio::test]
 async fn test_end_to_end_serialize_load_execute() {
-    let dir = std::env::temp_dir().join(format!(
-        "django_rs_e2e_{}",
-        std::process::id()
-    ));
+    let dir = std::env::temp_dir().join(format!("django_rs_e2e_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
 
     // Step 1: Create a serializable migration
@@ -1585,10 +1578,7 @@ fn test_serialize_field_with_defaults() {
         assert_eq!(count.default, Some(Value::Int(0)));
 
         let label = fields.iter().find(|f| f.name == "label").unwrap();
-        assert_eq!(
-            label.default,
-            Some(Value::String("default".into()))
-        );
+        assert_eq!(label.default, Some(Value::String("default".into())));
     } else {
         panic!("Expected CreateModel");
     }

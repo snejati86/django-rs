@@ -186,9 +186,7 @@ impl ActionRegistry {
             .actions
             .iter()
             .find(|a| a.name() == action_name)
-            .ok_or_else(|| {
-                DjangoError::NotFound(format!("Action '{action_name}' not found"))
-            })?;
+            .ok_or_else(|| DjangoError::NotFound(format!("Action '{action_name}' not found")))?;
 
         action.execute(model_key, selected_ids).await
     }
@@ -312,9 +310,7 @@ mod tests {
     #[tokio::test]
     async fn test_action_registry_execute_not_found() {
         let registry = ActionRegistry::new();
-        let result = registry
-            .execute("nonexistent", "blog.article", &[])
-            .await;
+        let result = registry.execute("nonexistent", "blog.article", &[]).await;
         assert!(result.is_err());
     }
 

@@ -156,9 +156,7 @@ impl Exists {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::query::compiler::{
-        DatabaseBackendType, SelectColumn, SqlCompiler, WhereNode,
-    };
+    use crate::query::compiler::{DatabaseBackendType, SelectColumn, SqlCompiler, WhereNode};
     use crate::query::lookups::Lookup;
     use crate::value::Value;
 
@@ -361,10 +359,9 @@ mod tests {
 
         let subquery = SubqueryExpression::new(inner);
         let mut outer = Query::new("posts");
-        outer.annotations.insert(
-            "comment_count".to_string(),
-            subquery.into_expression(),
-        );
+        outer
+            .annotations
+            .insert("comment_count".to_string(), subquery.into_expression());
 
         let compiler = pg();
         let (sql, params) = compiler.compile_select(&outer);

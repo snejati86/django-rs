@@ -86,7 +86,10 @@ fn test_registration_form_optional_field() {
     let fields = RegistrationForm::form_fields();
     // Option<String> should default to required = false
     let bio = fields.iter().find(|f| f.name == "bio").unwrap();
-    assert!(!bio.required, "Option<String> should default to not required");
+    assert!(
+        !bio.required,
+        "Option<String> should default to not required"
+    );
 }
 
 #[test]
@@ -103,7 +106,10 @@ fn test_registration_form_required_fields() {
 fn test_registration_form_password_widget() {
     let fields = RegistrationForm::form_fields();
     let pw = fields.iter().find(|f| f.name == "password").unwrap();
-    assert_eq!(pw.widget, django_rs_forms::widgets::WidgetType::PasswordInput);
+    assert_eq!(
+        pw.widget,
+        django_rs_forms::widgets::WidgetType::PasswordInput
+    );
 }
 
 // ── Form with numeric fields ────────────────────────────────────────────
@@ -121,7 +127,11 @@ pub struct FilterForm {
 #[test]
 fn test_filter_form_integer_type() {
     let fields = FilterForm::form_fields();
-    if let FormFieldType::Integer { min_value, max_value } = &fields[0].field_type {
+    if let FormFieldType::Integer {
+        min_value,
+        max_value,
+    } = &fields[0].field_type
+    {
         assert_eq!(*min_value, Some(0));
         assert_eq!(*max_value, Some(1000));
     } else {

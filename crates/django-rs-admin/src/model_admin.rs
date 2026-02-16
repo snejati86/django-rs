@@ -571,8 +571,7 @@ mod tests {
 
     #[test]
     fn test_model_admin_list_filter_fields() {
-        let admin = ModelAdmin::new("blog", "article")
-            .list_filter_fields(vec!["status", "author"]);
+        let admin = ModelAdmin::new("blog", "article").list_filter_fields(vec!["status", "author"]);
         assert_eq!(admin.list_filter.len(), 2);
         match &admin.list_filter[0] {
             ListFilter::Field(f) => assert_eq!(f, "status"),
@@ -582,35 +581,32 @@ mod tests {
 
     #[test]
     fn test_model_admin_custom_list_filter() {
-        let admin = ModelAdmin::new("blog", "article")
-            .list_filter(vec![
-                ListFilter::Field("status".to_string()),
-                ListFilter::DateHierarchy("published_date".to_string()),
-                ListFilter::Custom {
-                    name: "Has Image".to_string(),
-                    choices: vec![
-                        FilterChoice::new("Yes", "true"),
-                        FilterChoice::new("No", "false"),
-                    ],
-                },
-            ]);
+        let admin = ModelAdmin::new("blog", "article").list_filter(vec![
+            ListFilter::Field("status".to_string()),
+            ListFilter::DateHierarchy("published_date".to_string()),
+            ListFilter::Custom {
+                name: "Has Image".to_string(),
+                choices: vec![
+                    FilterChoice::new("Yes", "true"),
+                    FilterChoice::new("No", "false"),
+                ],
+            },
+        ]);
         assert_eq!(admin.list_filter.len(), 3);
     }
 
     #[test]
     fn test_model_admin_fieldsets() {
-        let admin = ModelAdmin::new("blog", "article")
-            .fieldsets(vec![
-                Fieldset::new(vec!["title", "slug"])
-                    .name("Basic Info"),
-                Fieldset::new(vec!["body", "summary"])
-                    .name("Content")
-                    .classes(vec!["wide"])
-                    .description("Main content fields"),
-                Fieldset::new(vec!["author", "published_date"])
-                    .name("Metadata")
-                    .classes(vec!["collapse"]),
-            ]);
+        let admin = ModelAdmin::new("blog", "article").fieldsets(vec![
+            Fieldset::new(vec!["title", "slug"]).name("Basic Info"),
+            Fieldset::new(vec!["body", "summary"])
+                .name("Content")
+                .classes(vec!["wide"])
+                .description("Main content fields"),
+            Fieldset::new(vec!["author", "published_date"])
+                .name("Metadata")
+                .classes(vec!["collapse"]),
+        ]);
         assert_eq!(admin.fieldsets.len(), 3);
         assert_eq!(admin.fieldsets[0].name, Some("Basic Info".to_string()));
         assert_eq!(admin.fieldsets[1].classes, vec!["wide"]);
@@ -622,14 +618,15 @@ mod tests {
 
     #[test]
     fn test_model_admin_inlines() {
-        let admin = ModelAdmin::new("blog", "article")
-            .inlines(vec![
-                InlineAdmin::new("blog", "comment", InlineType::Tabular)
-                    .extra(1)
-                    .min_num(0)
-                    .max_num(Some(10))
-                    .fields(vec!["author", "text"]),
-            ]);
+        let admin = ModelAdmin::new("blog", "article").inlines(vec![InlineAdmin::new(
+            "blog",
+            "comment",
+            InlineType::Tabular,
+        )
+        .extra(1)
+        .min_num(0)
+        .max_num(Some(10))
+        .fields(vec!["author", "text"])]);
         assert_eq!(admin.inlines.len(), 1);
         assert_eq!(admin.inlines[0].model_name, "comment");
         assert_eq!(admin.inlines[0].inline_type, InlineType::Tabular);
@@ -641,8 +638,7 @@ mod tests {
     fn test_model_admin_prepopulated_fields() {
         let mut prepopulated = HashMap::new();
         prepopulated.insert("slug".to_string(), vec!["title".to_string()]);
-        let admin = ModelAdmin::new("blog", "article")
-            .prepopulated_fields(prepopulated);
+        let admin = ModelAdmin::new("blog", "article").prepopulated_fields(prepopulated);
         assert_eq!(
             admin.prepopulated_fields.get("slug"),
             Some(&vec!["title".to_string()])
@@ -732,8 +728,7 @@ mod tests {
 
     #[test]
     fn test_field_schema_relation() {
-        let schema = FieldSchema::new("author", "ForeignKey")
-            .relation("auth.user");
+        let schema = FieldSchema::new("author", "ForeignKey").relation("auth.user");
         assert!(schema.is_relation);
         assert_eq!(schema.related_model, Some("auth.user".to_string()));
     }
@@ -752,12 +747,11 @@ mod tests {
 
     #[test]
     fn test_model_admin_fields_schema() {
-        let admin = ModelAdmin::new("auth", "user")
-            .fields_schema(vec![
-                FieldSchema::new("id", "BigAutoField").primary_key(),
-                FieldSchema::new("username", "CharField").max_length(150),
-                FieldSchema::new("email", "EmailField").optional(),
-            ]);
+        let admin = ModelAdmin::new("auth", "user").fields_schema(vec![
+            FieldSchema::new("id", "BigAutoField").primary_key(),
+            FieldSchema::new("username", "CharField").max_length(150),
+            FieldSchema::new("email", "EmailField").optional(),
+        ]);
         assert_eq!(admin.fields_schema.len(), 3);
         assert!(admin.fields_schema[0].primary_key);
     }

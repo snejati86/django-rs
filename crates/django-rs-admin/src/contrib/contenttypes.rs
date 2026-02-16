@@ -122,10 +122,7 @@ mod tests {
     #[test]
     fn test_content_type_natural_key() {
         let ct = ContentType::new("auth", "user");
-        assert_eq!(
-            ct.natural_key(),
-            ("auth".to_string(), "user".to_string())
-        );
+        assert_eq!(ct.natural_key(), ("auth".to_string(), "user".to_string()));
     }
 
     #[test]

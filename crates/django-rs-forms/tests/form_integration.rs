@@ -87,17 +87,17 @@ static ARTICLE_META: LazyLock<ModelMeta> = LazyLock::new(|| ModelMeta {
         FieldDef::new("body", FieldType::TextField)
             .verbose_name("Body")
             .help_text("Article body text"),
-        FieldDef::new("author_email", FieldType::EmailField)
-            .verbose_name("Author Email"),
-        FieldDef::new("published", FieldType::BooleanField)
-            .default(Value::Bool(false)),
-        FieldDef::new("view_count", FieldType::IntegerField)
-            .default(Value::Int(0)),
+        FieldDef::new("author_email", FieldType::EmailField).verbose_name("Author Email"),
+        FieldDef::new("published", FieldType::BooleanField).default(Value::Bool(false)),
+        FieldDef::new("view_count", FieldType::IntegerField).default(Value::Int(0)),
         FieldDef::new("rating", FieldType::FloatField).nullable(),
-        FieldDef::new("price", FieldType::DecimalField {
-            max_digits: 10,
-            decimal_places: 2,
-        }),
+        FieldDef::new(
+            "price",
+            FieldType::DecimalField {
+                max_digits: 10,
+                decimal_places: 2,
+            },
+        ),
         FieldDef::new("publish_date", FieldType::DateField).nullable(),
         FieldDef::new("slug", FieldType::SlugField)
             .unique()
@@ -154,9 +154,7 @@ async fn test_required_field_rejects_empty_value() {
     );
     let username_errors = &errors["username"];
     assert!(
-        username_errors
-            .iter()
-            .any(|e| e.contains("required")),
+        username_errors.iter().any(|e| e.contains("required")),
         "Expected 'required' error message, got: {:?}",
         username_errors
     );
@@ -189,9 +187,7 @@ async fn test_email_format_validation() {
         "Expected error on 'email' field"
     );
     assert!(
-        errors["email"]
-            .iter()
-            .any(|e| e.contains("valid email")),
+        errors["email"].iter().any(|e| e.contains("valid email")),
         "Expected email validation error, got: {:?}",
         errors["email"]
     );
@@ -208,10 +204,7 @@ async fn test_integer_range_validation() {
         "Age 200 should exceed max_value of 150"
     );
     let errors = form.errors();
-    assert!(
-        errors.contains_key("age"),
-        "Expected error on 'age' field"
-    );
+    assert!(errors.contains_key("age"), "Expected error on 'age' field");
     assert!(
         errors["age"]
             .iter()
@@ -225,9 +218,7 @@ async fn test_integer_range_validation() {
 async fn test_max_length_validation() {
     let mut form = make_contact_form();
     let long_name = "a".repeat(25); // exceeds max_length=20
-    let qd = QueryDict::parse(&format!(
-        "username={long_name}&email=alice@example.com"
-    ));
+    let qd = QueryDict::parse(&format!("username={long_name}&email=alice@example.com"));
     form.bind(&qd);
 
     assert!(
@@ -292,14 +283,8 @@ async fn test_errors_contain_field_specific_messages() {
     form.is_valid().await;
 
     let errors = form.errors();
-    assert!(
-        errors.contains_key("username"),
-        "Expected username error"
-    );
-    assert!(
-        errors.contains_key("email"),
-        "Expected email error"
-    );
+    assert!(errors.contains_key("username"), "Expected username error");
+    assert!(errors.contains_key("email"), "Expected email error");
     assert!(
         errors.contains_key("age"),
         "Expected age error (non-integer)"
@@ -547,10 +532,7 @@ async fn test_modelform_save_updates_existing_instance() {
     let form_fields = generate_form_fields(&config);
 
     let mut initial = HashMap::new();
-    initial.insert(
-        "title".to_string(),
-        Value::String("Old Title".to_string()),
-    );
+    initial.insert("title".to_string(), Value::String("Old Title".to_string()));
 
     let mut form = BaseForm::new(form_fields).with_initial(initial);
 
@@ -570,18 +552,18 @@ async fn test_modelform_save_updates_existing_instance() {
             "Updated title should override initial"
         );
     } else {
-        eprintln!(
-            "ModelForm update validation failed: {:?}",
-            form.errors()
-        );
+        eprintln!("ModelForm update validation failed: {:?}", form.errors());
     }
 }
 
 #[test]
 fn test_modelform_meta_fields_subset() {
-    let config = ModelFormConfig::new(get_article_meta()).with_fields(
-        ModelFormFields::Include(vec!["title".into(), "body".into(), "slug".into()]),
-    );
+    let config =
+        ModelFormConfig::new(get_article_meta()).with_fields(ModelFormFields::Include(vec![
+            "title".into(),
+            "body".into(),
+            "slug".into(),
+        ]));
     let fields = generate_form_fields(&config);
 
     assert_eq!(fields.len(), 3, "Should only have 3 included fields");
@@ -595,13 +577,19 @@ fn test_modelform_meta_fields_subset() {
 
 #[test]
 fn test_modelform_meta_exclude() {
-    let config = ModelFormConfig::new(get_article_meta()).with_fields(
-        ModelFormFields::Exclude(vec!["body".into(), "rating".into(), "publish_date".into()]),
-    );
+    let config =
+        ModelFormConfig::new(get_article_meta()).with_fields(ModelFormFields::Exclude(vec![
+            "body".into(),
+            "rating".into(),
+            "publish_date".into(),
+        ]));
     let fields = generate_form_fields(&config);
 
     let names: Vec<&str> = fields.iter().map(|f| f.name.as_str()).collect();
-    assert!(!names.contains(&"body"), "Excluded field 'body' should be absent");
+    assert!(
+        !names.contains(&"body"),
+        "Excluded field 'body' should be absent"
+    );
     assert!(
         !names.contains(&"rating"),
         "Excluded field 'rating' should be absent"
@@ -610,8 +598,14 @@ fn test_modelform_meta_exclude() {
         !names.contains(&"publish_date"),
         "Excluded field 'publish_date' should be absent"
     );
-    assert!(names.contains(&"title"), "Non-excluded field should be present");
-    assert!(names.contains(&"slug"), "Non-excluded field should be present");
+    assert!(
+        names.contains(&"title"),
+        "Non-excluded field should be present"
+    );
+    assert!(
+        names.contains(&"slug"),
+        "Non-excluded field should be present"
+    );
 }
 
 #[test]
@@ -679,7 +673,10 @@ fn test_modelform_required_derived_from_model() {
 
     // published: has default -> not required
     let published = fields.iter().find(|f| f.name == "published").unwrap();
-    assert!(!published.required, "published (has default) should not be required");
+    assert!(
+        !published.required,
+        "published (has default) should not be required"
+    );
 
     // rating: nullable -> not required
     let rating = fields.iter().find(|f| f.name == "rating").unwrap();
@@ -687,7 +684,10 @@ fn test_modelform_required_derived_from_model() {
 
     // view_count: has default -> not required
     let views = fields.iter().find(|f| f.name == "view_count").unwrap();
-    assert!(!views.required, "view_count (has default) should not be required");
+    assert!(
+        !views.required,
+        "view_count (has default) should not be required"
+    );
 }
 
 #[test]
@@ -751,9 +751,7 @@ fn make_form_view() -> FormView {
 #[tokio::test]
 async fn test_formview_get_renders_empty_form() {
     let view = make_form_view();
-    let request = HttpRequest::builder()
-        .method(http::Method::GET)
-        .build();
+    let request = HttpRequest::builder().method(http::Method::GET).build();
     let response = view.dispatch(&request).await;
 
     assert_eq!(
@@ -827,10 +825,7 @@ impl ContextMixin for ArticleCreateView {
         _kwargs: &HashMap<String, String>,
     ) -> HashMap<String, serde_json::Value> {
         let mut ctx = HashMap::new();
-        ctx.insert(
-            "form_fields".to_string(),
-            serde_json::json!(self.fields()),
-        );
+        ctx.insert("form_fields".to_string(), serde_json::json!(self.fields()));
         ctx
     }
 }
@@ -853,11 +848,14 @@ impl View for ArticleCreateView {
                     strip: true,
                 },
             ),
-            FormFieldDef::new("body", FormFieldType::Char {
-                min_length: None,
-                max_length: None,
-                strip: false,
-            }),
+            FormFieldDef::new(
+                "body",
+                FormFieldType::Char {
+                    min_length: None,
+                    max_length: None,
+                    strip: false,
+                },
+            ),
         ]);
         form.bind(&data);
 
@@ -901,9 +899,7 @@ impl CreateView for ArticleCreateView {
 #[tokio::test]
 async fn test_createview_get_renders_form() {
     let view = ArticleCreateView;
-    let request = HttpRequest::builder()
-        .method(http::Method::GET)
-        .build();
+    let request = HttpRequest::builder().method(http::Method::GET).build();
     let response = view.dispatch(request).await;
 
     assert_eq!(
@@ -1045,9 +1041,7 @@ impl UpdateView for ArticleUpdateView {
 #[tokio::test]
 async fn test_updateview_get_renders_form_with_initial() {
     let view = ArticleUpdateView;
-    let request = HttpRequest::builder()
-        .method(http::Method::GET)
-        .build();
+    let request = HttpRequest::builder().method(http::Method::GET).build();
     let response = view.dispatch(request).await;
 
     assert_eq!(
@@ -1148,9 +1142,7 @@ async fn test_deleteview_get_shows_confirmation() {
     let view = ArticleDeleteView {
         deleted: std::sync::atomic::AtomicBool::new(false),
     };
-    let request = HttpRequest::builder()
-        .method(http::Method::GET)
-        .build();
+    let request = HttpRequest::builder().method(http::Method::GET).build();
     let response = view.dispatch(request).await;
 
     assert_eq!(
@@ -1170,9 +1162,7 @@ async fn test_deleteview_post_processes_deletion() {
     let view = ArticleDeleteView {
         deleted: std::sync::atomic::AtomicBool::new(false),
     };
-    let request = HttpRequest::builder()
-        .method(http::Method::POST)
-        .build();
+    let request = HttpRequest::builder().method(http::Method::POST).build();
     let response = view.dispatch(request).await;
 
     assert_eq!(
@@ -1190,8 +1180,7 @@ async fn test_deleteview_post_processes_deletion() {
         "/articles/"
     );
     assert!(
-        view.deleted
-            .load(std::sync::atomic::Ordering::SeqCst),
+        view.deleted.load(std::sync::atomic::Ordering::SeqCst),
         "perform_delete should have been called"
     );
 }
@@ -1259,18 +1248,13 @@ async fn test_bind_form_from_request_creates_bound_form() {
     );
 
     let valid = form.is_valid().await;
-    assert!(
-        valid,
-        "Form bound from valid request data should be valid"
-    );
+    assert!(valid, "Form bound from valid request data should be valid");
 }
 
 #[tokio::test]
 async fn test_formview_method_not_allowed() {
     let view = make_form_view();
-    let request = HttpRequest::builder()
-        .method(http::Method::DELETE)
-        .build();
+    let request = HttpRequest::builder().method(http::Method::DELETE).build();
     let response = view.dispatch(&request).await;
 
     assert_eq!(
@@ -1283,14 +1267,13 @@ async fn test_formview_method_not_allowed() {
 #[tokio::test]
 async fn test_full_pipeline_form_view_model_roundtrip() {
     // End-to-end test: ModelForm fields -> BaseForm -> bind from request -> validate -> cleaned_data
-    let config = ModelFormConfig::new(get_article_meta()).with_fields(
-        ModelFormFields::Include(vec![
+    let config =
+        ModelFormConfig::new(get_article_meta()).with_fields(ModelFormFields::Include(vec![
             "title".into(),
             "body".into(),
             "author_email".into(),
             "slug".into(),
-        ]),
-    );
+        ]));
     let form_fields = generate_form_fields(&config);
 
     let mut form = BaseForm::new(form_fields);
@@ -1358,10 +1341,7 @@ async fn test_full_clean_returns_errors() {
         "full_clean should return Err for invalid data"
     );
     let errors = result.unwrap_err();
-    assert!(
-        !errors.is_empty(),
-        "Should have at least one field error"
-    );
+    assert!(!errors.is_empty(), "Should have at least one field error");
 }
 
 #[tokio::test]

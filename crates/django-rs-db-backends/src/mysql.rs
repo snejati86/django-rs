@@ -42,10 +42,7 @@ impl MySqlBackend {
         let port = config.port.unwrap_or(3306);
         let user = config.user.as_deref().unwrap_or("root");
         let password = config.password.as_deref().unwrap_or("");
-        let url = format!(
-            "mysql://{user}:{password}@{host}:{port}/{}",
-            config.name
-        );
+        let url = format!("mysql://{user}:{password}@{host}:{port}/{}", config.name);
         Self::from_url(&url)
     }
 
@@ -64,17 +61,12 @@ impl MySqlBackend {
                 Value::DateTime(dt) => mysql_async::Value::from(dt.to_string()),
                 Value::DateTimeTz(dt) => mysql_async::Value::from(dt.to_string()),
                 Value::Time(t) => mysql_async::Value::from(t.to_string()),
-                Value::Duration(d) => {
-                    mysql_async::Value::from(d.num_microseconds().unwrap_or(0))
-                }
+                Value::Duration(d) => mysql_async::Value::from(d.num_microseconds().unwrap_or(0)),
                 Value::Uuid(u) => mysql_async::Value::from(u.to_string()),
                 Value::Json(j) => mysql_async::Value::from(j.to_string()),
                 Value::List(vals) => {
                     let json = serde_json::to_string(
-                        &vals
-                            .iter()
-                            .map(|v| v.to_string())
-                            .collect::<Vec<_>>(),
+                        &vals.iter().map(|v| v.to_string()).collect::<Vec<_>>(),
                     )
                     .unwrap_or_default();
                     mysql_async::Value::from(json)
@@ -134,11 +126,10 @@ impl DatabaseBackend for MySqlBackend {
     async fn execute(&self, sql: &str, params: &[Value]) -> Result<u64, DjangoError> {
         use mysql_async::prelude::Queryable;
 
-        let mut conn = self
-            .pool
-            .get_conn()
-            .await
-            .map_err(|e| DjangoError::OperationalError(format!("MySQL connection error: {e}")))?;
+        let mut conn =
+            self.pool.get_conn().await.map_err(|e| {
+                DjangoError::OperationalError(format!("MySQL connection error: {e}"))
+            })?;
 
         let mysql_params = Self::values_to_params(params);
         let result = conn
@@ -153,11 +144,10 @@ impl DatabaseBackend for MySqlBackend {
     async fn query(&self, sql: &str, params: &[Value]) -> Result<Vec<Row>, DjangoError> {
         use mysql_async::prelude::Queryable;
 
-        let mut conn = self
-            .pool
-            .get_conn()
-            .await
-            .map_err(|e| DjangoError::OperationalError(format!("MySQL connection error: {e}")))?;
+        let mut conn =
+            self.pool.get_conn().await.map_err(|e| {
+                DjangoError::OperationalError(format!("MySQL connection error: {e}"))
+            })?;
 
         let mysql_params = Self::values_to_params(params);
         let rows: Vec<mysql_async::Row> = conn
@@ -218,18 +208,13 @@ impl django_rs_db::DbExecutor for MySqlBackend {
         DatabaseBackend::query_one(self, sql, params).await
     }
 
-    async fn insert_returning_id(
-        &self,
-        sql: &str,
-        params: &[Value],
-    ) -> Result<Value, DjangoError> {
+    async fn insert_returning_id(&self, sql: &str, params: &[Value]) -> Result<Value, DjangoError> {
         use mysql_async::prelude::Queryable;
 
-        let mut conn = self
-            .pool
-            .get_conn()
-            .await
-            .map_err(|e| DjangoError::OperationalError(format!("MySQL connection error: {e}")))?;
+        let mut conn =
+            self.pool.get_conn().await.map_err(|e| {
+                DjangoError::OperationalError(format!("MySQL connection error: {e}"))
+            })?;
 
         let mysql_params = Self::values_to_params(params);
         conn.exec_drop(sql, mysql_params)

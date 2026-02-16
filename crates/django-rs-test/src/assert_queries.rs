@@ -80,8 +80,8 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use django_rs_db::DbExecutor;
     use django_rs_db::value::Value;
+    use django_rs_db::DbExecutor;
 
     #[tokio::test]
     async fn test_assert_num_queries_passes() {

@@ -59,16 +59,13 @@ impl MigrationSquasher {
     ///
     /// Returns `None` if the operation was merged, or `Some(op)` if it could
     /// not be merged and should be added to the list.
-    fn try_merge(
-        existing: &mut Vec<SquashableOp>,
-        op: SquashableOp,
-    ) -> Option<SquashableOp> {
+    fn try_merge(existing: &mut Vec<SquashableOp>, op: SquashableOp) -> Option<SquashableOp> {
         match &op {
             // DeleteModel cancels CreateModel
             SquashableOp::DeleteModel { name } => {
-                let create_idx = existing.iter().position(|e| {
-                    matches!(e, SquashableOp::CreateModel { name: cn, .. } if cn == name)
-                });
+                let create_idx = existing.iter().position(
+                    |e| matches!(e, SquashableOp::CreateModel { name: cn, .. } if cn == name),
+                );
                 if let Some(idx) = create_idx {
                     // Also remove any AddField / AlterField / RemoveField for this model
                     existing.remove(idx);
@@ -90,9 +87,9 @@ impl MigrationSquasher {
             SquashableOp::AddField {
                 model_name, field, ..
             } => {
-                let create_idx = existing.iter().position(|e| {
-                    matches!(e, SquashableOp::CreateModel { name, .. } if name == model_name)
-                });
+                let create_idx = existing.iter().position(
+                    |e| matches!(e, SquashableOp::CreateModel { name, .. } if name == model_name),
+                );
                 if let Some(idx) = create_idx {
                     if let SquashableOp::CreateModel { fields, .. } = &mut existing[idx] {
                         fields.push(field.clone());
@@ -689,7 +686,7 @@ mod tests {
                 name: Some("idx".into()),
                 fields: vec!["title".into()],
                 unique: false,
-                    index_type: IndexType::default(),
+                index_type: IndexType::default(),
             },
         };
         let boxed = op.to_operation();

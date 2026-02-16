@@ -135,10 +135,7 @@ mod tests {
     #[test]
     fn test_get_table_names_from_settings() {
         let settings = Settings {
-            installed_apps: vec![
-                "django_rs.auth".to_string(),
-                "myapp.blog".to_string(),
-            ],
+            installed_apps: vec!["django_rs.auth".to_string(), "myapp.blog".to_string()],
             ..Settings::default()
         };
 
@@ -168,11 +165,9 @@ mod tests {
     #[tokio::test]
     async fn test_flush_requires_noinput() {
         let cmd = FlushCommand;
-        let cli = clap::Command::new("test")
-            .subcommand(cmd.add_arguments(clap::Command::new("flush")));
-        let matches = cli
-            .try_get_matches_from(["test", "flush"])
-            .unwrap();
+        let cli =
+            clap::Command::new("test").subcommand(cmd.add_arguments(clap::Command::new("flush")));
+        let matches = cli.try_get_matches_from(["test", "flush"]).unwrap();
         let (_, sub_matches) = matches.subcommand().unwrap();
 
         let settings = Settings::default();
@@ -183,8 +178,8 @@ mod tests {
     #[tokio::test]
     async fn test_flush_with_noinput() {
         let cmd = FlushCommand;
-        let cli = clap::Command::new("test")
-            .subcommand(cmd.add_arguments(clap::Command::new("flush")));
+        let cli =
+            clap::Command::new("test").subcommand(cmd.add_arguments(clap::Command::new("flush")));
         let matches = cli
             .try_get_matches_from(["test", "flush", "--noinput"])
             .unwrap();

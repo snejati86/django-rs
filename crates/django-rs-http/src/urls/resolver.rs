@@ -156,10 +156,10 @@ impl URLResolver {
     /// Returns [`DjangoError::NotFound`] if no pattern matches the path.
     pub fn resolve(&self, path: &str) -> DjangoResult<ResolverMatch> {
         // First, match the prefix
-        let (prefix_kwargs, remaining) =
-            self.pattern.match_path(path).ok_or_else(|| {
-                DjangoError::NotFound(format!("No URL pattern matches '{path}'"))
-            })?;
+        let (prefix_kwargs, remaining) = self
+            .pattern
+            .match_path(path)
+            .ok_or_else(|| DjangoError::NotFound(format!("No URL pattern matches '{path}'")))?;
 
         // Try each child pattern
         for entry in &self.url_patterns {
@@ -180,11 +180,7 @@ impl URLResolver {
                             app_names.push(app.clone());
                         }
 
-                        let route = format!(
-                            "{}{}",
-                            self.pattern.route(),
-                            child_pattern.route()
-                        );
+                        let route = format!("{}{}", self.pattern.route(), child_pattern.route());
 
                         return Ok(ResolverMatch {
                             func: child_pattern.callback().clone(),
@@ -198,8 +194,7 @@ impl URLResolver {
                     }
                 }
                 URLEntry::Resolver(child_resolver) => {
-                    if let Ok(mut resolver_match) = child_resolver.resolve(&remaining)
-                    {
+                    if let Ok(mut resolver_match) = child_resolver.resolve(&remaining) {
                         // Merge prefix kwargs
                         for (k, v) in &prefix_kwargs {
                             resolver_match
@@ -217,11 +212,8 @@ impl URLResolver {
                         }
 
                         // Prepend our route
-                        resolver_match.route = format!(
-                            "{}{}",
-                            self.pattern.route(),
-                            resolver_match.route
-                        );
+                        resolver_match.route =
+                            format!("{}{}", self.pattern.route(), resolver_match.route);
 
                         return Ok(resolver_match);
                     }
@@ -280,8 +272,7 @@ impl URLResolver {
                     }
                 }
                 URLEntry::Resolver(child_resolver) => {
-                    child_resolver
-                        .collect_named_patterns_inner(result, &namespaces, &routes);
+                    child_resolver.collect_named_patterns_inner(result, &namespaces, &routes);
                 }
             }
         }
@@ -338,7 +329,12 @@ pub fn include(
     app_name: Option<&str>,
 ) -> DjangoResult<URLResolver> {
     let prefix_pattern = pattern::path_prefix(prefix)?;
-    Ok(URLResolver::new(prefix_pattern, patterns, namespace, app_name))
+    Ok(URLResolver::new(
+        prefix_pattern,
+        patterns,
+        namespace,
+        app_name,
+    ))
 }
 
 /// Creates a root resolver (matches empty prefix) with the given URL entries.
@@ -379,7 +375,12 @@ mod tests {
     #[test]
     fn test_resolve_pattern_with_params() {
         let patterns = vec![URLEntry::Pattern(
-            path("articles/<int:year>/", dummy_handler(), Some("article-year")).unwrap(),
+            path(
+                "articles/<int:year>/",
+                dummy_handler(),
+                Some("article-year"),
+            )
+            .unwrap(),
         )];
 
         let resolver = root(patterns).unwrap();
@@ -391,12 +392,8 @@ mod tests {
     #[test]
     fn test_resolve_nested_include() {
         let user_patterns = vec![
-            URLEntry::Pattern(
-                path("", dummy_handler(), Some("user-list")).unwrap(),
-            ),
-            URLEntry::Pattern(
-                path("<int:id>/", dummy_handler(), Some("user-detail")).unwrap(),
-            ),
+            URLEntry::Pattern(path("", dummy_handler(), Some("user-list")).unwrap()),
+            URLEntry::Pattern(path("<int:id>/", dummy_handler(), Some("user-detail")).unwrap()),
         ];
 
         let patterns = vec![URLEntry::Resolver(
@@ -450,12 +447,8 @@ mod tests {
     #[test]
     fn test_resolve_multiple_patterns_first_match_wins() {
         let patterns = vec![
-            URLEntry::Pattern(
-                path("articles/", dummy_handler(), Some("first")).unwrap(),
-            ),
-            URLEntry::Pattern(
-                path("articles/", dummy_handler(), Some("second")).unwrap(),
-            ),
+            URLEntry::Pattern(path("articles/", dummy_handler(), Some("first")).unwrap()),
+            URLEntry::Pattern(path("articles/", dummy_handler(), Some("second")).unwrap()),
         ];
 
         let resolver = root(patterns).unwrap();
@@ -525,13 +518,8 @@ mod tests {
             path("posts/", dummy_handler(), Some("posts")).unwrap(),
         )];
 
-        let resolver_entry = include(
-            "api/<str:version>/",
-            patterns,
-            Some("api"),
-            Some("api"),
-        )
-        .unwrap();
+        let resolver_entry =
+            include("api/<str:version>/", patterns, Some("api"), Some("api")).unwrap();
 
         let root_resolver = root(vec![URLEntry::Resolver(resolver_entry)]).unwrap();
         let m = root_resolver.resolve("api/v2/posts/").unwrap();

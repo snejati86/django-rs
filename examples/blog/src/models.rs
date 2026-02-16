@@ -30,7 +30,11 @@ pub struct Post {
 
 impl Post {
     /// Creates a new unpublished post with the current timestamp.
-    pub fn new(title: impl Into<String>, content: impl Into<String>, author: impl Into<String>) -> Self {
+    pub fn new(
+        title: impl Into<String>,
+        content: impl Into<String>,
+        author: impl Into<String>,
+    ) -> Self {
         Self {
             id: 0,
             title: title.into(),
@@ -142,11 +146,7 @@ pub struct Comment {
 
 impl Comment {
     /// Creates a new comment on the given post.
-    pub fn new(
-        post_id: i64,
-        author: impl Into<String>,
-        content: impl Into<String>,
-    ) -> Self {
+    pub fn new(post_id: i64, author: impl Into<String>, content: impl Into<String>) -> Self {
         Self {
             id: 0,
             post_id,

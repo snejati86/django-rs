@@ -52,23 +52,22 @@ pub mod session;
 pub mod views;
 
 // Re-export the most commonly used types at the crate root.
-pub use middleware::{Middleware, MiddlewarePipeline};
 pub use middleware::builtin::{
-    AuthenticationMiddleware, CacheMiddleware, LocaleMiddleware, LoginRequiredMiddleware,
-    Message, MessageLevel, MessageMiddleware,
     add_message, add_message_with_tags, error, get_messages, info, success, warning,
+    AuthenticationMiddleware, CacheMiddleware, LocaleMiddleware, LoginRequiredMiddleware, Message,
+    MessageLevel, MessageMiddleware,
 };
+pub use middleware::{Middleware, MiddlewarePipeline};
 pub use server::DjangoApp;
 pub use session::{
     CookieSessionBackend, DatabaseSessionBackend, FileSessionBackend, InMemorySessionBackend,
     SessionBackend, SessionData, SessionMiddleware, SignedCookieSessionBackend,
 };
 pub use views::{
-    ArchiveIndexView, ContextMixin, CreateView, DateDetailView, DateMixin, DayArchiveView,
-    DeleteView, DetailView, FormView, ListView, MonthArchiveView, RedirectView,
-    TemplateView, TemplateResponseMixin, TodayArchiveView, UpdateView, View, ViewFunction,
-    YearArchiveView,
     bind_form_from_request, cleaned_data_as_strings, extract_post_data, form_context_to_json,
-    form_errors, login_required_redirect, permission_required,
-    LoginRequiredMixin, PermissionRequiredMixin,
+    form_errors, login_required_redirect, permission_required, ArchiveIndexView, ContextMixin,
+    CreateView, DateDetailView, DateMixin, DayArchiveView, DeleteView, DetailView, FormView,
+    ListView, LoginRequiredMixin, MonthArchiveView, PermissionRequiredMixin, RedirectView,
+    TemplateResponseMixin, TemplateView, TodayArchiveView, UpdateView, View, ViewFunction,
+    YearArchiveView,
 };

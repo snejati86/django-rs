@@ -263,13 +263,14 @@ impl MigrationAutodetector {
         // 1. Detect new models
         for (key, model) in &self.to_state.models {
             if !self.from_state.models.contains_key(key) {
-                result.entry(key.0.clone()).or_default().push(Box::new(
-                    CreateModel {
+                result
+                    .entry(key.0.clone())
+                    .or_default()
+                    .push(Box::new(CreateModel {
                         name: model.name.clone(),
                         fields: model.fields.clone(),
                         options: model.options.clone(),
-                    },
-                ));
+                    }));
             }
         }
 
@@ -288,10 +289,16 @@ impl MigrationAutodetector {
         // 3. Detect field changes for existing models
         for (key, new_model) in &self.to_state.models {
             if let Some(old_model) = self.from_state.models.get(key) {
-                let old_fields: HashMap<&str, &MigrationFieldDef> =
-                    old_model.fields.iter().map(|f| (f.name.as_str(), f)).collect();
-                let new_fields: HashMap<&str, &MigrationFieldDef> =
-                    new_model.fields.iter().map(|f| (f.name.as_str(), f)).collect();
+                let old_fields: HashMap<&str, &MigrationFieldDef> = old_model
+                    .fields
+                    .iter()
+                    .map(|f| (f.name.as_str(), f))
+                    .collect();
+                let new_fields: HashMap<&str, &MigrationFieldDef> = new_model
+                    .fields
+                    .iter()
+                    .map(|f| (f.name.as_str(), f))
+                    .collect();
 
                 let mut added: Vec<&MigrationFieldDef> = Vec::new();
                 let mut removed: Vec<&MigrationFieldDef> = Vec::new();
@@ -318,13 +325,14 @@ impl MigrationAutodetector {
                     let a = added[0];
                     let r = removed[0];
                     if field_types_match(&a.field_type, &r.field_type) {
-                        result.entry(key.0.clone()).or_default().push(Box::new(
-                            RenameField {
+                        result
+                            .entry(key.0.clone())
+                            .or_default()
+                            .push(Box::new(RenameField {
                                 model_name: new_model.name.clone(),
                                 old_name: r.name.clone(),
                                 new_name: a.name.clone(),
-                            },
-                        ));
+                            }));
                         renamed_old.push(r.name.clone());
                         renamed_new.push(a.name.clone());
                     }
@@ -333,24 +341,26 @@ impl MigrationAutodetector {
                 // Emit AddField for truly new fields
                 for field in &added {
                     if !renamed_new.contains(&field.name) {
-                        result.entry(key.0.clone()).or_default().push(Box::new(
-                            AddField {
+                        result
+                            .entry(key.0.clone())
+                            .or_default()
+                            .push(Box::new(AddField {
                                 model_name: new_model.name.clone(),
                                 field: (*field).clone(),
-                            },
-                        ));
+                            }));
                     }
                 }
 
                 // Emit RemoveField for truly removed fields
                 for field in &removed {
                     if !renamed_old.contains(&field.name) {
-                        result.entry(key.0.clone()).or_default().push(Box::new(
-                            RemoveField {
+                        result
+                            .entry(key.0.clone())
+                            .or_default()
+                            .push(Box::new(RemoveField {
                                 model_name: new_model.name.clone(),
                                 field_name: field.name.clone(),
-                            },
-                        ));
+                            }));
                     }
                 }
 
@@ -358,13 +368,14 @@ impl MigrationAutodetector {
                 for (name, new_field) in &new_fields {
                     if let Some(old_field) = old_fields.get(name) {
                         if fields_differ(old_field, new_field) {
-                            result.entry(key.0.clone()).or_default().push(Box::new(
-                                AlterField {
+                            result
+                                .entry(key.0.clone())
+                                .or_default()
+                                .push(Box::new(AlterField {
                                     model_name: new_model.name.clone(),
                                     field_name: (*name).to_string(),
                                     field: (*new_field).clone(),
-                                },
-                            ));
+                                }));
                         }
                     }
                 }
@@ -398,12 +409,13 @@ impl MigrationAutodetector {
                 for idx in &old_model.options.indexes {
                     if let Some(ref idx_name) = idx.name {
                         if !new_idx_names.contains(&Some(idx_name.as_str())) {
-                            result.entry(key.0.clone()).or_default().push(Box::new(
-                                RemoveIndex {
+                            result
+                                .entry(key.0.clone())
+                                .or_default()
+                                .push(Box::new(RemoveIndex {
                                     model_name: new_model.name.clone(),
                                     index_name: idx_name.clone(),
-                                },
-                            ));
+                                }));
                         }
                     }
                 }
@@ -412,12 +424,13 @@ impl MigrationAutodetector {
                 for idx in &new_model.options.indexes {
                     if let Some(ref idx_name) = idx.name {
                         if !old_idx_names.contains(&Some(idx_name.as_str())) {
-                            result.entry(key.0.clone()).or_default().push(Box::new(
-                                AddIndex {
+                            result
+                                .entry(key.0.clone())
+                                .or_default()
+                                .push(Box::new(AddIndex {
                                     model_name: new_model.name.clone(),
                                     index: idx.clone(),
-                                },
-                            ));
+                                }));
                         }
                     }
                 }
@@ -663,7 +676,9 @@ mod tests {
             "post",
             vec![
                 make_field("id", FieldType::BigAutoField).primary_key(),
-                make_field("title", FieldType::CharField).max_length(200).nullable(),
+                make_field("title", FieldType::CharField)
+                    .max_length(200)
+                    .nullable(),
             ],
         ));
 
@@ -743,7 +758,9 @@ mod tests {
         let detector = MigrationAutodetector::new(old, new_state);
         let changes = detector.detect_changes();
         let ops = changes.get("blog").unwrap();
-        assert!(ops.iter().any(|op| op.describe().contains("unique_together")));
+        assert!(ops
+            .iter()
+            .any(|op| op.describe().contains("unique_together")));
     }
 
     #[test]
@@ -879,7 +896,10 @@ mod tests {
         let changes = detector.detect_changes();
         let ops = changes.get("blog").unwrap();
         // Should produce Add + Remove, not renames, because there are 2 of each
-        let add_count = ops.iter().filter(|op| op.describe().contains("Add field")).count();
+        let add_count = ops
+            .iter()
+            .filter(|op| op.describe().contains("Add field"))
+            .count();
         let remove_count = ops
             .iter()
             .filter(|op| op.describe().contains("Remove field"))
@@ -916,8 +936,14 @@ mod tests {
 
     #[test]
     fn test_field_types_match() {
-        assert!(field_types_match(&FieldType::CharField, &FieldType::CharField));
-        assert!(!field_types_match(&FieldType::CharField, &FieldType::TextField));
+        assert!(field_types_match(
+            &FieldType::CharField,
+            &FieldType::CharField
+        ));
+        assert!(!field_types_match(
+            &FieldType::CharField,
+            &FieldType::TextField
+        ));
     }
 
     #[test]

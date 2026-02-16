@@ -289,10 +289,7 @@ mod tests {
     #[test]
     fn test_render_sitemap_xml_with_changefreq() {
         let mut sitemap = Sitemap::new();
-        sitemap.add(
-            SitemapEntry::new("https://example.com/")
-                .changefreq(ChangeFreq::Daily),
-        );
+        sitemap.add(SitemapEntry::new("https://example.com/").changefreq(ChangeFreq::Daily));
         let xml = render_sitemap_xml(&sitemap);
         assert!(xml.contains("<changefreq>daily</changefreq>"));
     }

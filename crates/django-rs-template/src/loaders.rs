@@ -142,7 +142,9 @@ impl TemplateLoader for StringLoader {
             .get(name)
             .cloned()
             .ok_or_else(|| {
-                DjangoError::TemplateDoesNotExist(format!("Template '{name}' not found in StringLoader"))
+                DjangoError::TemplateDoesNotExist(format!(
+                    "Template '{name}' not found in StringLoader"
+                ))
             })
     }
 }

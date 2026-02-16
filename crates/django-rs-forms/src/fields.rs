@@ -247,10 +247,7 @@ pub fn default_widget_for_field_type(field_type: &FormFieldType) -> WidgetType {
 /// 4. Custom validators
 ///
 /// Returns the cleaned `Value` or a list of error messages.
-pub fn clean_field_value(
-    field: &FormFieldDef,
-    raw: Option<&str>,
-) -> Result<Value, Vec<String>> {
+pub fn clean_field_value(field: &FormFieldDef, raw: Option<&str>) -> Result<Value, Vec<String>> {
     let raw_str = raw.unwrap_or("");
     let is_empty = raw_str.is_empty() || raw.is_none();
 
@@ -298,57 +295,55 @@ pub fn clean_field_value(
             Value::String(s.to_string())
         }
 
-        FormFieldType::Integer { min_value, max_value } => {
-            match raw_str.parse::<i64>() {
-                Ok(n) => {
-                    if let Some(min) = min_value {
-                        if n < *min {
-                            errors.push(format!(
-                                "Ensure this value is greater than or equal to {min}."
-                            ));
-                        }
+        FormFieldType::Integer {
+            min_value,
+            max_value,
+        } => match raw_str.parse::<i64>() {
+            Ok(n) => {
+                if let Some(min) = min_value {
+                    if n < *min {
+                        errors.push(format!(
+                            "Ensure this value is greater than or equal to {min}."
+                        ));
                     }
-                    if let Some(max) = max_value {
-                        if n > *max {
-                            errors.push(format!(
-                                "Ensure this value is less than or equal to {max}."
-                            ));
-                        }
+                }
+                if let Some(max) = max_value {
+                    if n > *max {
+                        errors.push(format!("Ensure this value is less than or equal to {max}."));
                     }
-                    Value::Int(n)
                 }
-                Err(_) => {
-                    errors.push("Enter a whole number.".to_string());
-                    Value::Null
-                }
+                Value::Int(n)
             }
-        }
+            Err(_) => {
+                errors.push("Enter a whole number.".to_string());
+                Value::Null
+            }
+        },
 
-        FormFieldType::Float { min_value, max_value } => {
-            match raw_str.parse::<f64>() {
-                Ok(n) => {
-                    if let Some(min) = min_value {
-                        if n < *min {
-                            errors.push(format!(
-                                "Ensure this value is greater than or equal to {min}."
-                            ));
-                        }
+        FormFieldType::Float {
+            min_value,
+            max_value,
+        } => match raw_str.parse::<f64>() {
+            Ok(n) => {
+                if let Some(min) = min_value {
+                    if n < *min {
+                        errors.push(format!(
+                            "Ensure this value is greater than or equal to {min}."
+                        ));
                     }
-                    if let Some(max) = max_value {
-                        if n > *max {
-                            errors.push(format!(
-                                "Ensure this value is less than or equal to {max}."
-                            ));
-                        }
+                }
+                if let Some(max) = max_value {
+                    if n > *max {
+                        errors.push(format!("Ensure this value is less than or equal to {max}."));
                     }
-                    Value::Float(n)
                 }
-                Err(_) => {
-                    errors.push("Enter a number.".to_string());
-                    Value::Null
-                }
+                Value::Float(n)
             }
-        }
+            Err(_) => {
+                errors.push("Enter a number.".to_string());
+                Value::Null
+            }
+        },
 
         FormFieldType::Decimal {
             max_digits,
@@ -382,10 +377,7 @@ pub fn clean_field_value(
         }
 
         FormFieldType::Boolean => {
-            let val = matches!(
-                raw_str.to_lowercase().as_str(),
-                "true" | "1" | "yes" | "on"
-            );
+            let val = matches!(raw_str.to_lowercase().as_str(), "true" | "1" | "yes" | "on");
             Value::Bool(val)
         }
 
@@ -402,15 +394,13 @@ pub fn clean_field_value(
             }
         }
 
-        FormFieldType::Date => {
-            match chrono::NaiveDate::parse_from_str(raw_str, "%Y-%m-%d") {
-                Ok(d) => Value::Date(d),
-                Err(_) => {
-                    errors.push("Enter a valid date (YYYY-MM-DD).".to_string());
-                    Value::Null
-                }
+        FormFieldType::Date => match chrono::NaiveDate::parse_from_str(raw_str, "%Y-%m-%d") {
+            Ok(d) => Value::Date(d),
+            Err(_) => {
+                errors.push("Enter a valid date (YYYY-MM-DD).".to_string());
+                Value::Null
             }
-        }
+        },
 
         FormFieldType::DateTime => {
             // Try multiple formats
@@ -451,9 +441,8 @@ pub fn clean_field_value(
 
         FormFieldType::Email => {
             // Basic email validation
-            let email_re =
-                regex::Regex::new(r"^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$")
-                    .expect("valid regex");
+            let email_re = regex::Regex::new(r"^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$")
+                .expect("valid regex");
             if email_re.is_match(raw_str) {
                 Value::String(raw_str.to_string())
             } else {
@@ -464,8 +453,7 @@ pub fn clean_field_value(
 
         FormFieldType::Url => {
             // Basic URL validation
-            let url_re =
-                regex::Regex::new(r"^https?://[^\s/$.?#].[^\s]*$").expect("valid regex");
+            let url_re = regex::Regex::new(r"^https?://[^\s/$.?#].[^\s]*$").expect("valid regex");
             if url_re.is_match(raw_str) {
                 Value::String(raw_str.to_string())
             } else {
@@ -474,15 +462,13 @@ pub fn clean_field_value(
             }
         }
 
-        FormFieldType::Uuid => {
-            match uuid::Uuid::parse_str(raw_str) {
-                Ok(u) => Value::Uuid(u),
-                Err(_) => {
-                    errors.push("Enter a valid UUID.".to_string());
-                    Value::Null
-                }
+        FormFieldType::Uuid => match uuid::Uuid::parse_str(raw_str) {
+            Ok(u) => Value::Uuid(u),
+            Err(_) => {
+                errors.push("Enter a valid UUID.".to_string());
+                Value::Null
             }
-        }
+        },
 
         FormFieldType::Slug => {
             let slug_re = regex::Regex::new(r"^[-a-zA-Z0-9_]+$").expect("valid regex");
@@ -597,15 +583,13 @@ pub fn clean_field_value(
             }
         }
 
-        FormFieldType::Json => {
-            match serde_json::from_str::<serde_json::Value>(raw_str) {
-                Ok(j) => Value::Json(j),
-                Err(_) => {
-                    errors.push("Enter valid JSON.".to_string());
-                    Value::Null
-                }
+        FormFieldType::Json => match serde_json::from_str::<serde_json::Value>(raw_str) {
+            Ok(j) => Value::Json(j),
+            Err(_) => {
+                errors.push("Enter valid JSON.".to_string());
+                Value::Null
             }
-        }
+        },
 
         FormFieldType::Regex { regex } => {
             let re = regex::Regex::new(regex).map_err(|e| vec![format!("Invalid regex: {e}")])?;
@@ -668,11 +652,14 @@ mod tests {
 
     #[test]
     fn test_char_field_clean() {
-        let field = FormFieldDef::new("name", FormFieldType::Char {
-            min_length: Some(2),
-            max_length: Some(50),
-            strip: true,
-        });
+        let field = FormFieldDef::new(
+            "name",
+            FormFieldType::Char {
+                min_length: Some(2),
+                max_length: Some(50),
+                strip: true,
+            },
+        );
         let result = clean_field_value(&field, Some("  Alice  "));
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), Value::String("Alice".to_string()));
@@ -680,11 +667,14 @@ mod tests {
 
     #[test]
     fn test_char_field_too_short() {
-        let field = FormFieldDef::new("name", FormFieldType::Char {
-            min_length: Some(5),
-            max_length: None,
-            strip: false,
-        });
+        let field = FormFieldDef::new(
+            "name",
+            FormFieldType::Char {
+                min_length: Some(5),
+                max_length: None,
+                strip: false,
+            },
+        );
         let result = clean_field_value(&field, Some("Hi"));
         assert!(result.is_err());
         assert!(result.unwrap_err()[0].contains("at least 5"));
@@ -692,11 +682,14 @@ mod tests {
 
     #[test]
     fn test_char_field_too_long() {
-        let field = FormFieldDef::new("name", FormFieldType::Char {
-            min_length: None,
-            max_length: Some(3),
-            strip: false,
-        });
+        let field = FormFieldDef::new(
+            "name",
+            FormFieldType::Char {
+                min_length: None,
+                max_length: Some(3),
+                strip: false,
+            },
+        );
         let result = clean_field_value(&field, Some("Hello"));
         assert!(result.is_err());
         assert!(result.unwrap_err()[0].contains("at most 3"));
@@ -704,20 +697,26 @@ mod tests {
 
     #[test]
     fn test_integer_field_clean() {
-        let field = FormFieldDef::new("age", FormFieldType::Integer {
-            min_value: Some(0),
-            max_value: Some(150),
-        });
+        let field = FormFieldDef::new(
+            "age",
+            FormFieldType::Integer {
+                min_value: Some(0),
+                max_value: Some(150),
+            },
+        );
         let result = clean_field_value(&field, Some("25"));
         assert_eq!(result.unwrap(), Value::Int(25));
     }
 
     #[test]
     fn test_integer_field_invalid() {
-        let field = FormFieldDef::new("age", FormFieldType::Integer {
-            min_value: None,
-            max_value: None,
-        });
+        let field = FormFieldDef::new(
+            "age",
+            FormFieldType::Integer {
+                min_value: None,
+                max_value: None,
+            },
+        );
         let result = clean_field_value(&field, Some("abc"));
         assert!(result.is_err());
         assert!(result.unwrap_err()[0].contains("whole number"));
@@ -725,10 +724,13 @@ mod tests {
 
     #[test]
     fn test_integer_field_min() {
-        let field = FormFieldDef::new("age", FormFieldType::Integer {
-            min_value: Some(18),
-            max_value: None,
-        });
+        let field = FormFieldDef::new(
+            "age",
+            FormFieldType::Integer {
+                min_value: Some(18),
+                max_value: None,
+            },
+        );
         let result = clean_field_value(&field, Some("10"));
         assert!(result.is_err());
         assert!(result.unwrap_err()[0].contains("greater than or equal to 18"));
@@ -736,50 +738,65 @@ mod tests {
 
     #[test]
     fn test_integer_field_max() {
-        let field = FormFieldDef::new("age", FormFieldType::Integer {
-            min_value: None,
-            max_value: Some(100),
-        });
+        let field = FormFieldDef::new(
+            "age",
+            FormFieldType::Integer {
+                min_value: None,
+                max_value: Some(100),
+            },
+        );
         let result = clean_field_value(&field, Some("150"));
         assert!(result.is_err());
     }
 
     #[test]
     fn test_float_field_clean() {
-        let field = FormFieldDef::new("price", FormFieldType::Float {
-            min_value: None,
-            max_value: None,
-        });
+        let field = FormFieldDef::new(
+            "price",
+            FormFieldType::Float {
+                min_value: None,
+                max_value: None,
+            },
+        );
         let result = clean_field_value(&field, Some("19.99"));
         assert_eq!(result.unwrap(), Value::Float(19.99));
     }
 
     #[test]
     fn test_float_field_invalid() {
-        let field = FormFieldDef::new("price", FormFieldType::Float {
-            min_value: None,
-            max_value: None,
-        });
+        let field = FormFieldDef::new(
+            "price",
+            FormFieldType::Float {
+                min_value: None,
+                max_value: None,
+            },
+        );
         let result = clean_field_value(&field, Some("not-a-number"));
         assert!(result.is_err());
     }
 
     #[test]
     fn test_decimal_field_clean() {
-        let field = FormFieldDef::new("amount", FormFieldType::Decimal {
-            max_digits: 5,
-            decimal_places: 2,
-        });
+        let field = FormFieldDef::new(
+            "amount",
+            FormFieldType::Decimal {
+                max_digits: 5,
+                decimal_places: 2,
+            },
+        );
         let result = clean_field_value(&field, Some("123.45"));
         assert!(result.is_ok());
     }
 
     #[test]
     fn test_decimal_field_too_many_digits() {
-        let field = FormFieldDef::new("amount", FormFieldType::Decimal {
-            max_digits: 4,
-            decimal_places: 2,
-        });
+        let field = FormFieldDef::new(
+            "amount",
+            FormFieldType::Decimal {
+                max_digits: 4,
+                decimal_places: 2,
+            },
+        );
         let result = clean_field_value(&field, Some("123.45"));
         assert!(result.is_err());
         assert!(result.unwrap_err()[0].contains("no more than 4 digits"));
@@ -787,10 +804,13 @@ mod tests {
 
     #[test]
     fn test_decimal_field_too_many_decimal_places() {
-        let field = FormFieldDef::new("amount", FormFieldType::Decimal {
-            max_digits: 10,
-            decimal_places: 1,
-        });
+        let field = FormFieldDef::new(
+            "amount",
+            FormFieldType::Decimal {
+                max_digits: 10,
+                decimal_places: 1,
+            },
+        );
         let result = clean_field_value(&field, Some("1.234"));
         assert!(result.is_err());
         assert!(result.unwrap_err()[0].contains("no more than 1 decimal places"));
@@ -973,10 +993,7 @@ mod tests {
         let field = FormFieldDef::new(
             "color",
             FormFieldType::Choice {
-                choices: vec![
-                    ("red".into(), "Red".into()),
-                    ("blue".into(), "Blue".into()),
-                ],
+                choices: vec![("red".into(), "Red".into()), ("blue".into(), "Blue".into())],
             },
         );
         let result = clean_field_value(&field, Some("red"));
@@ -1057,11 +1074,14 @@ mod tests {
 
     #[test]
     fn test_required_field_empty() {
-        let field = FormFieldDef::new("name", FormFieldType::Char {
-            min_length: None,
-            max_length: None,
-            strip: false,
-        });
+        let field = FormFieldDef::new(
+            "name",
+            FormFieldType::Char {
+                min_length: None,
+                max_length: None,
+                strip: false,
+            },
+        );
         let result = clean_field_value(&field, Some(""));
         assert!(result.is_err());
         assert_eq!(result.unwrap_err()[0], "This field is required.");
@@ -1069,22 +1089,28 @@ mod tests {
 
     #[test]
     fn test_required_field_none() {
-        let field = FormFieldDef::new("name", FormFieldType::Char {
-            min_length: None,
-            max_length: None,
-            strip: false,
-        });
+        let field = FormFieldDef::new(
+            "name",
+            FormFieldType::Char {
+                min_length: None,
+                max_length: None,
+                strip: false,
+            },
+        );
         let result = clean_field_value(&field, None);
         assert!(result.is_err());
     }
 
     #[test]
     fn test_optional_field_empty() {
-        let field = FormFieldDef::new("name", FormFieldType::Char {
-            min_length: None,
-            max_length: None,
-            strip: false,
-        })
+        let field = FormFieldDef::new(
+            "name",
+            FormFieldType::Char {
+                min_length: None,
+                max_length: None,
+                strip: false,
+            },
+        )
         .required(false);
         let result = clean_field_value(&field, Some(""));
         assert!(result.is_ok());
@@ -1093,11 +1119,14 @@ mod tests {
 
     #[test]
     fn test_custom_error_message() {
-        let field = FormFieldDef::new("name", FormFieldType::Char {
-            min_length: None,
-            max_length: None,
-            strip: false,
-        })
+        let field = FormFieldDef::new(
+            "name",
+            FormFieldType::Char {
+                min_length: None,
+                max_length: None,
+                strip: false,
+            },
+        )
         .error_message("required", "Please enter your name.");
         let result = clean_field_value(&field, Some(""));
         assert!(result.is_err());
@@ -1206,11 +1235,14 @@ mod tests {
 
     #[test]
     fn test_optional_field_with_initial() {
-        let field = FormFieldDef::new("status", FormFieldType::Char {
-            min_length: None,
-            max_length: None,
-            strip: false,
-        })
+        let field = FormFieldDef::new(
+            "status",
+            FormFieldType::Char {
+                min_length: None,
+                max_length: None,
+                strip: false,
+            },
+        )
         .required(false)
         .initial(Value::String("active".into()));
         let result = clean_field_value(&field, Some(""));

@@ -178,11 +178,7 @@ pub struct UploadedFile {
 
 impl UploadedFile {
     /// Creates a new `UploadedFile` from its components.
-    pub fn new(
-        name: impl Into<String>,
-        content_type: impl Into<String>,
-        content: Vec<u8>,
-    ) -> Self {
+    pub fn new(name: impl Into<String>, content_type: impl Into<String>, content: Vec<u8>) -> Self {
         let content_len = content.len() as u64;
         Self {
             name: name.into(),
@@ -231,38 +227,26 @@ mod tests {
 
     #[test]
     fn test_filesystem_storage_path() {
-        let storage = FileSystemStorage::new(
-            PathBuf::from("/media"),
-            "/media/",
-        );
+        let storage = FileSystemStorage::new(PathBuf::from("/media"), "/media/");
         assert_eq!(storage.path("photo.jpg"), PathBuf::from("/media/photo.jpg"));
     }
 
     #[test]
     fn test_filesystem_storage_url() {
-        let storage = FileSystemStorage::new(
-            PathBuf::from("/media"),
-            "/media/",
-        );
+        let storage = FileSystemStorage::new(PathBuf::from("/media"), "/media/");
         assert_eq!(storage.url("photo.jpg"), "/media/photo.jpg");
     }
 
     #[test]
     fn test_filesystem_storage_url_normalizes_slashes() {
-        let storage = FileSystemStorage::new(
-            PathBuf::from("/media"),
-            "/media",
-        );
+        let storage = FileSystemStorage::new(PathBuf::from("/media"), "/media");
         assert_eq!(storage.url("/photo.jpg"), "/media/photo.jpg");
     }
 
     #[tokio::test]
     async fn test_filesystem_storage_save_and_open() {
         let dir = tempfile::tempdir().unwrap();
-        let storage = FileSystemStorage::new(
-            dir.path().to_path_buf(),
-            "/media/",
-        );
+        let storage = FileSystemStorage::new(dir.path().to_path_buf(), "/media/");
 
         let name = storage.save("test.txt", b"hello").await.unwrap();
         assert_eq!(name, "test.txt");
@@ -274,10 +258,7 @@ mod tests {
     #[tokio::test]
     async fn test_filesystem_storage_save_deduplicates_names() {
         let dir = tempfile::tempdir().unwrap();
-        let storage = FileSystemStorage::new(
-            dir.path().to_path_buf(),
-            "/media/",
-        );
+        let storage = FileSystemStorage::new(dir.path().to_path_buf(), "/media/");
 
         let name1 = storage.save("test.txt", b"first").await.unwrap();
         let name2 = storage.save("test.txt", b"second").await.unwrap();
@@ -290,12 +271,12 @@ mod tests {
     #[tokio::test]
     async fn test_filesystem_storage_save_creates_dirs() {
         let dir = tempfile::tempdir().unwrap();
-        let storage = FileSystemStorage::new(
-            dir.path().to_path_buf(),
-            "/media/",
-        );
+        let storage = FileSystemStorage::new(dir.path().to_path_buf(), "/media/");
 
-        let name = storage.save("subdir/deep/file.txt", b"nested").await.unwrap();
+        let name = storage
+            .save("subdir/deep/file.txt", b"nested")
+            .await
+            .unwrap();
         assert_eq!(name, "subdir/deep/file.txt");
 
         let content = storage.open("subdir/deep/file.txt").await.unwrap();
@@ -305,10 +286,7 @@ mod tests {
     #[tokio::test]
     async fn test_filesystem_storage_delete() {
         let dir = tempfile::tempdir().unwrap();
-        let storage = FileSystemStorage::new(
-            dir.path().to_path_buf(),
-            "/media/",
-        );
+        let storage = FileSystemStorage::new(dir.path().to_path_buf(), "/media/");
 
         storage.save("to_delete.txt", b"data").await.unwrap();
         assert!(storage.exists("to_delete.txt").await.unwrap());
@@ -320,10 +298,7 @@ mod tests {
     #[tokio::test]
     async fn test_filesystem_storage_delete_nonexistent() {
         let dir = tempfile::tempdir().unwrap();
-        let storage = FileSystemStorage::new(
-            dir.path().to_path_buf(),
-            "/media/",
-        );
+        let storage = FileSystemStorage::new(dir.path().to_path_buf(), "/media/");
 
         let result = storage.delete("nonexistent.txt").await;
         assert!(result.is_err());
@@ -332,10 +307,7 @@ mod tests {
     #[tokio::test]
     async fn test_filesystem_storage_exists() {
         let dir = tempfile::tempdir().unwrap();
-        let storage = FileSystemStorage::new(
-            dir.path().to_path_buf(),
-            "/media/",
-        );
+        let storage = FileSystemStorage::new(dir.path().to_path_buf(), "/media/");
 
         assert!(!storage.exists("file.txt").await.unwrap());
 
@@ -346,10 +318,7 @@ mod tests {
     #[tokio::test]
     async fn test_filesystem_storage_size() {
         let dir = tempfile::tempdir().unwrap();
-        let storage = FileSystemStorage::new(
-            dir.path().to_path_buf(),
-            "/media/",
-        );
+        let storage = FileSystemStorage::new(dir.path().to_path_buf(), "/media/");
 
         storage.save("sized.txt", b"12345").await.unwrap();
         let size = storage.size("sized.txt").await.unwrap();
@@ -359,10 +328,7 @@ mod tests {
     #[tokio::test]
     async fn test_filesystem_storage_size_nonexistent() {
         let dir = tempfile::tempdir().unwrap();
-        let storage = FileSystemStorage::new(
-            dir.path().to_path_buf(),
-            "/media/",
-        );
+        let storage = FileSystemStorage::new(dir.path().to_path_buf(), "/media/");
 
         let result = storage.size("nonexistent.txt").await;
         assert!(result.is_err());
@@ -371,10 +337,7 @@ mod tests {
     #[tokio::test]
     async fn test_filesystem_storage_open_nonexistent() {
         let dir = tempfile::tempdir().unwrap();
-        let storage = FileSystemStorage::new(
-            dir.path().to_path_buf(),
-            "/media/",
-        );
+        let storage = FileSystemStorage::new(dir.path().to_path_buf(), "/media/");
 
         let result = storage.open("nonexistent.txt").await;
         assert!(result.is_err());

@@ -58,14 +58,14 @@ pub mod test_database;
 // Re-export primary types at the crate root for convenience.
 pub use client::{TestClient, TestResponse};
 pub use framework::{
-    TestCase, assert_contains, assert_form_error, assert_has_header, assert_not_contains,
-    assert_not_has_header, assert_redirects, assert_status, assert_template_used,
+    assert_contains, assert_form_error, assert_has_header, assert_not_contains,
+    assert_not_has_header, assert_redirects, assert_status, assert_template_used, TestCase,
 };
 
 // Re-export new infrastructure types.
 pub use assert_queries::{assert_max_queries, assert_num_queries};
 pub use live_server::LiveServerTestCase;
 pub use mail_outbox::{EmailMessage, MailOutbox};
-pub use override_settings::{SettingsOverride, get_settings, override_settings};
+pub use override_settings::{get_settings, override_settings, SettingsOverride};
 pub use request_factory::RequestFactory;
 pub use test_database::TestDatabase;

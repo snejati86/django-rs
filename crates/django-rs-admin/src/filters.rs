@@ -75,14 +75,13 @@ pub fn apply_filters<S: ::std::hash::BuildHasher>(
         .iter()
         .filter(|obj| {
             filters.iter().all(|(field, value)| {
-                obj.get(field)
-                    .is_some_and(|v| match v {
-                        serde_json::Value::String(s) => s == value,
-                        serde_json::Value::Number(n) => n.to_string() == *value,
-                        serde_json::Value::Bool(b) => b.to_string() == *value,
-                        serde_json::Value::Null => value.is_empty() || value == "null",
-                        _ => false,
-                    })
+                obj.get(field).is_some_and(|v| match v {
+                    serde_json::Value::String(s) => s == value,
+                    serde_json::Value::Number(n) => n.to_string() == *value,
+                    serde_json::Value::Bool(b) => b.to_string() == *value,
+                    serde_json::Value::Null => value.is_empty() || value == "null",
+                    _ => false,
+                })
             })
         })
         .cloned()
@@ -143,8 +142,7 @@ mod tests {
 
     #[test]
     fn test_filter_spec_selected() {
-        let spec = FilterSpec::new("status", "Status")
-            .selected("active");
+        let spec = FilterSpec::new("status", "Status").selected("active");
         assert_eq!(spec.selected, Some("active".to_string()));
     }
 
@@ -224,9 +222,7 @@ mod tests {
 
     #[test]
     fn test_apply_filters_no_match() {
-        let objects = vec![
-            serde_json::json!({"name": "Alice", "status": "active"}),
-        ];
+        let objects = vec![serde_json::json!({"name": "Alice", "status": "active"})];
         let mut filters = HashMap::new();
         filters.insert("status".to_string(), "deleted".to_string());
         let result = apply_filters(&objects, &filters);
@@ -235,18 +231,14 @@ mod tests {
 
     #[test]
     fn test_apply_search_empty_query() {
-        let objects = vec![
-            serde_json::json!({"title": "Hello World"}),
-        ];
+        let objects = vec![serde_json::json!({"title": "Hello World"})];
         let result = apply_search(&objects, &["title".to_string()], "");
         assert_eq!(result.len(), 1);
     }
 
     #[test]
     fn test_apply_search_empty_fields() {
-        let objects = vec![
-            serde_json::json!({"title": "Hello World"}),
-        ];
+        let objects = vec![serde_json::json!({"title": "Hello World"})];
         let result = apply_search(&objects, &[], "hello");
         assert_eq!(result.len(), 1);
     }
@@ -277,9 +269,7 @@ mod tests {
 
     #[test]
     fn test_apply_search_no_match() {
-        let objects = vec![
-            serde_json::json!({"title": "Hello"}),
-        ];
+        let objects = vec![serde_json::json!({"title": "Hello"})];
         let fields = vec!["title".to_string()];
         let result = apply_search(&objects, &fields, "xyz");
         assert!(result.is_empty());

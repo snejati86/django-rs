@@ -349,11 +349,7 @@ pub fn derive_model_impl(input: DeriveInput) -> TokenStream {
 /// For types that implement `FromValue` (i64, i32, f64, bool, String, Uuid, Option<T>),
 /// we use `row.get::<T>(name)`. For chrono types and other types that don't have
 /// `FromValue`, we extract the raw `Value` and convert manually.
-fn generate_from_row_field(
-    ident: &syn::Ident,
-    name_str: &str,
-    ty: &Type,
-) -> TokenStream {
+fn generate_from_row_field(ident: &syn::Ident, name_str: &str, ty: &Type) -> TokenStream {
     let inner = unwrap_option_type(ty);
     let effective_ty = inner.unwrap_or(ty);
     let type_str = type_to_string(effective_ty);

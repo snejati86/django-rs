@@ -10,16 +10,12 @@ use django_rs_auth::csrf::{
     generate_csrf_token, mask_csrf_token, unmask_csrf_token, validate_csrf_token, CsrfMiddleware,
 };
 use django_rs_auth::hashers::{
-    Argon2Hasher, BcryptHasher, Pbkdf2Hasher, PasswordHasher,
-    check_password, make_password,
+    check_password, make_password, Argon2Hasher, BcryptHasher, PasswordHasher, Pbkdf2Hasher,
 };
-use django_rs_auth::permissions::{
-    Group, Permission, has_perm, has_perm_with_groups,
-};
+use django_rs_auth::permissions::{has_perm, has_perm_with_groups, Group, Permission};
 use django_rs_auth::session_auth::{
-    get_user_from_request, get_user_from_session, get_user_id_from_meta,
-    get_backend_from_meta, is_authenticated, login_to_session,
-    login_to_session_with_backend, logout_from_session,
+    get_backend_from_meta, get_user_from_request, get_user_from_session, get_user_id_from_meta,
+    is_authenticated, login_to_session, login_to_session_with_backend, logout_from_session,
 };
 use django_rs_auth::user::{AbstractUser, AnonymousUser};
 use django_rs_http::HttpRequest;
@@ -78,7 +74,10 @@ async fn login_invalid_password_fails_authentication() {
     let creds = Credentials::with_username("alice", "wrong_password");
     let backends: Vec<Box<dyn AuthBackend>> = vec![Box::new(backend)];
     let result = authenticate(&creds, &backends).await.unwrap();
-    assert!(result.is_none(), "Authentication should fail with wrong password");
+    assert!(
+        result.is_none(),
+        "Authentication should fail with wrong password"
+    );
 }
 
 #[tokio::test]
@@ -88,7 +87,10 @@ async fn login_nonexistent_user_fails() {
     let creds = Credentials::with_username("ghost", "password");
     let backends: Vec<Box<dyn AuthBackend>> = vec![Box::new(backend)];
     let result = authenticate(&creds, &backends).await.unwrap();
-    assert!(result.is_none(), "Authentication should fail for nonexistent user");
+    assert!(
+        result.is_none(),
+        "Authentication should fail for nonexistent user"
+    );
 }
 
 #[tokio::test]
@@ -165,11 +167,7 @@ async fn login_with_custom_backend_stores_backend_name() {
     let user = create_test_user("eve", "Ev3P@ss!").await;
     let mut request = make_request();
 
-    login_to_session_with_backend(
-        &mut request,
-        &user,
-        "myapp.backends.LDAPBackend",
-    );
+    login_to_session_with_backend(&mut request, &user, "myapp.backends.LDAPBackend");
 
     let backend = get_backend_from_meta(&request);
     assert_eq!(backend.as_deref(), Some("myapp.backends.LDAPBackend"));
@@ -547,11 +545,23 @@ fn group_permissions_inherited_by_members() {
     user.groups = vec!["editors".to_string()];
 
     let mut editors = Group::new("editors");
-    editors.add_permission(Permission::new("change_post", "Can change post", "blog.post"));
+    editors.add_permission(Permission::new(
+        "change_post",
+        "Can change post",
+        "blog.post",
+    ));
     editors.add_permission(Permission::new("add_post", "Can add post", "blog.post"));
 
-    assert!(has_perm_with_groups(&user, "blog.post.change_post", &[editors.clone()]));
-    assert!(has_perm_with_groups(&user, "blog.post.add_post", &[editors]));
+    assert!(has_perm_with_groups(
+        &user,
+        "blog.post.change_post",
+        &[editors.clone()]
+    ));
+    assert!(has_perm_with_groups(
+        &user,
+        "blog.post.add_post",
+        &[editors]
+    ));
 }
 
 #[test]
@@ -559,9 +569,17 @@ fn non_member_does_not_inherit_group_permissions() {
     let user = AbstractUser::new("outsider");
 
     let mut editors = Group::new("editors");
-    editors.add_permission(Permission::new("change_post", "Can change post", "blog.post"));
+    editors.add_permission(Permission::new(
+        "change_post",
+        "Can change post",
+        "blog.post",
+    ));
 
-    assert!(!has_perm_with_groups(&user, "blog.post.change_post", &[editors]));
+    assert!(!has_perm_with_groups(
+        &user,
+        "blog.post.change_post",
+        &[editors]
+    ));
 }
 
 #[tokio::test]
@@ -678,7 +696,10 @@ async fn csrf_middleware_allows_post_with_valid_header_token() {
         .build();
 
     let result = mw.process_request(&mut request).await;
-    assert!(result.is_none(), "POST with valid CSRF token should be allowed");
+    assert!(
+        result.is_none(),
+        "POST with valid CSRF token should be allowed"
+    );
 }
 
 #[tokio::test]
@@ -694,7 +715,10 @@ async fn csrf_middleware_allows_post_with_masked_token() {
         .build();
 
     let result = mw.process_request(&mut request).await;
-    assert!(result.is_none(), "POST with masked CSRF token should be allowed");
+    assert!(
+        result.is_none(),
+        "POST with masked CSRF token should be allowed"
+    );
 }
 
 #[tokio::test]
@@ -760,8 +784,14 @@ async fn wrong_password_verification_fails_all_hashers() {
 #[tokio::test]
 async fn different_hashers_produce_different_hash_formats() {
     let argon2_hash = Argon2Hasher.hash("same_password").await.unwrap();
-    let bcrypt_hash = BcryptHasher { cost: 4 }.hash("same_password").await.unwrap();
-    let pbkdf2_hash = Pbkdf2Hasher { iterations: 1000 }.hash("same_password").await.unwrap();
+    let bcrypt_hash = BcryptHasher { cost: 4 }
+        .hash("same_password")
+        .await
+        .unwrap();
+    let pbkdf2_hash = Pbkdf2Hasher { iterations: 1000 }
+        .hash("same_password")
+        .await
+        .unwrap();
 
     // All hashes should be different (different algorithms)
     assert_ne!(argon2_hash, bcrypt_hash);
@@ -799,12 +829,9 @@ async fn full_login_session_persist_logout_flow() {
     // Need to use the backend that has the user
     let auth_backend = ModelBackend::new();
     auth_backend.add_user(user.clone()).await;
-    let auth_result = authenticate(
-        &creds,
-        &[Box::new(auth_backend) as Box<dyn AuthBackend>],
-    )
-    .await
-    .unwrap();
+    let auth_result = authenticate(&creds, &[Box::new(auth_backend) as Box<dyn AuthBackend>])
+        .await
+        .unwrap();
     assert!(auth_result.is_some());
 
     // 3. Login to session
@@ -844,7 +871,10 @@ async fn session_auth_hash_detects_password_change() {
 
     // Session should be invalidated because hash fragment differs
     let loaded = get_user_from_session(&session, &backend).await;
-    assert!(loaded.is_none(), "Password change should invalidate session");
+    assert!(
+        loaded.is_none(),
+        "Password change should invalidate session"
+    );
 }
 
 #[tokio::test]
@@ -863,9 +893,7 @@ async fn login_required_decorator_blocks_then_allows() {
     let view = login_required(make_view());
 
     // Unauthenticated: 403
-    let request1 = HttpRequest::builder()
-        .method(http::Method::GET)
-        .build();
+    let request1 = HttpRequest::builder().method(http::Method::GET).build();
     let response1 = view(request1).await;
     assert_eq!(response1.status(), http::StatusCode::FORBIDDEN);
 
@@ -916,7 +944,10 @@ async fn csrf_token_via_cookie_roundtrip_in_middleware() {
         .build();
 
     let result = mw.process_request(&mut post_request).await;
-    assert!(result.is_none(), "POST with cookie-sourced CSRF token should succeed");
+    assert!(
+        result.is_none(),
+        "POST with cookie-sourced CSRF token should succeed"
+    );
 }
 
 #[tokio::test]

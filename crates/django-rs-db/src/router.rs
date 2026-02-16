@@ -77,12 +77,7 @@ pub trait DatabaseRouter: Send + Sync {
     ///
     /// Returns `Some(true)` to allow, `Some(false)` to deny, or `None`
     /// to defer to the next router.
-    fn allow_migrate(
-        &self,
-        db: &str,
-        app_label: &str,
-        model_name: &str,
-    ) -> Option<bool> {
+    fn allow_migrate(&self, db: &str, app_label: &str, model_name: &str) -> Option<bool> {
         let _ = (db, app_label, model_name);
         None
     }
@@ -153,8 +148,7 @@ impl RouterChain {
         obj2_model: &str,
     ) -> bool {
         for router in &self.routers {
-            if let Some(allowed) =
-                router.allow_relation(obj1_app, obj1_model, obj2_app, obj2_model)
+            if let Some(allowed) = router.allow_relation(obj1_app, obj1_model, obj2_app, obj2_model)
             {
                 return allowed;
             }

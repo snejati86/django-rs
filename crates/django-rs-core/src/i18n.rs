@@ -73,11 +73,7 @@ pub fn deactivate() {
 ///
 /// Returns the activated language if one is set, otherwise returns `"en"`.
 pub fn get_language() -> String {
-    CURRENT_LANGUAGE.with(|cell| {
-        cell.borrow()
-            .clone()
-            .unwrap_or_else(|| "en".to_string())
-    })
+    CURRENT_LANGUAGE.with(|cell| cell.borrow().clone().unwrap_or_else(|| "en".to_string()))
 }
 
 /// Translates a message using the current thread's active language.
@@ -97,8 +93,7 @@ pub fn get_language() -> String {
 /// ```
 pub fn gettext(msgid: &str) -> String {
     let lang = get_language();
-    catalog::translate(&lang, msgid)
-        .unwrap_or_else(|| msgid.to_string())
+    catalog::translate(&lang, msgid).unwrap_or_else(|| msgid.to_string())
 }
 
 /// Translates a message with plural support.
@@ -121,14 +116,13 @@ pub fn gettext(msgid: &str) -> String {
 /// ```
 pub fn ngettext(singular: &str, plural: &str, count: u64) -> String {
     let lang = get_language();
-    catalog::translate_plural(&lang, singular, plural, count)
-        .unwrap_or_else(|| {
-            if count == 1 {
-                singular.to_string()
-            } else {
-                plural.to_string()
-            }
-        })
+    catalog::translate_plural(&lang, singular, plural, count).unwrap_or_else(|| {
+        if count == 1 {
+            singular.to_string()
+        } else {
+            plural.to_string()
+        }
+    })
 }
 
 /// Translates a message with a context disambiguator.
@@ -152,8 +146,7 @@ pub fn ngettext(singular: &str, plural: &str, count: u64) -> String {
 /// ```
 pub fn pgettext(context: &str, msgid: &str) -> String {
     let lang = get_language();
-    catalog::translate_context(&lang, context, msgid)
-        .unwrap_or_else(|| msgid.to_string())
+    catalog::translate_context(&lang, context, msgid).unwrap_or_else(|| msgid.to_string())
 }
 
 /// Returns a lazy translation that defers `gettext` until the value is used.
@@ -226,9 +219,7 @@ mod tests {
     #[test]
     fn test_ngettext_with_translation() {
         setup();
-        catalog::register_plural_translations("fr", vec![
-            ("apple", "apples", "pomme", "pommes"),
-        ]);
+        catalog::register_plural_translations("fr", vec![("apple", "apples", "pomme", "pommes")]);
         activate("fr");
         assert_eq!(ngettext("apple", "apples", 1), "pomme");
         assert_eq!(ngettext("apple", "apples", 3), "pommes");
@@ -244,10 +235,10 @@ mod tests {
     #[test]
     fn test_pgettext_with_translation() {
         setup();
-        catalog::register_context_translations("de", vec![
-            ("month", "May", "Mai"),
-            ("verb", "May", "Darf"),
-        ]);
+        catalog::register_context_translations(
+            "de",
+            vec![("month", "May", "Mai"), ("verb", "May", "Darf")],
+        );
         activate("de");
         assert_eq!(pgettext("month", "May"), "Mai");
         assert_eq!(pgettext("verb", "May"), "Darf");

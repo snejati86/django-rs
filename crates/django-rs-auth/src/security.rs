@@ -138,10 +138,9 @@ impl Middleware for SecurityMiddleware {
         if request.is_secure() {
             if let Some(hsts_value) = self.hsts_header_value() {
                 if let Ok(value) = http::HeaderValue::from_str(&hsts_value) {
-                    response.headers_mut().insert(
-                        http::header::STRICT_TRANSPORT_SECURITY,
-                        value,
-                    );
+                    response
+                        .headers_mut()
+                        .insert(http::header::STRICT_TRANSPORT_SECURITY, value);
                 }
             }
         }
@@ -168,10 +167,9 @@ impl Middleware for SecurityMiddleware {
         // Referrer-Policy
         if !self.referrer_policy.is_empty() {
             if let Ok(value) = http::HeaderValue::from_str(&self.referrer_policy) {
-                response.headers_mut().insert(
-                    http::header::REFERRER_POLICY,
-                    value,
-                );
+                response
+                    .headers_mut()
+                    .insert(http::header::REFERRER_POLICY, value);
             }
         }
 
@@ -247,9 +245,7 @@ mod tests {
             allowed_hosts: vec!["example.com".to_string()],
             ..SecurityMiddleware::default()
         };
-        let request = HttpRequest::builder()
-            .meta("HTTP_HOST", "evil.com")
-            .build();
+        let request = HttpRequest::builder().meta("HTTP_HOST", "evil.com").build();
         assert!(!mw.is_host_allowed(&request));
     }
 
@@ -363,9 +359,7 @@ mod tests {
             allowed_hosts: vec!["example.com".to_string()],
             ..SecurityMiddleware::default()
         };
-        let mut request = HttpRequest::builder()
-            .meta("HTTP_HOST", "evil.com")
-            .build();
+        let mut request = HttpRequest::builder().meta("HTTP_HOST", "evil.com").build();
         let result = mw.process_request(&mut request).await;
         assert!(result.is_some());
         assert_eq!(result.unwrap().status(), http::StatusCode::BAD_REQUEST);

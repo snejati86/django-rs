@@ -110,11 +110,7 @@ impl JsonListResponse {
     ///
     /// This method handles computing pagination metadata and slicing the results
     /// to the requested page.
-    pub fn paginate(
-        all_results: &[serde_json::Value],
-        page: usize,
-        page_size: usize,
-    ) -> Self {
+    pub fn paginate(all_results: &[serde_json::Value], page: usize, page_size: usize) -> Self {
         let count = all_results.len();
         let page_size = if page_size == 0 { 1 } else { page_size };
         let total_pages = count.div_ceil(page_size).max(1);
@@ -336,7 +332,9 @@ fn compare_json_values(
             if let (Some(a_str), Some(b_str)) = (a.as_str(), b.as_str()) {
                 a_str.cmp(b_str)
             } else if let (Some(a_num), Some(b_num)) = (a.as_f64(), b.as_f64()) {
-                a_num.partial_cmp(&b_num).unwrap_or(std::cmp::Ordering::Equal)
+                a_num
+                    .partial_cmp(&b_num)
+                    .unwrap_or(std::cmp::Ordering::Equal)
             } else if let (Some(a_bool), Some(b_bool)) = (a.as_bool(), b.as_bool()) {
                 a_bool.cmp(&b_bool)
             } else {
@@ -403,9 +401,8 @@ mod tests {
 
     #[test]
     fn test_json_list_response_paginate_basic() {
-        let items: Vec<serde_json::Value> = (1..=25)
-            .map(|i| serde_json::json!({"id": i}))
-            .collect();
+        let items: Vec<serde_json::Value> =
+            (1..=25).map(|i| serde_json::json!({"id": i})).collect();
         let response = JsonListResponse::paginate(&items, 1, 10);
         assert_eq!(response.count, 25);
         assert_eq!(response.page, 1);
@@ -418,9 +415,8 @@ mod tests {
 
     #[test]
     fn test_json_list_response_paginate_middle_page() {
-        let items: Vec<serde_json::Value> = (1..=25)
-            .map(|i| serde_json::json!({"id": i}))
-            .collect();
+        let items: Vec<serde_json::Value> =
+            (1..=25).map(|i| serde_json::json!({"id": i})).collect();
         let response = JsonListResponse::paginate(&items, 2, 10);
         assert_eq!(response.page, 2);
         assert_eq!(response.results.len(), 10);
@@ -430,9 +426,8 @@ mod tests {
 
     #[test]
     fn test_json_list_response_paginate_last_page() {
-        let items: Vec<serde_json::Value> = (1..=25)
-            .map(|i| serde_json::json!({"id": i}))
-            .collect();
+        let items: Vec<serde_json::Value> =
+            (1..=25).map(|i| serde_json::json!({"id": i})).collect();
         let response = JsonListResponse::paginate(&items, 3, 10);
         assert_eq!(response.page, 3);
         assert_eq!(response.results.len(), 5);
@@ -442,9 +437,7 @@ mod tests {
 
     #[test]
     fn test_json_list_response_paginate_single_page() {
-        let items: Vec<serde_json::Value> = (1..=5)
-            .map(|i| serde_json::json!({"id": i}))
-            .collect();
+        let items: Vec<serde_json::Value> = (1..=5).map(|i| serde_json::json!({"id": i})).collect();
         let response = JsonListResponse::paginate(&items, 1, 10);
         assert_eq!(response.count, 5);
         assert_eq!(response.total_pages, 1);
@@ -466,9 +459,7 @@ mod tests {
 
     #[test]
     fn test_json_list_response_paginate_page_beyond_range() {
-        let items: Vec<serde_json::Value> = (1..=5)
-            .map(|i| serde_json::json!({"id": i}))
-            .collect();
+        let items: Vec<serde_json::Value> = (1..=5).map(|i| serde_json::json!({"id": i})).collect();
         let response = JsonListResponse::paginate(&items, 100, 10);
         // Should clamp to last page
         assert_eq!(response.page, 1);
@@ -476,9 +467,7 @@ mod tests {
 
     #[test]
     fn test_json_list_response_paginate_zero_page_size() {
-        let items: Vec<serde_json::Value> = (1..=3)
-            .map(|i| serde_json::json!({"id": i}))
-            .collect();
+        let items: Vec<serde_json::Value> = (1..=3).map(|i| serde_json::json!({"id": i})).collect();
         let response = JsonListResponse::paginate(&items, 1, 0);
         assert_eq!(response.page_size, 1);
     }
@@ -495,11 +484,7 @@ mod tests {
     #[test]
     fn test_json_list_response_serialization() {
         let items = vec![serde_json::json!({"id": 1, "name": "Test"})];
-        let response = JsonListResponse::paginate(
-            &items,
-            1,
-            10,
-        );
+        let response = JsonListResponse::paginate(&items, 1, 10);
         let json = serde_json::to_string(&response).unwrap();
         assert!(json.contains("\"count\":1"));
         assert!(json.contains("\"page\":1"));
@@ -548,10 +533,7 @@ mod tests {
         let admin = ModelAdmin::new("blog", "article");
         let admins: Vec<&ModelAdmin> = vec![&admin];
         let index = build_model_index(&admins, "/api/admin");
-        assert_eq!(
-            index.apps[0].models[0].url,
-            "/api/admin/blog/article/"
-        );
+        assert_eq!(index.apps[0].models[0].url, "/api/admin/blog/article/");
     }
 
     #[test]
@@ -619,8 +601,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_process_list_request_basic() {
-        let admin = ModelAdmin::new("blog", "article")
-            .search_fields(vec!["title"]);
+        let admin = ModelAdmin::new("blog", "article").search_fields(vec!["title"]);
         let objects: Vec<serde_json::Value> = (1..=30)
             .map(|i| serde_json::json!({"id": i, "title": format!("Article {i}")}))
             .collect();
@@ -633,8 +614,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_process_list_request_with_search() {
-        let admin = ModelAdmin::new("blog", "article")
-            .search_fields(vec!["title"]);
+        let admin = ModelAdmin::new("blog", "article").search_fields(vec!["title"]);
         let objects = vec![
             serde_json::json!({"id": 1, "title": "Rust Guide"}),
             serde_json::json!({"id": 2, "title": "Python Guide"}),
@@ -675,9 +655,8 @@ mod tests {
 
     #[test]
     fn test_pagination_math_exact_division() {
-        let items: Vec<serde_json::Value> = (1..=20)
-            .map(|i| serde_json::json!({"id": i}))
-            .collect();
+        let items: Vec<serde_json::Value> =
+            (1..=20).map(|i| serde_json::json!({"id": i})).collect();
         let response = JsonListResponse::paginate(&items, 2, 10);
         assert_eq!(response.total_pages, 2);
         assert_eq!(response.results.len(), 10);
@@ -697,9 +676,7 @@ mod tests {
 
     #[test]
     fn test_pagination_math_page_zero() {
-        let items: Vec<serde_json::Value> = (1..=5)
-            .map(|i| serde_json::json!({"id": i}))
-            .collect();
+        let items: Vec<serde_json::Value> = (1..=5).map(|i| serde_json::json!({"id": i})).collect();
         // Page 0 should clamp to 1
         let response = JsonListResponse::paginate(&items, 0, 10);
         assert_eq!(response.page, 1);

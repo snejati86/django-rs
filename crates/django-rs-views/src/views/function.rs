@@ -63,7 +63,8 @@ pub fn require_http_methods(methods: &[&str], view: ViewFunction) -> ViewFunctio
             if allowed.iter().any(|m| m == &method) {
                 view(request).await
             } else {
-                let method_strs: Vec<&str> = allowed_for_header.iter().map(String::as_str).collect();
+                let method_strs: Vec<&str> =
+                    allowed_for_header.iter().map(String::as_str).collect();
                 HttpResponse::not_allowed(&method_strs)
             }
         })
@@ -176,11 +177,7 @@ pub fn login_required_redirect(
 /// are redirected to the login URL.
 ///
 /// This mirrors Django's `@permission_required` decorator.
-pub fn permission_required(
-    perm: &str,
-    login_url: &str,
-    view: ViewFunction,
-) -> ViewFunction {
+pub fn permission_required(perm: &str, login_url: &str, view: ViewFunction) -> ViewFunction {
     let perm = perm.to_string();
     let login_url = login_url.to_string();
     let view = Arc::new(view);
@@ -206,9 +203,7 @@ pub fn permission_required(
             let has_permission = request
                 .meta()
                 .get("USER_PERMISSIONS")
-                .is_some_and(|perms| {
-                    perms.split(',').any(|p| p.trim() == perm)
-                });
+                .is_some_and(|perms| perms.split(',').any(|p| p.trim() == perm));
 
             let is_superuser = request
                 .meta()
@@ -304,9 +299,7 @@ mod tests {
     #[tokio::test]
     async fn test_require_http_methods_allowed() {
         let view = require_http_methods(&["GET", "POST"], make_view());
-        let request = HttpRequest::builder()
-            .method(http::Method::GET)
-            .build();
+        let request = HttpRequest::builder().method(http::Method::GET).build();
         let response = view(request).await;
         assert_eq!(response.status(), http::StatusCode::OK);
     }
@@ -314,9 +307,7 @@ mod tests {
     #[tokio::test]
     async fn test_require_http_methods_allowed_post() {
         let view = require_http_methods(&["GET", "POST"], make_view());
-        let request = HttpRequest::builder()
-            .method(http::Method::POST)
-            .build();
+        let request = HttpRequest::builder().method(http::Method::POST).build();
         let response = view(request).await;
         assert_eq!(response.status(), http::StatusCode::OK);
     }
@@ -324,9 +315,7 @@ mod tests {
     #[tokio::test]
     async fn test_require_http_methods_not_allowed() {
         let view = require_http_methods(&["GET"], make_view());
-        let request = HttpRequest::builder()
-            .method(http::Method::POST)
-            .build();
+        let request = HttpRequest::builder().method(http::Method::POST).build();
         let response = view(request).await;
         assert_eq!(response.status(), http::StatusCode::METHOD_NOT_ALLOWED);
     }
@@ -334,9 +323,7 @@ mod tests {
     #[tokio::test]
     async fn test_require_http_methods_not_allowed_has_allow_header() {
         let view = require_http_methods(&["GET", "POST"], make_view());
-        let request = HttpRequest::builder()
-            .method(http::Method::DELETE)
-            .build();
+        let request = HttpRequest::builder().method(http::Method::DELETE).build();
         let response = view(request).await;
         assert_eq!(response.status(), http::StatusCode::METHOD_NOT_ALLOWED);
         let allow = response
@@ -352,9 +339,7 @@ mod tests {
     #[tokio::test]
     async fn test_require_get_allows_get() {
         let view = require_get(make_view());
-        let request = HttpRequest::builder()
-            .method(http::Method::GET)
-            .build();
+        let request = HttpRequest::builder().method(http::Method::GET).build();
         let response = view(request).await;
         assert_eq!(response.status(), http::StatusCode::OK);
     }
@@ -362,9 +347,7 @@ mod tests {
     #[tokio::test]
     async fn test_require_get_allows_head() {
         let view = require_get(make_view());
-        let request = HttpRequest::builder()
-            .method(http::Method::HEAD)
-            .build();
+        let request = HttpRequest::builder().method(http::Method::HEAD).build();
         let response = view(request).await;
         assert_eq!(response.status(), http::StatusCode::OK);
     }
@@ -372,9 +355,7 @@ mod tests {
     #[tokio::test]
     async fn test_require_get_blocks_post() {
         let view = require_get(make_view());
-        let request = HttpRequest::builder()
-            .method(http::Method::POST)
-            .build();
+        let request = HttpRequest::builder().method(http::Method::POST).build();
         let response = view(request).await;
         assert_eq!(response.status(), http::StatusCode::METHOD_NOT_ALLOWED);
     }
@@ -382,9 +363,7 @@ mod tests {
     #[tokio::test]
     async fn test_require_post_allows_post() {
         let view = require_post(make_view());
-        let request = HttpRequest::builder()
-            .method(http::Method::POST)
-            .build();
+        let request = HttpRequest::builder().method(http::Method::POST).build();
         let response = view(request).await;
         assert_eq!(response.status(), http::StatusCode::OK);
     }
@@ -392,9 +371,7 @@ mod tests {
     #[tokio::test]
     async fn test_require_post_blocks_get() {
         let view = require_post(make_view());
-        let request = HttpRequest::builder()
-            .method(http::Method::GET)
-            .build();
+        let request = HttpRequest::builder().method(http::Method::GET).build();
         let response = view(request).await;
         assert_eq!(response.status(), http::StatusCode::METHOD_NOT_ALLOWED);
     }
@@ -430,9 +407,7 @@ mod tests {
     #[tokio::test]
     async fn test_require_http_methods_case_insensitive() {
         let view = require_http_methods(&["get"], make_view());
-        let request = HttpRequest::builder()
-            .method(http::Method::GET)
-            .build();
+        let request = HttpRequest::builder().method(http::Method::GET).build();
         let response = view(request).await;
         assert_eq!(response.status(), http::StatusCode::OK);
     }
@@ -455,9 +430,7 @@ mod tests {
         let view = login_required(require_get(make_view()));
 
         // Unauthenticated should fail
-        let request = HttpRequest::builder()
-            .method(http::Method::GET)
-            .build();
+        let request = HttpRequest::builder().method(http::Method::GET).build();
         let response = view(request).await;
         assert_eq!(response.status(), http::StatusCode::FORBIDDEN);
     }
@@ -616,9 +589,7 @@ mod tests {
     #[test]
     fn test_login_mixin_unauthenticated() {
         let view = TestLoginView;
-        let request = HttpRequest::builder()
-            .path("/protected/")
-            .build();
+        let request = HttpRequest::builder().path("/protected/").build();
         let response = view.check_login(&request);
         assert!(response.is_some());
         let response = response.unwrap();
@@ -645,9 +616,7 @@ mod tests {
     #[test]
     fn test_login_mixin_custom_url() {
         let view = CustomLoginView;
-        let request = HttpRequest::builder()
-            .path("/secret/")
-            .build();
+        let request = HttpRequest::builder().path("/secret/").build();
         let response = view.check_login(&request).unwrap();
         assert_eq!(response.status(), http::StatusCode::FOUND);
         let location = response
@@ -694,9 +663,7 @@ mod tests {
     #[test]
     fn test_perm_mixin_unauthenticated() {
         let view = TestPermView;
-        let request = HttpRequest::builder()
-            .path("/blog/create/")
-            .build();
+        let request = HttpRequest::builder().path("/blog/create/").build();
         let response = view.check_permission(&request).unwrap();
         assert_eq!(response.status(), http::StatusCode::FOUND);
     }

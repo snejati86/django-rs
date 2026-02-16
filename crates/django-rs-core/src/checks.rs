@@ -99,27 +99,52 @@ impl CheckMessage {
     }
 
     /// Creates a debug-level message.
-    pub fn debug(msg: impl Into<String>, hint: Option<&str>, obj: Option<&str>, id: Option<&str>) -> Self {
+    pub fn debug(
+        msg: impl Into<String>,
+        hint: Option<&str>,
+        obj: Option<&str>,
+        id: Option<&str>,
+    ) -> Self {
         Self::new(CheckLevel::Debug, msg, hint, obj, id)
     }
 
     /// Creates an info-level message.
-    pub fn info(msg: impl Into<String>, hint: Option<&str>, obj: Option<&str>, id: Option<&str>) -> Self {
+    pub fn info(
+        msg: impl Into<String>,
+        hint: Option<&str>,
+        obj: Option<&str>,
+        id: Option<&str>,
+    ) -> Self {
         Self::new(CheckLevel::Info, msg, hint, obj, id)
     }
 
     /// Creates a warning-level message.
-    pub fn warning(msg: impl Into<String>, hint: Option<&str>, obj: Option<&str>, id: Option<&str>) -> Self {
+    pub fn warning(
+        msg: impl Into<String>,
+        hint: Option<&str>,
+        obj: Option<&str>,
+        id: Option<&str>,
+    ) -> Self {
         Self::new(CheckLevel::Warning, msg, hint, obj, id)
     }
 
     /// Creates an error-level message.
-    pub fn error(msg: impl Into<String>, hint: Option<&str>, obj: Option<&str>, id: Option<&str>) -> Self {
+    pub fn error(
+        msg: impl Into<String>,
+        hint: Option<&str>,
+        obj: Option<&str>,
+        id: Option<&str>,
+    ) -> Self {
         Self::new(CheckLevel::Error, msg, hint, obj, id)
     }
 
     /// Creates a critical-level message.
-    pub fn critical(msg: impl Into<String>, hint: Option<&str>, obj: Option<&str>, id: Option<&str>) -> Self {
+    pub fn critical(
+        msg: impl Into<String>,
+        hint: Option<&str>,
+        obj: Option<&str>,
+        id: Option<&str>,
+    ) -> Self {
         Self::new(CheckLevel::Critical, msg, hint, obj, id)
     }
 
@@ -190,16 +215,14 @@ impl CheckRegistry {
     ///
     /// If `tags` is `None`, all checks are run. If `Some(&["security"])`,
     /// only checks tagged with "security" are run.
-    pub fn run_checks(
-        &self,
-        tags: Option<&[&str]>,
-        settings: &Settings,
-    ) -> Vec<CheckMessage> {
+    pub fn run_checks(&self, tags: Option<&[&str]>, settings: &Settings) -> Vec<CheckMessage> {
         let mut messages = Vec::new();
 
         for check in &self.checks {
             let should_run = tags.map_or(true, |filter_tags| {
-                filter_tags.iter().any(|t| check.tags.contains(&(*t).to_string()))
+                filter_tags
+                    .iter()
+                    .any(|t| check.tags.contains(&(*t).to_string()))
             });
 
             if should_run {
@@ -578,7 +601,9 @@ mod tests {
         let messages = registry.run_checks(Some(&["security"]), &settings);
         // Should get at least the secret_key warning
         assert!(!messages.is_empty());
-        assert!(messages.iter().any(|m| m.id.as_deref() == Some("security.W001")));
+        assert!(messages
+            .iter()
+            .any(|m| m.id.as_deref() == Some("security.W001")));
     }
 
     #[test]
@@ -592,7 +617,11 @@ mod tests {
         };
         let messages = registry.run_checks(None, &settings);
         // Should get: empty secret key (W001) + empty allowed_hosts (E001)
-        assert!(messages.iter().any(|m| m.id.as_deref() == Some("security.W001")));
-        assert!(messages.iter().any(|m| m.id.as_deref() == Some("security.E001")));
+        assert!(messages
+            .iter()
+            .any(|m| m.id.as_deref() == Some("security.W001")));
+        assert!(messages
+            .iter()
+            .any(|m| m.id.as_deref() == Some("security.E001")));
     }
 }

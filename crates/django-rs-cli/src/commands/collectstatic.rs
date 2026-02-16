@@ -36,7 +36,10 @@ pub async fn collect_static_files(
 
     for source_dir in source_dirs {
         if !source_dir.exists() {
-            tracing::warn!("Static files directory does not exist: {}", source_dir.display());
+            tracing::warn!(
+                "Static files directory does not exist: {}",
+                source_dir.display()
+            );
             continue;
         }
 
@@ -118,7 +121,10 @@ impl ManagementCommand for CollectstaticCommand {
         })?;
 
         if clear {
-            tracing::info!("Clearing existing static files in {}", static_root.display());
+            tracing::info!(
+                "Clearing existing static files in {}",
+                static_root.display()
+            );
             if static_root.exists() {
                 tokio::fs::remove_dir_all(static_root).await.map_err(|e| {
                     DjangoError::IoError(std::io::Error::new(
@@ -131,7 +137,10 @@ impl ManagementCommand for CollectstaticCommand {
 
         let count = collect_static_files(&settings.staticfiles_dirs, static_root).await?;
 
-        tracing::info!("Collected {count} static file(s) to {}", static_root.display());
+        tracing::info!(
+            "Collected {count} static file(s) to {}",
+            static_root.display()
+        );
 
         Ok(())
     }

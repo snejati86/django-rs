@@ -425,10 +425,7 @@ async fn test_filter_in_lookup() {
     let results = mgr
         .filter(Q::filter(
             "department",
-            Lookup::In(vec![
-                Value::from("Engineering"),
-                Value::from("Marketing"),
-            ]),
+            Lookup::In(vec![Value::from("Engineering"), Value::from("Marketing")]),
         ))
         .order_by(vec![OrderBy::asc("name")])
         .execute_query(&db)
@@ -510,7 +507,10 @@ async fn test_values_select_specific_columns() {
         .values(vec!["name", "department"])
         .to_sql(DatabaseBackendType::SQLite);
     // Should only SELECT name and department columns
-    assert!(sql.contains("\"name\""), "SQL should contain name column: {sql}");
+    assert!(
+        sql.contains("\"name\""),
+        "SQL should contain name column: {sql}"
+    );
     assert!(
         sql.contains("\"department\""),
         "SQL should contain department column: {sql}"
@@ -650,7 +650,10 @@ async fn test_get_exec_multiple_objects_returned() {
         ))
         .get_exec(&db)
         .await;
-    assert!(matches!(result, Err(DjangoError::MultipleObjectsReturned(_))));
+    assert!(matches!(
+        result,
+        Err(DjangoError::MultipleObjectsReturned(_))
+    ));
 }
 
 #[tokio::test]
@@ -774,7 +777,7 @@ async fn test_update_exec_filtered() {
         .await
         .unwrap();
     assert_eq!(affected, 2); // Eve and Frank
-    // Verify update
+                             // Verify update
     let eve = mgr
         .filter(Q::filter("name", Lookup::Exact(Value::from("Eve"))))
         .get_exec(&db)
@@ -1390,7 +1393,10 @@ async fn test_isolation_level_sql() {
 
     // SQLite-specific set_sql
     let sqlite_sql = IsolationLevel::ReadUncommitted.set_sql(DatabaseBackendType::SQLite);
-    assert!(sqlite_sql.contains("PRAGMA"), "SQLite should use PRAGMA: {sqlite_sql}");
+    assert!(
+        sqlite_sql.contains("PRAGMA"),
+        "SQLite should use PRAGMA: {sqlite_sql}"
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -1459,10 +1465,7 @@ async fn test_raw_sql_fetch_one() {
     let db = setup_employee_db().await;
     seed_employees(&db).await;
 
-    let raw = django_rs_db::RawSql::new(
-        "SELECT COUNT(*) as total FROM hr_employee",
-        vec![],
-    );
+    let raw = django_rs_db::RawSql::new("SELECT COUNT(*) as total FROM hr_employee", vec![]);
     let row = raw.fetch_one(&db).await.unwrap();
     assert!(row.is_some());
     assert_eq!(row.unwrap().get::<i64>("total").unwrap(), 8);
@@ -1503,7 +1506,9 @@ async fn test_raw_sql_execute_many() {
             vec![Value::from("C"), Value::Int(3)],
         ),
     ];
-    let total = django_rs_db::RawSql::execute_many(&stmts, &db).await.unwrap();
+    let total = django_rs_db::RawSql::execute_many(&stmts, &db)
+        .await
+        .unwrap();
     assert_eq!(total, 3);
 }
 
@@ -1646,10 +1651,8 @@ fn test_resolve_chain_transform_then_lookup() {
 #[test]
 fn test_resolve_field_path() {
     let registry = django_rs_db::LookupRegistry::with_defaults();
-    let (field, col_sql, lookup) = registry.resolve_field_path(
-        "name__lower__exact",
-        DatabaseBackendType::SQLite,
-    );
+    let (field, col_sql, lookup) =
+        registry.resolve_field_path("name__lower__exact", DatabaseBackendType::SQLite);
     assert_eq!(field, "name");
     assert_eq!(col_sql, "LOWER(\"name\")");
     assert_eq!(lookup, "exact");
@@ -1658,10 +1661,8 @@ fn test_resolve_field_path() {
 #[test]
 fn test_resolve_field_path_no_transform() {
     let registry = django_rs_db::LookupRegistry::with_defaults();
-    let (field, col_sql, lookup) = registry.resolve_field_path(
-        "name__contains",
-        DatabaseBackendType::SQLite,
-    );
+    let (field, col_sql, lookup) =
+        registry.resolve_field_path("name__contains", DatabaseBackendType::SQLite);
     assert_eq!(field, "name");
     assert_eq!(col_sql, "\"name\"");
     assert_eq!(lookup, "contains");
@@ -1670,10 +1671,7 @@ fn test_resolve_field_path_no_transform() {
 #[test]
 fn test_resolve_field_path_only_field() {
     let registry = django_rs_db::LookupRegistry::with_defaults();
-    let (field, col_sql, lookup) = registry.resolve_field_path(
-        "name",
-        DatabaseBackendType::SQLite,
-    );
+    let (field, col_sql, lookup) = registry.resolve_field_path("name", DatabaseBackendType::SQLite);
     assert_eq!(field, "name");
     assert_eq!(col_sql, "\"name\"");
     assert_eq!(lookup, "exact"); // defaults to exact
@@ -1681,7 +1679,8 @@ fn test_resolve_field_path_only_field() {
 
 #[test]
 fn test_compile_custom_lookup_with_params() {
-    let lookup = django_rs_db::CustomLookup::new("contains_ci", "LOWER({column}) LIKE LOWER({value})");
+    let lookup =
+        django_rs_db::CustomLookup::new("contains_ci", "LOWER({column}) LIKE LOWER({value})");
     let mut params = Vec::new();
     let sql = django_rs_db::query::custom_lookups::compile_custom_lookup(
         &lookup,
@@ -1726,30 +1725,20 @@ async fn test_func_coalesce_execution() {
 #[tokio::test]
 async fn test_func_lower_upper_execution() {
     let db = SqliteBackend::memory().unwrap();
-    db.execute(
-        "CREATE TABLE t (id INTEGER PRIMARY KEY, name TEXT)",
-        &[],
-    )
-    .await
-    .unwrap();
-    db.execute(
-        "INSERT INTO t (id, name) VALUES (1, 'Hello World')",
-        &[],
-    )
-    .await
-    .unwrap();
+    db.execute("CREATE TABLE t (id INTEGER PRIMARY KEY, name TEXT)", &[])
+        .await
+        .unwrap();
+    db.execute("INSERT INTO t (id, name) VALUES (1, 'Hello World')", &[])
+        .await
+        .unwrap();
 
-    let lower = django_rs_db::RawSql::new(
-        "SELECT LOWER(name) as result FROM t WHERE id = 1",
-        vec![],
-    );
+    let lower =
+        django_rs_db::RawSql::new("SELECT LOWER(name) as result FROM t WHERE id = 1", vec![]);
     let row = lower.fetch_one(&db).await.unwrap().unwrap();
     assert_eq!(row.get::<String>("result").unwrap(), "hello world");
 
-    let upper = django_rs_db::RawSql::new(
-        "SELECT UPPER(name) as result FROM t WHERE id = 1",
-        vec![],
-    );
+    let upper =
+        django_rs_db::RawSql::new("SELECT UPPER(name) as result FROM t WHERE id = 1", vec![]);
     let row = upper.fetch_one(&db).await.unwrap().unwrap();
     assert_eq!(row.get::<String>("result").unwrap(), "HELLO WORLD");
 }
@@ -1757,20 +1746,14 @@ async fn test_func_lower_upper_execution() {
 #[tokio::test]
 async fn test_func_length_execution() {
     let db = SqliteBackend::memory().unwrap();
-    db.execute(
-        "CREATE TABLE t (id INTEGER PRIMARY KEY, name TEXT)",
-        &[],
-    )
-    .await
-    .unwrap();
+    db.execute("CREATE TABLE t (id INTEGER PRIMARY KEY, name TEXT)", &[])
+        .await
+        .unwrap();
     db.execute("INSERT INTO t (id, name) VALUES (1, 'Hello')", &[])
         .await
         .unwrap();
 
-    let raw = django_rs_db::RawSql::new(
-        "SELECT LENGTH(name) as len FROM t WHERE id = 1",
-        vec![],
-    );
+    let raw = django_rs_db::RawSql::new("SELECT LENGTH(name) as len FROM t WHERE id = 1", vec![]);
     let row = raw.fetch_one(&db).await.unwrap().unwrap();
     assert_eq!(row.get::<i64>("len").unwrap(), 5);
 }
@@ -1778,20 +1761,14 @@ async fn test_func_length_execution() {
 #[tokio::test]
 async fn test_func_abs_execution() {
     let db = SqliteBackend::memory().unwrap();
-    db.execute(
-        "CREATE TABLE t (id INTEGER PRIMARY KEY, val INTEGER)",
-        &[],
-    )
-    .await
-    .unwrap();
+    db.execute("CREATE TABLE t (id INTEGER PRIMARY KEY, val INTEGER)", &[])
+        .await
+        .unwrap();
     db.execute("INSERT INTO t (id, val) VALUES (1, -42)", &[])
         .await
         .unwrap();
 
-    let raw = django_rs_db::RawSql::new(
-        "SELECT ABS(val) as result FROM t WHERE id = 1",
-        vec![],
-    );
+    let raw = django_rs_db::RawSql::new("SELECT ABS(val) as result FROM t WHERE id = 1", vec![]);
     let row = raw.fetch_one(&db).await.unwrap().unwrap();
     assert_eq!(row.get::<i64>("result").unwrap(), 42);
 }
@@ -1799,20 +1776,15 @@ async fn test_func_abs_execution() {
 #[tokio::test]
 async fn test_func_round_execution() {
     let db = SqliteBackend::memory().unwrap();
-    db.execute(
-        "CREATE TABLE t (id INTEGER PRIMARY KEY, val REAL)",
-        &[],
-    )
-    .await
-    .unwrap();
+    db.execute("CREATE TABLE t (id INTEGER PRIMARY KEY, val REAL)", &[])
+        .await
+        .unwrap();
     db.execute("INSERT INTO t (id, val) VALUES (1, 3.14159)", &[])
         .await
         .unwrap();
 
-    let raw = django_rs_db::RawSql::new(
-        "SELECT ROUND(val, 2) as result FROM t WHERE id = 1",
-        vec![],
-    );
+    let raw =
+        django_rs_db::RawSql::new("SELECT ROUND(val, 2) as result FROM t WHERE id = 1", vec![]);
     let row = raw.fetch_one(&db).await.unwrap().unwrap();
     let result: Value = row.get("result").unwrap();
     match result {
@@ -1825,18 +1797,12 @@ async fn test_func_round_execution() {
 #[tokio::test]
 async fn test_func_replace_execution() {
     let db = SqliteBackend::memory().unwrap();
-    db.execute(
-        "CREATE TABLE t (id INTEGER PRIMARY KEY, name TEXT)",
-        &[],
-    )
-    .await
-    .unwrap();
-    db.execute(
-        "INSERT INTO t (id, name) VALUES (1, 'Hello World')",
-        &[],
-    )
-    .await
-    .unwrap();
+    db.execute("CREATE TABLE t (id INTEGER PRIMARY KEY, name TEXT)", &[])
+        .await
+        .unwrap();
+    db.execute("INSERT INTO t (id, name) VALUES (1, 'Hello World')", &[])
+        .await
+        .unwrap();
 
     let raw = django_rs_db::RawSql::new(
         "SELECT REPLACE(name, 'World', 'Rust') as result FROM t WHERE id = 1",
@@ -1849,18 +1815,12 @@ async fn test_func_replace_execution() {
 #[tokio::test]
 async fn test_func_substr_execution() {
     let db = SqliteBackend::memory().unwrap();
-    db.execute(
-        "CREATE TABLE t (id INTEGER PRIMARY KEY, name TEXT)",
-        &[],
-    )
-    .await
-    .unwrap();
-    db.execute(
-        "INSERT INTO t (id, name) VALUES (1, 'Hello World')",
-        &[],
-    )
-    .await
-    .unwrap();
+    db.execute("CREATE TABLE t (id INTEGER PRIMARY KEY, name TEXT)", &[])
+        .await
+        .unwrap();
+    db.execute("INSERT INTO t (id, name) VALUES (1, 'Hello World')", &[])
+        .await
+        .unwrap();
 
     let raw = django_rs_db::RawSql::new(
         "SELECT SUBSTR(name, 1, 5) as result FROM t WHERE id = 1",
@@ -1959,7 +1919,8 @@ fn test_expression_aggregate_builders() {
         }
     ));
 
-    let distinct_count = Expression::aggregate_distinct(AggregateFunc::Count, Expression::col("department"));
+    let distinct_count =
+        Expression::aggregate_distinct(AggregateFunc::Count, Expression::col("department"));
     if let Expression::Aggregate { distinct, .. } = &distinct_count {
         assert!(distinct);
     }
@@ -2031,9 +1992,7 @@ fn test_compile_bulk_insert_empty() {
 
 #[test]
 fn test_compile_bulk_insert_with_conflict() {
-    let rows = vec![
-        vec![("name", Value::from("A")), ("price", Value::Int(10))],
-    ];
+    let rows = vec![vec![("name", Value::from("A")), ("price", Value::Int(10))]];
     let opts = django_rs_db::BulkCreateOptions {
         ignore_conflicts: true,
         unique_fields: vec!["name"],
@@ -2045,8 +2004,14 @@ fn test_compile_bulk_insert_with_conflict() {
         &opts,
         DatabaseBackendType::SQLite,
     );
-    assert!(sql.contains("ON CONFLICT"), "Should contain ON CONFLICT: {sql}");
-    assert!(sql.contains("DO NOTHING"), "Should contain DO NOTHING: {sql}");
+    assert!(
+        sql.contains("ON CONFLICT"),
+        "Should contain ON CONFLICT: {sql}"
+    );
+    assert!(
+        sql.contains("DO NOTHING"),
+        "Should contain DO NOTHING: {sql}"
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════

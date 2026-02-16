@@ -40,7 +40,9 @@ impl FromMeta for StringList {
                         {
                             Ok(lit.value())
                         } else {
-                            Err(darling::Error::unexpected_type("non-string literal in array"))
+                            Err(darling::Error::unexpected_type(
+                                "non-string literal in array",
+                            ))
                         }
                     })
                     .collect();

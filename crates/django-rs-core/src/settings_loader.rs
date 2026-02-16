@@ -57,9 +57,8 @@ pub fn from_toml_str(toml_str: &str) -> Result<Settings, DjangoError> {
     // We use a two-step approach: deserialize the TOML into a serde_json::Value,
     // then merge it with the default settings. This lets us keep defaults for
     // any settings not specified in the TOML.
-    let toml_value: toml::Value = toml::from_str(toml_str).map_err(|e| {
-        DjangoError::ConfigurationError(format!("Failed to parse TOML: {e}"))
-    })?;
+    let toml_value: toml::Value = toml::from_str(toml_str)
+        .map_err(|e| DjangoError::ConfigurationError(format!("Failed to parse TOML: {e}")))?;
 
     let json_value = toml_to_json(toml_value);
     let default_json = serde_json::to_value(Settings::default()).map_err(|e| {
@@ -104,9 +103,8 @@ pub fn from_toml_file_with_env(path: impl AsRef<Path>) -> Result<Settings, Djang
 ///
 /// Returns an error if the JSON is malformed or cannot be deserialized.
 pub fn from_json_str(json_str: &str) -> Result<Settings, DjangoError> {
-    let json_value: serde_json::Value = serde_json::from_str(json_str).map_err(|e| {
-        DjangoError::ConfigurationError(format!("Failed to parse JSON: {e}"))
-    })?;
+    let json_value: serde_json::Value = serde_json::from_str(json_str)
+        .map_err(|e| DjangoError::ConfigurationError(format!("Failed to parse JSON: {e}")))?;
 
     let default_json = serde_json::to_value(Settings::default()).map_err(|e| {
         DjangoError::ConfigurationError(format!("Failed to serialize default settings: {e}"))
@@ -525,7 +523,9 @@ mod tests {
         apply_env_overrides(&mut settings);
         assert_eq!(settings.allowed_hosts.len(), 2);
         assert!(settings.allowed_hosts.contains(&"example.com".to_string()));
-        assert!(settings.allowed_hosts.contains(&"api.example.com".to_string()));
+        assert!(settings
+            .allowed_hosts
+            .contains(&"api.example.com".to_string()));
         std::env::remove_var("DJANGO_ALLOWED_HOSTS");
     }
 
@@ -600,14 +600,17 @@ mod tests {
 
     #[test]
     fn test_toml_to_json() {
-        let toml_val: toml::Value = toml::from_str(r#"
+        let toml_val: toml::Value = toml::from_str(
+            r#"
             name = "test"
             count = 42
             flag = true
             items = [1, 2, 3]
             [nested]
             key = "value"
-        "#).unwrap();
+        "#,
+        )
+        .unwrap();
 
         let json = toml_to_json(toml_val);
         assert_eq!(json["name"], "test");

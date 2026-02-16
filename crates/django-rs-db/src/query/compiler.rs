@@ -96,12 +96,8 @@ impl WhereNode {
                 column: field.clone(),
                 lookup: lookup.clone(),
             },
-            Q::And(children) => {
-                Self::And(children.iter().map(Self::from_q).collect())
-            }
-            Q::Or(children) => {
-                Self::Or(children.iter().map(Self::from_q).collect())
-            }
+            Q::And(children) => Self::And(children.iter().map(Self::from_q).collect()),
+            Q::Or(children) => Self::Or(children.iter().map(Self::from_q).collect()),
             Q::Not(inner) => Self::Not(Box::new(Self::from_q(inner))),
         }
     }
@@ -570,10 +566,7 @@ impl SqlCompiler {
 
         // Explicit JOINs
         for join in &query.joins {
-            let alias = join
-                .alias
-                .as_deref()
-                .unwrap_or(&join.table);
+            let alias = join.alias.as_deref().unwrap_or(&join.table);
             sql.push_str(&format!(
                 " {} \"{}\" AS \"{}\" ON ",
                 join.join_type.sql_keyword(),
@@ -593,7 +586,9 @@ impl SqlCompiler {
         let real_group_by: Vec<&String> = query
             .group_by
             .iter()
-            .filter(|c| !c.starts_with("__select_related__") && !c.starts_with("__prefetch_related__"))
+            .filter(|c| {
+                !c.starts_with("__select_related__") && !c.starts_with("__prefetch_related__")
+            })
             .collect();
         if !real_group_by.is_empty() {
             let cols: Vec<String> = real_group_by.iter().map(|c| format!("\"{c}\"")).collect();
@@ -668,21 +663,20 @@ impl SqlCompiler {
 
             // For PostgreSQL, re-number the placeholders ($1, $2, ...) so they
             // continue from where the previous query left off.
-            let renumbered_sql = if self.backend == DatabaseBackendType::PostgreSQL
-                && !other_params.is_empty()
-            {
-                let offset = params.len();
-                let mut result_sql = other_sql;
-                // Replace from highest to lowest to avoid $1 -> $11 collisions
-                for i in (1..=other_params.len()).rev() {
-                    let old = format!("${i}");
-                    let new = format!("${}", i + offset);
-                    result_sql = result_sql.replace(&old, &new);
-                }
-                result_sql
-            } else {
-                other_sql
-            };
+            let renumbered_sql =
+                if self.backend == DatabaseBackendType::PostgreSQL && !other_params.is_empty() {
+                    let offset = params.len();
+                    let mut result_sql = other_sql;
+                    // Replace from highest to lowest to avoid $1 -> $11 collisions
+                    for i in (1..=other_params.len()).rev() {
+                        let old = format!("${i}");
+                        let new = format!("${}", i + offset);
+                        result_sql = result_sql.replace(&old, &new);
+                    }
+                    result_sql
+                } else {
+                    other_sql
+                };
 
             sql.push_str(&format!(" {keyword} {renumbered_sql}"));
             params.extend(other_params);
@@ -785,13 +779,12 @@ impl SqlCompiler {
     }
 
     /// Compiles an INSERT statement.
-    pub fn compile_insert(
-        &self,
-        table: &str,
-        fields: &[(&str, Value)],
-    ) -> (String, Vec<Value>) {
+    pub fn compile_insert(&self, table: &str, fields: &[(&str, Value)]) -> (String, Vec<Value>) {
         let mut params = Vec::new();
-        let columns: Vec<String> = fields.iter().map(|(name, _)| format!("\"{name}\"")).collect();
+        let columns: Vec<String> = fields
+            .iter()
+            .map(|(name, _)| format!("\"{name}\""))
+            .collect();
         let placeholders: Vec<String> = fields
             .iter()
             .enumerate()
@@ -829,11 +822,7 @@ impl SqlCompiler {
             })
             .collect();
 
-        let mut sql = format!(
-            "UPDATE \"{}\" SET {} WHERE ",
-            table,
-            set_parts.join(", ")
-        );
+        let mut sql = format!("UPDATE \"{}\" SET {} WHERE ", table, set_parts.join(", "));
 
         self.compile_where_node(where_clause, &mut sql, &mut params);
 
@@ -841,11 +830,7 @@ impl SqlCompiler {
     }
 
     /// Compiles a DELETE statement.
-    pub fn compile_delete(
-        &self,
-        table: &str,
-        where_clause: &WhereNode,
-    ) -> (String, Vec<Value>) {
+    pub fn compile_delete(&self, table: &str, where_clause: &WhereNode) -> (String, Vec<Value>) {
         let mut params = Vec::new();
         let mut sql = format!("DELETE FROM \"{table}\" WHERE ");
         self.compile_where_node(where_clause, &mut sql, &mut params);
@@ -866,12 +851,7 @@ impl SqlCompiler {
     }
 
     /// Compiles a `WhereNode` into SQL, appending to the provided string.
-    fn compile_where_node(
-        &self,
-        node: &WhereNode,
-        sql: &mut String,
-        params: &mut Vec<Value>,
-    ) {
+    fn compile_where_node(&self, node: &WhereNode, sql: &mut String, params: &mut Vec<Value>) {
         match node {
             WhereNode::Condition { column, lookup } => {
                 self.compile_lookup(column, lookup, sql, params);
@@ -960,10 +940,7 @@ impl SqlCompiler {
                         self.placeholder(params.len())
                     })
                     .collect();
-                sql.push_str(&format!(
-                    "\"{column}\" IN ({})",
-                    placeholders.join(", ")
-                ));
+                sql.push_str(&format!("\"{column}\" IN ({})", placeholders.join(", ")));
             }
             Lookup::Gt(val) => {
                 params.push(val.clone());
@@ -1144,11 +1121,7 @@ impl SqlCompiler {
     }
 
     /// Compiles an expression into SQL.
-    pub(crate) fn compile_expression(
-        &self,
-        expr: &Expression,
-        params: &mut Vec<Value>,
-    ) -> String {
+    pub(crate) fn compile_expression(&self, expr: &Expression, params: &mut Vec<Value>) -> String {
         match expr {
             Expression::Col(name) => format!("\"{name}\""),
             Expression::Value(val) => {
@@ -1218,9 +1191,7 @@ impl SqlCompiler {
                     format!("EXISTS ({sub_sql})")
                 }
             }
-            Expression::Window(window_expr) => {
-                self.compile_window_expression(window_expr, params)
-            }
+            Expression::Window(window_expr) => self.compile_window_expression(window_expr, params),
             Expression::Extract { part, expr } => {
                 let expr_sql = self.compile_expression(expr, params);
                 format!("EXTRACT({part} FROM {expr_sql})")
@@ -1306,11 +1277,7 @@ impl SqlCompiler {
     }
 
     /// Compiles a window function call (the part before OVER).
-    fn compile_window_function(
-        &self,
-        func: &WindowFunction,
-        params: &mut Vec<Value>,
-    ) -> String {
+    fn compile_window_function(&self, func: &WindowFunction, params: &mut Vec<Value>) -> String {
         match func {
             WindowFunction::RowNumber => "ROW_NUMBER()".to_string(),
             WindowFunction::Rank => "RANK()".to_string(),
@@ -1318,7 +1285,11 @@ impl SqlCompiler {
             WindowFunction::CumeDist => "CUME_DIST()".to_string(),
             WindowFunction::PercentRank => "PERCENT_RANK()".to_string(),
             WindowFunction::Ntile(n) => format!("NTILE({n})"),
-            WindowFunction::Lag { expression, offset, default } => {
+            WindowFunction::Lag {
+                expression,
+                offset,
+                default,
+            } => {
                 let expr_sql = self.compile_expression(expression, params);
                 let mut args = vec![expr_sql];
                 if let Some(off) = offset {
@@ -1329,7 +1300,11 @@ impl SqlCompiler {
                 }
                 format!("LAG({})", args.join(", "))
             }
-            WindowFunction::Lead { expression, offset, default } => {
+            WindowFunction::Lead {
+                expression,
+                offset,
+                default,
+            } => {
                 let expr_sql = self.compile_expression(expression, params);
                 let mut args = vec![expr_sql];
                 if let Some(off) = offset {
@@ -1402,19 +1377,13 @@ mod tests {
 
     #[test]
     fn test_row_get_bool() {
-        let row = Row::new(
-            vec!["active".to_string()],
-            vec![Value::Bool(true)],
-        );
+        let row = Row::new(vec!["active".to_string()], vec![Value::Bool(true)]);
         assert!(row.get::<bool>("active").unwrap());
     }
 
     #[test]
     fn test_row_get_float() {
-        let row = Row::new(
-            vec!["price".to_string()],
-            vec![Value::Float(9.99)],
-        );
+        let row = Row::new(vec!["price".to_string()], vec![Value::Float(9.99)]);
         let price: f64 = row.get("price").unwrap();
         assert!((price - 9.99).abs() < f64::EPSILON);
     }
@@ -1578,19 +1547,13 @@ mod tests {
             lookup: Lookup::Exact(Value::from(false)),
         })));
         let (sql, _) = pg().compile_select(&query);
-        assert_eq!(
-            sql,
-            "SELECT * FROM \"users\" WHERE NOT (\"active\" = $1)"
-        );
+        assert_eq!(sql, "SELECT * FROM \"users\" WHERE NOT (\"active\" = $1)");
     }
 
     #[test]
     fn test_select_with_order_by() {
         let mut query = Query::new("users");
-        query.order_by = vec![
-            OrderBy::asc("name"),
-            OrderBy::desc("created_at"),
-        ];
+        query.order_by = vec![OrderBy::asc("name"), OrderBy::desc("created_at")];
         let (sql, _) = pg().compile_select(&query);
         assert!(sql.contains("ORDER BY \"name\" ASC, \"created_at\" DESC"));
     }
@@ -1666,10 +1629,7 @@ mod tests {
             lookup: Lookup::Contains("rust".to_string()),
         });
         let (sql, params) = pg().compile_select(&query);
-        assert_eq!(
-            sql,
-            "SELECT * FROM \"posts\" WHERE \"title\" LIKE $1"
-        );
+        assert_eq!(sql, "SELECT * FROM \"posts\" WHERE \"title\" LIKE $1");
         assert_eq!(params, vec![Value::String("%rust%".to_string())]);
     }
 
@@ -1703,10 +1663,7 @@ mod tests {
             lookup: Lookup::In(vec![Value::from(1), Value::from(2), Value::from(3)]),
         });
         let (sql, params) = pg().compile_select(&query);
-        assert_eq!(
-            sql,
-            "SELECT * FROM \"users\" WHERE \"id\" IN ($1, $2, $3)"
-        );
+        assert_eq!(sql, "SELECT * FROM \"users\" WHERE \"id\" IN ($1, $2, $3)");
         assert_eq!(params.len(), 3);
     }
 
@@ -1827,10 +1784,8 @@ mod tests {
 
     #[test]
     fn test_insert_pg() {
-        let fields: Vec<(&str, Value)> = vec![
-            ("name", Value::from("Alice")),
-            ("age", Value::from(30)),
-        ];
+        let fields: Vec<(&str, Value)> =
+            vec![("name", Value::from("Alice")), ("age", Value::from(30))];
         let (sql, params) = pg().compile_insert("users", &fields);
         assert_eq!(
             sql,
@@ -1863,19 +1818,14 @@ mod tests {
             lookup: Lookup::Exact(Value::from(1)),
         };
         let (sql, params) = pg().compile_update("users", &fields, &where_clause);
-        assert_eq!(
-            sql,
-            "UPDATE \"users\" SET \"name\" = $1 WHERE \"id\" = $2"
-        );
+        assert_eq!(sql, "UPDATE \"users\" SET \"name\" = $1 WHERE \"id\" = $2");
         assert_eq!(params.len(), 2);
     }
 
     #[test]
     fn test_update_sqlite() {
-        let fields: Vec<(&str, Value)> = vec![
-            ("name", Value::from("Updated")),
-            ("age", Value::from(31)),
-        ];
+        let fields: Vec<(&str, Value)> =
+            vec![("name", Value::from("Updated")), ("age", Value::from(31))];
         let where_clause = WhereNode::Condition {
             column: "id".to_string(),
             lookup: Lookup::Exact(Value::from(1)),
@@ -1940,7 +1890,8 @@ mod tests {
     fn test_compile_aggregate_count_distinct() {
         let compiler = pg();
         let mut params = Vec::new();
-        let expr = Expression::aggregate_distinct(AggregateFunc::Count, Expression::col("category"));
+        let expr =
+            Expression::aggregate_distinct(AggregateFunc::Count, Expression::col("category"));
         let sql = compiler.compile_expression(&expr, &mut params);
         assert_eq!(sql, "COUNT(DISTINCT \"category\")");
     }
@@ -1949,10 +1900,10 @@ mod tests {
     fn test_compile_func() {
         let compiler = pg();
         let mut params = Vec::new();
-        let expr = Expression::func("COALESCE", vec![
-            Expression::col("name"),
-            Expression::value("unknown"),
-        ]);
+        let expr = Expression::func(
+            "COALESCE",
+            vec![Expression::col("name"), Expression::value("unknown")],
+        );
         let sql = compiler.compile_expression(&expr, &mut params);
         assert_eq!(sql, "COALESCE(\"name\", $1)");
     }
@@ -2104,10 +2055,7 @@ mod tests {
             "total".to_string(),
         )];
         let (sql, _) = pg().compile_select(&query);
-        assert_eq!(
-            sql,
-            "SELECT COUNT(\"id\") AS \"total\" FROM \"orders\""
-        );
+        assert_eq!(sql, "SELECT COUNT(\"id\") AS \"total\" FROM \"orders\"");
     }
 
     // ── Case expression compilation ──────────────────────────────────
@@ -2341,11 +2289,26 @@ mod tests {
 
     #[test]
     fn test_compound_type_sql_keywords() {
-        assert_eq!(CompoundType::Union.sql_keyword(DatabaseBackendType::PostgreSQL), "UNION");
-        assert_eq!(CompoundType::UnionAll.sql_keyword(DatabaseBackendType::PostgreSQL), "UNION ALL");
-        assert_eq!(CompoundType::Intersect.sql_keyword(DatabaseBackendType::PostgreSQL), "INTERSECT");
-        assert_eq!(CompoundType::Except.sql_keyword(DatabaseBackendType::PostgreSQL), "EXCEPT");
-        assert_eq!(CompoundType::Except.sql_keyword(DatabaseBackendType::MySQL), "EXCEPT");
+        assert_eq!(
+            CompoundType::Union.sql_keyword(DatabaseBackendType::PostgreSQL),
+            "UNION"
+        );
+        assert_eq!(
+            CompoundType::UnionAll.sql_keyword(DatabaseBackendType::PostgreSQL),
+            "UNION ALL"
+        );
+        assert_eq!(
+            CompoundType::Intersect.sql_keyword(DatabaseBackendType::PostgreSQL),
+            "INTERSECT"
+        );
+        assert_eq!(
+            CompoundType::Except.sql_keyword(DatabaseBackendType::PostgreSQL),
+            "EXCEPT"
+        );
+        assert_eq!(
+            CompoundType::Except.sql_keyword(DatabaseBackendType::MySQL),
+            "EXCEPT"
+        );
     }
 
     // ── select_related JOIN tests ────────────────────────────────────
@@ -2569,9 +2532,7 @@ mod tests {
         let (sql, _) = pg().compile_select(&query);
         assert!(sql.contains("FROM \"restaurant_restaurant\""));
         assert!(sql.contains("INNER JOIN \"myapp_place\""));
-        assert!(sql.contains(
-            "\"restaurant_restaurant\".\"place_ptr_id\" = \"myapp_place\".\"id\""
-        ));
+        assert!(sql.contains("\"restaurant_restaurant\".\"place_ptr_id\" = \"myapp_place\".\"id\""));
     }
 
     #[test]

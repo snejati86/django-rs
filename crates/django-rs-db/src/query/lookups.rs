@@ -330,9 +330,7 @@ mod tests {
     #[test]
     fn test_and_with_or_right() {
         let q1 = Q::filter("a", Lookup::Exact(Value::from(1)));
-        let q_and = Q::And(vec![
-            Q::filter("b", Lookup::Exact(Value::from(2))),
-        ]);
+        let q_and = Q::And(vec![Q::filter("b", Lookup::Exact(Value::from(2)))]);
         let combined = q1 & q_and;
         match &combined {
             Q::And(children) => assert_eq!(children.len(), 2),
@@ -374,10 +372,7 @@ mod tests {
 
     #[test]
     fn test_array_overlap_lookup() {
-        let q = Q::filter(
-            "tags",
-            Lookup::ArrayOverlap(vec![Value::from("x")]),
-        );
+        let q = Q::filter("tags", Lookup::ArrayOverlap(vec![Value::from("x")]));
         assert!(matches!(
             q,
             Q::Filter {

@@ -44,7 +44,10 @@ pub fn find_fixture(name: &str, fixture_dirs: &[String]) -> Option<String> {
     }
 
     // Try adding .json extension
-    let with_ext = if path.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("json")) {
+    let with_ext = if path
+        .extension()
+        .is_some_and(|ext| ext.eq_ignore_ascii_case("json"))
+    {
         name.to_string()
     } else {
         format!("{name}.json")

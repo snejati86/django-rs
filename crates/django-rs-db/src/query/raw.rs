@@ -193,10 +193,7 @@ impl RawSql {
     ///
     /// Each statement uses the same parameters. Returns the total number
     /// of affected rows across all statements.
-    pub async fn execute_many(
-        statements: &[RawSql],
-        db: &dyn DbExecutor,
-    ) -> DjangoResult<u64> {
+    pub async fn execute_many(statements: &[RawSql], db: &dyn DbExecutor) -> DjangoResult<u64> {
         let mut total = 0u64;
         for stmt in statements {
             total += stmt.execute(db).await?;
@@ -390,8 +387,7 @@ mod tests {
         )];
         let db = MockDb::new(rows);
 
-        let raw =
-            RawQuerySet::<TestUser>::new("SELECT * FROM test_user LIMIT 1", vec![]);
+        let raw = RawQuerySet::<TestUser>::new("SELECT * FROM test_user LIMIT 1", vec![]);
 
         let result = raw.first(&db).await.unwrap();
         assert!(result.is_some());
@@ -416,14 +412,12 @@ mod tests {
         )];
         let db = MockDb::new(rows);
 
-        let raw = RawQuerySet::<TestUser>::new(
-            "SELECT user_id, user_name FROM custom_view",
-            vec![],
-        )
-        .translate(vec![
-            ("user_id".to_string(), "id".to_string()),
-            ("user_name".to_string(), "name".to_string()),
-        ]);
+        let raw =
+            RawQuerySet::<TestUser>::new("SELECT user_id, user_name FROM custom_view", vec![])
+                .translate(vec![
+                    ("user_id".to_string(), "id".to_string()),
+                    ("user_name".to_string(), "name".to_string()),
+                ]);
 
         let results = raw.execute(&db).await.unwrap();
         assert_eq!(results.len(), 1);
@@ -433,9 +427,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_raw_sql_fetch_all() {
-        let rows = vec![
-            Row::new(vec!["count".to_string()], vec![Value::Int(42)]),
-        ];
+        let rows = vec![Row::new(vec!["count".to_string()], vec![Value::Int(42)])];
         let db = MockDb::new(rows);
 
         let raw = RawSql::new("SELECT COUNT(*) AS count FROM test_user", vec![]);
@@ -446,9 +438,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_raw_sql_fetch_one() {
-        let rows = vec![
-            Row::new(vec!["val".to_string()], vec![Value::Int(1)]),
-        ];
+        let rows = vec![Row::new(vec!["val".to_string()], vec![Value::Int(1)])];
         let db = MockDb::new(rows);
 
         let raw = RawSql::new("SELECT 1 AS val", vec![]);

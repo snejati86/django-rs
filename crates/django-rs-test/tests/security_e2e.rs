@@ -10,9 +10,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use django_rs_auth::csrf::{
-    generate_csrf_token, mask_csrf_token, CsrfMiddleware,
-};
+use django_rs_auth::csrf::{generate_csrf_token, mask_csrf_token, CsrfMiddleware};
 use django_rs_core::Settings;
 use django_rs_db::value::Value;
 use django_rs_db::DbExecutor;
@@ -45,12 +43,9 @@ async fn test_sql_injection_single_quotes_escaped() {
     )
     .await
     .unwrap();
-    db.execute_sql(
-        "INSERT INTO users (name) VALUES (?)",
-        &[Value::from("Bob")],
-    )
-    .await
-    .unwrap();
+    db.execute_sql("INSERT INTO users (name) VALUES (?)", &[Value::from("Bob")])
+        .await
+        .unwrap();
 
     // Attempt SQL injection via parameterized query
     let malicious_input = "'; DROP TABLE users; --";
@@ -210,14 +205,8 @@ async fn test_xss_auto_escapes_html_entities() {
         result.contains("&lt;script&gt;"),
         "< should be escaped: {result}"
     );
-    assert!(
-        result.contains("&gt;"),
-        "> should be escaped: {result}"
-    );
-    assert!(
-        result.contains("&amp;"),
-        "& should be escaped: {result}"
-    );
+    assert!(result.contains("&gt;"), "> should be escaped: {result}");
+    assert!(result.contains("&amp;"), "& should be escaped: {result}");
     assert!(
         result.contains("&quot;"),
         "double quotes should be escaped: {result}"
@@ -233,17 +222,16 @@ async fn test_xss_auto_escapes_html_entities() {
 #[tokio::test]
 async fn test_xss_script_tag_in_template_variable() {
     let engine = Engine::new();
-    engine.add_string_template(
-        "safe_output.html",
-        "<div>{{ user_input }}</div>",
-    );
+    engine.add_string_template("safe_output.html", "<div>{{ user_input }}</div>");
 
     let mut ctx = Context::new();
     ctx.set(
         "user_input",
         ContextValue::from("</script><script>alert('xss')</script>"),
     );
-    let result = engine.render_to_string("safe_output.html", &mut ctx).unwrap();
+    let result = engine
+        .render_to_string("safe_output.html", &mut ctx)
+        .unwrap();
 
     // The </script> should be escaped
     assert!(
@@ -324,10 +312,7 @@ async fn test_xss_full_pipeline_escaping() {
         !body.contains("<img src=x onerror=alert(1)>"),
         "XSS payload should be escaped, got: {body}"
     );
-    assert!(
-        body.contains("&lt;img"),
-        "Should be HTML-escaped: {body}"
-    );
+    assert!(body.contains("&lt;img"), "Should be HTML-escaped: {body}");
 }
 
 // ============================================================================
@@ -427,7 +412,10 @@ async fn test_csrf_token_is_masked() {
 
     // Each masking should produce a different result
     let masked2 = mask_csrf_token(&raw_token);
-    assert_ne!(masked, masked2, "Different maskings should produce different values");
+    assert_ne!(
+        masked, masked2,
+        "Different maskings should produce different values"
+    );
 }
 
 /// 12. GET/HEAD/OPTIONS requests bypass CSRF check.

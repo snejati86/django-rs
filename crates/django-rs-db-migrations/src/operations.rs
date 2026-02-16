@@ -80,10 +80,9 @@ impl Operation for CreateModel {
         to_state: &ProjectState,
     ) -> Result<Vec<String>, DjangoError> {
         let key = (app_label.to_string(), self.name.clone());
-        let model = to_state
-            .models
-            .get(&key)
-            .ok_or_else(|| DjangoError::DatabaseError(format!("Model {} not found in state", self.name)))?;
+        let model = to_state.models.get(&key).ok_or_else(|| {
+            DjangoError::DatabaseError(format!("Model {} not found in state", self.name))
+        })?;
         Ok(schema_editor.create_table(model))
     }
 
@@ -142,10 +141,9 @@ impl Operation for DeleteModel {
         _to_state: &ProjectState,
     ) -> Result<Vec<String>, DjangoError> {
         let key = (app_label.to_string(), self.name.clone());
-        let model = from_state
-            .models
-            .get(&key)
-            .ok_or_else(|| DjangoError::DatabaseError(format!("Model {} not found in from_state", self.name)))?;
+        let model = from_state.models.get(&key).ok_or_else(|| {
+            DjangoError::DatabaseError(format!("Model {} not found in from_state", self.name))
+        })?;
         Ok(schema_editor.create_table(model))
     }
 
@@ -282,10 +280,7 @@ pub struct AlterField {
 
 impl Operation for AlterField {
     fn describe(&self) -> String {
-        format!(
-            "Alter field {} on {}",
-            self.field_name, self.model_name
-        )
+        format!("Alter field {} on {}", self.field_name, self.model_name)
     }
 
     fn state_forwards(&self, app_label: &str, state: &mut ProjectState) {
@@ -452,11 +447,7 @@ impl Operation for AddIndex {
         _from_state: &ProjectState,
         _to_state: &ProjectState,
     ) -> Result<Vec<String>, DjangoError> {
-        let idx_name = self
-            .index
-            .name
-            .as_deref()
-            .unwrap_or("unnamed_index");
+        let idx_name = self.index.name.as_deref().unwrap_or("unnamed_index");
         Ok(schema_editor.drop_index(idx_name))
     }
 
@@ -547,7 +538,10 @@ impl Operation for AlterUniqueTogether {
     fn state_forwards(&self, app_label: &str, state: &mut ProjectState) {
         let key = (app_label.to_string(), self.model_name.clone());
         if let Some(model) = state.models.get_mut(&key) {
-            model.options.unique_together.clone_from(&self.unique_together);
+            model
+                .options
+                .unique_together
+                .clone_from(&self.unique_together);
         }
     }
 
@@ -778,7 +772,12 @@ mod tests {
             options: ModelOptions::default(),
         };
         let sqls = op
-            .database_backwards("blog", &pg_editor(), &ProjectState::new(), &ProjectState::new())
+            .database_backwards(
+                "blog",
+                &pg_editor(),
+                &ProjectState::new(),
+                &ProjectState::new(),
+            )
             .unwrap();
         assert!(!sqls.is_empty());
         assert!(sqls[0].contains("DROP TABLE"));
@@ -811,7 +810,12 @@ mod tests {
             name: "post".into(),
         };
         let sqls = op
-            .database_forwards("blog", &pg_editor(), &ProjectState::new(), &ProjectState::new())
+            .database_forwards(
+                "blog",
+                &pg_editor(),
+                &ProjectState::new(),
+                &ProjectState::new(),
+            )
             .unwrap();
         assert!(sqls[0].contains("DROP TABLE"));
     }
@@ -847,7 +851,12 @@ mod tests {
             field: make_field("title", FieldType::CharField).max_length(200),
         };
         let sqls = op
-            .database_forwards("blog", &pg_editor(), &ProjectState::new(), &ProjectState::new())
+            .database_forwards(
+                "blog",
+                &pg_editor(),
+                &ProjectState::new(),
+                &ProjectState::new(),
+            )
             .unwrap();
         assert!(sqls[0].contains("ALTER TABLE"));
         assert!(sqls[0].contains("ADD COLUMN"));
@@ -888,7 +897,12 @@ mod tests {
             field_name: "title".into(),
         };
         let sqls = op
-            .database_forwards("blog", &pg_editor(), &ProjectState::new(), &ProjectState::new())
+            .database_forwards(
+                "blog",
+                &pg_editor(),
+                &ProjectState::new(),
+                &ProjectState::new(),
+            )
             .unwrap();
         assert!(sqls[0].contains("ALTER TABLE"));
         assert!(sqls[0].contains("DROP COLUMN"));
@@ -962,7 +976,12 @@ mod tests {
             new_name: "headline".into(),
         };
         let sqls = op
-            .database_forwards("blog", &pg_editor(), &ProjectState::new(), &ProjectState::new())
+            .database_forwards(
+                "blog",
+                &pg_editor(),
+                &ProjectState::new(),
+                &ProjectState::new(),
+            )
             .unwrap();
         assert!(sqls[0].contains("RENAME COLUMN"));
     }
@@ -975,7 +994,12 @@ mod tests {
             new_name: "headline".into(),
         };
         let sqls = op
-            .database_backwards("blog", &pg_editor(), &ProjectState::new(), &ProjectState::new())
+            .database_backwards(
+                "blog",
+                &pg_editor(),
+                &ProjectState::new(),
+                &ProjectState::new(),
+            )
             .unwrap();
         assert!(sqls[0].contains("RENAME COLUMN"));
         assert!(sqls[0].contains("headline"));
@@ -992,7 +1016,7 @@ mod tests {
                 name: Some("idx_title".into()),
                 fields: vec!["title".into()],
                 unique: false,
-                    index_type: IndexType::default(),
+                index_type: IndexType::default(),
             },
         };
         assert_eq!(op.describe(), "Add index idx_title on post");
@@ -1006,11 +1030,16 @@ mod tests {
                 name: Some("idx_title".into()),
                 fields: vec!["title".into()],
                 unique: false,
-                    index_type: IndexType::default(),
+                index_type: IndexType::default(),
             },
         };
         let sqls = op
-            .database_forwards("blog", &pg_editor(), &ProjectState::new(), &ProjectState::new())
+            .database_forwards(
+                "blog",
+                &pg_editor(),
+                &ProjectState::new(),
+                &ProjectState::new(),
+            )
             .unwrap();
         assert!(sqls[0].contains("CREATE INDEX"));
     }
@@ -1033,7 +1062,12 @@ mod tests {
             index_name: "idx_title".into(),
         };
         let sqls = op
-            .database_forwards("blog", &pg_editor(), &ProjectState::new(), &ProjectState::new())
+            .database_forwards(
+                "blog",
+                &pg_editor(),
+                &ProjectState::new(),
+                &ProjectState::new(),
+            )
             .unwrap();
         assert!(sqls[0].contains("DROP INDEX"));
     }
@@ -1056,7 +1090,12 @@ mod tests {
             unique_together: vec![vec!["author".into(), "slug".into()]],
         };
         let sqls = op
-            .database_forwards("blog", &pg_editor(), &ProjectState::new(), &ProjectState::new())
+            .database_forwards(
+                "blog",
+                &pg_editor(),
+                &ProjectState::new(),
+                &ProjectState::new(),
+            )
             .unwrap();
         assert!(!sqls.is_empty());
         assert!(sqls[0].contains("UNIQUE"));
@@ -1098,7 +1137,12 @@ mod tests {
             sql_backwards: "DELETE FROM log WHERE id = 1".into(),
         };
         let sqls = op
-            .database_forwards("app", &pg_editor(), &ProjectState::new(), &ProjectState::new())
+            .database_forwards(
+                "app",
+                &pg_editor(),
+                &ProjectState::new(),
+                &ProjectState::new(),
+            )
             .unwrap();
         assert_eq!(sqls, vec!["INSERT INTO log VALUES (1)"]);
     }
@@ -1109,7 +1153,12 @@ mod tests {
             sql_forwards: "SELECT 1".into(),
             sql_backwards: String::new(),
         };
-        let result = op.database_backwards("app", &pg_editor(), &ProjectState::new(), &ProjectState::new());
+        let result = op.database_backwards(
+            "app",
+            &pg_editor(),
+            &ProjectState::new(),
+            &ProjectState::new(),
+        );
         assert!(result.is_err());
     }
 
@@ -1160,7 +1209,12 @@ mod tests {
             backwards: None,
         };
         let sqls = op
-            .database_forwards("app", &pg_editor(), &ProjectState::new(), &ProjectState::new())
+            .database_forwards(
+                "app",
+                &pg_editor(),
+                &ProjectState::new(),
+                &ProjectState::new(),
+            )
             .unwrap();
         assert!(sqls.is_empty());
         assert!(called.load(Ordering::SeqCst));

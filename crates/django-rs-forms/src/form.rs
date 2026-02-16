@@ -140,9 +140,7 @@ impl BaseForm {
 
     /// Returns the non-field (form-level) errors.
     pub fn non_field_errors(&self) -> &[String] {
-        self.errors
-            .get("__all__")
-            .map_or(&[], Vec::as_slice)
+        self.errors.get("__all__").map_or(&[], Vec::as_slice)
     }
 }
 
@@ -199,10 +197,7 @@ impl Form for BaseForm {
         // Step 2: Form-level cross-field validation (async)
         if let Err(form_errors) = self.clean().await {
             for (key, msgs) in form_errors {
-                self.errors
-                    .entry(key)
-                    .or_default()
-                    .extend(msgs);
+                self.errors.entry(key).or_default().extend(msgs);
             }
         }
 
@@ -300,10 +295,7 @@ mod tests {
                     strip: true,
                 },
             ),
-            FormFieldDef::new(
-                "email",
-                FormFieldType::Email,
-            ),
+            FormFieldDef::new("email", FormFieldType::Email),
             FormFieldDef::new(
                 "age",
                 FormFieldType::Integer {
@@ -375,9 +367,8 @@ mod tests {
     async fn test_form_with_prefix() {
         let mut form = make_test_form().with_prefix("myform");
         assert_eq!(form.prefix(), Some("myform"));
-        let qd = QueryDict::parse(
-            "myform-username=alice&myform-email=alice@example.com&myform-age=25",
-        );
+        let qd =
+            QueryDict::parse("myform-username=alice&myform-email=alice@example.com&myform-age=25");
         form.bind(&qd);
         assert!(form.is_valid().await);
     }

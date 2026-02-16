@@ -14,9 +14,9 @@
 
 use std::collections::HashMap;
 
+use django_rs_db::value::Value;
 use django_rs_forms::fields::{FormFieldDef, FormFieldType};
 use django_rs_forms::form::{BaseForm, Form};
-use django_rs_db::value::Value;
 use django_rs_http::QueryDict;
 
 // ── AuthenticationForm ──────────────────────────────────────────────
@@ -195,8 +195,16 @@ impl UserCreationForm {
         }
 
         // Check passwords match
-        let password1 = self.inner.cleaned_data().get("password1").map(|v| format!("{v}"));
-        let password2 = self.inner.cleaned_data().get("password2").map(|v| format!("{v}"));
+        let password1 = self
+            .inner
+            .cleaned_data()
+            .get("password1")
+            .map(|v| format!("{v}"));
+        let password2 = self
+            .inner
+            .cleaned_data()
+            .get("password2")
+            .map(|v| format!("{v}"));
 
         match (password1.as_deref(), password2.as_deref()) {
             (Some(p1), Some(p2)) if p1 != p2 => {
@@ -330,8 +338,16 @@ impl PasswordChangeForm {
             return false;
         }
 
-        let p1 = self.inner.cleaned_data().get("new_password1").map(|v| format!("{v}"));
-        let p2 = self.inner.cleaned_data().get("new_password2").map(|v| format!("{v}"));
+        let p1 = self
+            .inner
+            .cleaned_data()
+            .get("new_password1")
+            .map(|v| format!("{v}"));
+        let p2 = self
+            .inner
+            .cleaned_data()
+            .get("new_password2")
+            .map(|v| format!("{v}"));
 
         match (p1.as_deref(), p2.as_deref()) {
             (Some(p1), Some(p2)) if p1 != p2 => {
@@ -456,8 +472,16 @@ impl SetPasswordForm {
             return false;
         }
 
-        let p1 = self.inner.cleaned_data().get("new_password1").map(|v| format!("{v}"));
-        let p2 = self.inner.cleaned_data().get("new_password2").map(|v| format!("{v}"));
+        let p1 = self
+            .inner
+            .cleaned_data()
+            .get("new_password1")
+            .map(|v| format!("{v}"));
+        let p2 = self
+            .inner
+            .cleaned_data()
+            .get("new_password2")
+            .map(|v| format!("{v}"));
 
         match (p1.as_deref(), p2.as_deref()) {
             (Some(p1), Some(p2)) if p1 != p2 => {
@@ -829,8 +853,9 @@ mod tests {
     #[tokio::test]
     async fn test_password_change_weak_new_password() {
         let mut form = PasswordChangeForm::new();
-        let data =
-            QueryDict::parse("old_password=OldP@ss123&new_password1=password&new_password2=password");
+        let data = QueryDict::parse(
+            "old_password=OldP@ss123&new_password1=password&new_password2=password",
+        );
         form.bind(&data);
         assert!(!form.is_valid().await);
     }

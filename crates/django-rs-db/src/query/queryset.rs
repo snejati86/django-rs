@@ -657,13 +657,13 @@ impl<M: Model> QuerySet<M> {
         // Execute the main query
         let (sql, params) = self.to_sql(db.backend_type());
         let rows = db.query(&sql, &params).await?;
-        let models: Vec<M> = rows.iter().map(M::from_row).collect::<Result<Vec<_>, _>>()?;
+        let models: Vec<M> = rows
+            .iter()
+            .map(M::from_row)
+            .collect::<Result<Vec<_>, _>>()?;
 
         // Collect PK values from results for the prefetch IN clause
-        let pk_values: Vec<Value> = models
-            .iter()
-            .filter_map(|m| m.pk().cloned())
-            .collect();
+        let pk_values: Vec<Value> = models.iter().filter_map(|m| m.pk().cloned()).collect();
 
         // Run prefetch queries
         let compiler = SqlCompiler::new(db.backend_type());
@@ -812,10 +812,7 @@ mod tests {
         let mgr = Manager::<User>::new();
         let qs = mgr.filter(Q::filter("name", Lookup::Exact(Value::from("Alice"))));
         let (sql, params) = qs.to_sql(pg());
-        assert_eq!(
-            sql,
-            "SELECT * FROM \"auth_user\" WHERE \"name\" = $1"
-        );
+        assert_eq!(sql, "SELECT * FROM \"auth_user\" WHERE \"name\" = $1");
         assert_eq!(params, vec![Value::String("Alice".to_string())]);
     }
 
@@ -866,10 +863,7 @@ mod tests {
     #[test]
     fn test_queryset_reverse() {
         let mgr = Manager::<User>::new();
-        let qs = mgr
-            .all()
-            .order_by(vec![OrderBy::asc("name")])
-            .reverse();
+        let qs = mgr.all().order_by(vec![OrderBy::asc("name")]).reverse();
         let (sql, _) = qs.to_sql(pg());
         assert!(sql.contains("DESC"));
     }
@@ -1172,15 +1166,15 @@ mod tests {
     #[test]
     fn test_queryset_select_related_with() {
         let mgr = Manager::<User>::new();
-        let qs = mgr.all().select_related_with(vec![
-            crate::query::compiler::SelectRelatedField {
+        let qs = mgr
+            .all()
+            .select_related_with(vec![crate::query::compiler::SelectRelatedField {
                 field_name: "profile".to_string(),
                 related_table: "auth_profile".to_string(),
                 fk_column: "profile_id".to_string(),
                 related_column: "id".to_string(),
                 alias: "profile".to_string(),
-            },
-        ]);
+            }]);
         let (sql, _) = qs.to_sql(pg());
         assert!(sql.contains("LEFT JOIN \"auth_profile\" AS \"profile\""));
         assert!(sql.contains("\"auth_user\".\"profile_id\" = \"profile\".\"id\""));
@@ -1219,14 +1213,14 @@ mod tests {
     #[test]
     fn test_queryset_prefetch_related_with() {
         let mgr = Manager::<User>::new();
-        let qs = mgr.all().prefetch_related_with(vec![
-            crate::query::compiler::PrefetchRelatedField {
-                field_name: "orders".to_string(),
-                related_table: "shop_order".to_string(),
-                source_column: "id".to_string(),
-                related_column: "user_id".to_string(),
-            },
-        ]);
+        let qs =
+            mgr.all()
+                .prefetch_related_with(vec![crate::query::compiler::PrefetchRelatedField {
+                    field_name: "orders".to_string(),
+                    related_table: "shop_order".to_string(),
+                    source_column: "id".to_string(),
+                    related_column: "user_id".to_string(),
+                }]);
         // Main query should be normal (no JOIN)
         let (sql, _) = qs.to_sql(pg());
         assert!(!sql.contains("JOIN"));
@@ -1249,11 +1243,11 @@ mod tests {
     #[test]
     fn test_queryset_set_inheritance_proxy() {
         let mgr = Manager::<User>::new();
-        let qs = mgr.all().set_inheritance(
-            crate::query::compiler::InheritanceType::Proxy {
+        let qs = mgr
+            .all()
+            .set_inheritance(crate::query::compiler::InheritanceType::Proxy {
                 parent_table: "base_user".to_string(),
-            },
-        );
+            });
         let (sql, _) = qs.to_sql(pg());
         assert!(sql.contains("FROM \"base_user\""));
         assert!(!sql.contains("FROM \"auth_user\""));
@@ -1262,19 +1256,17 @@ mod tests {
     #[test]
     fn test_queryset_set_inheritance_multi_table() {
         let mgr = Manager::<User>::new();
-        let qs = mgr.all().set_inheritance(
-            crate::query::compiler::InheritanceType::MultiTable {
+        let qs = mgr
+            .all()
+            .set_inheritance(crate::query::compiler::InheritanceType::MultiTable {
                 parent_table: "base_person".to_string(),
                 parent_link_column: "person_ptr_id".to_string(),
                 parent_pk_column: "id".to_string(),
-            },
-        );
+            });
         let (sql, _) = qs.to_sql(pg());
         assert!(sql.contains("FROM \"auth_user\""));
         assert!(sql.contains("INNER JOIN \"base_person\""));
-        assert!(sql.contains(
-            "\"auth_user\".\"person_ptr_id\" = \"base_person\".\"id\""
-        ));
+        assert!(sql.contains("\"auth_user\".\"person_ptr_id\" = \"base_person\".\"id\""));
     }
 
     #[test]
@@ -1321,8 +1313,16 @@ mod tests {
         use super::super::compiler::Row;
         let result = super::PrefetchResult::<User> {
             models: vec![
-                User { id: 1, name: "Alice".to_string(), age: 30 },
-                User { id: 2, name: "Bob".to_string(), age: 25 },
+                User {
+                    id: 1,
+                    name: "Alice".to_string(),
+                    age: 30,
+                },
+                User {
+                    id: 2,
+                    name: "Bob".to_string(),
+                    age: 25,
+                },
             ],
             prefetch_cache: {
                 let mut m = std::collections::HashMap::new();

@@ -52,18 +52,30 @@ impl Model for User {
         &META
     }
 
-    fn table_name() -> &'static str { "auth_user" }
-    fn app_label() -> &'static str { "auth" }
+    fn table_name() -> &'static str {
+        "auth_user"
+    }
+    fn app_label() -> &'static str {
+        "auth"
+    }
 
     fn pk(&self) -> Option<&Value> {
-        if self.id == 0 { None } else { None }
+        if self.id == 0 {
+            None
+        } else {
+            None
+        }
     }
 
     fn set_pk(&mut self, value: Value) {
-        if let Value::Int(id) = value { self.id = id; }
+        if let Value::Int(id) = value {
+            self.id = id;
+        }
     }
 
-    fn pk_field_name() -> &'static str { "id" }
+    fn pk_field_name() -> &'static str {
+        "id"
+    }
 
     fn field_values(&self) -> Vec<(&'static str, Value)> {
         vec![
@@ -95,7 +107,12 @@ struct Product {
 
 impl Product {
     fn new(name: &str, price: f64) -> Self {
-        Self { pk_value: Value::Null, id: 0, name: name.to_string(), price }
+        Self {
+            pk_value: Value::Null,
+            id: 0,
+            name: name.to_string(),
+            price,
+        }
     }
 }
 
@@ -103,12 +120,15 @@ impl Model for Product {
     fn meta() -> &'static ModelMeta {
         use std::sync::LazyLock;
         static META: LazyLock<ModelMeta> = LazyLock::new(|| ModelMeta {
-            app_label: "shop", model_name: "product",
+            app_label: "shop",
+            model_name: "product",
             db_table: "shop_product".to_string(),
             verbose_name: "product".to_string(),
             verbose_name_plural: "products".to_string(),
-            ordering: vec![], unique_together: vec![],
-            indexes: vec![], abstract_model: false,
+            ordering: vec![],
+            unique_together: vec![],
+            indexes: vec![],
+            abstract_model: false,
             fields: vec![
                 FieldDef::new("id", FieldType::BigAutoField).primary_key(),
                 FieldDef::new("name", FieldType::CharField).max_length(200),
@@ -119,16 +139,28 @@ impl Model for Product {
         });
         &META
     }
-    fn table_name() -> &'static str { "shop_product" }
-    fn app_label() -> &'static str { "shop" }
+    fn table_name() -> &'static str {
+        "shop_product"
+    }
+    fn app_label() -> &'static str {
+        "shop"
+    }
     fn pk(&self) -> Option<&Value> {
-        if self.id == 0 { None } else { Some(&self.pk_value) }
+        if self.id == 0 {
+            None
+        } else {
+            Some(&self.pk_value)
+        }
     }
     fn set_pk(&mut self, value: Value) {
-        if let Value::Int(id) = &value { self.id = *id; }
+        if let Value::Int(id) = &value {
+            self.id = *id;
+        }
         self.pk_value = value;
     }
-    fn pk_field_name() -> &'static str { "id" }
+    fn pk_field_name() -> &'static str {
+        "id"
+    }
     fn field_values(&self) -> Vec<(&'static str, Value)> {
         vec![
             ("id", Value::Int(self.id)),
@@ -144,7 +176,12 @@ impl Model for Product {
             Value::Int(i) => i as f64,
             _ => 0.0,
         };
-        Ok(Product { pk_value: Value::Int(id), id, name: row.get("name")?, price })
+        Ok(Product {
+            pk_value: Value::Int(id),
+            id,
+            name: row.get("name")?,
+            price,
+        })
     }
 }
 
@@ -161,12 +198,15 @@ impl Model for HookedProduct {
     fn meta() -> &'static ModelMeta {
         use std::sync::LazyLock;
         static META: LazyLock<ModelMeta> = LazyLock::new(|| ModelMeta {
-            app_label: "test", model_name: "hookedproduct",
+            app_label: "test",
+            model_name: "hookedproduct",
             db_table: "test_hooked".to_string(),
             verbose_name: "hooked".to_string(),
             verbose_name_plural: "hookeds".to_string(),
-            ordering: vec![], unique_together: vec![],
-            indexes: vec![], abstract_model: false,
+            ordering: vec![],
+            unique_together: vec![],
+            indexes: vec![],
+            abstract_model: false,
             fields: vec![
                 FieldDef::new("id", FieldType::BigAutoField).primary_key(),
                 FieldDef::new("name", FieldType::CharField).max_length(100),
@@ -177,16 +217,28 @@ impl Model for HookedProduct {
         });
         &META
     }
-    fn table_name() -> &'static str { "test_hooked" }
-    fn app_label() -> &'static str { "test" }
+    fn table_name() -> &'static str {
+        "test_hooked"
+    }
+    fn app_label() -> &'static str {
+        "test"
+    }
     fn pk(&self) -> Option<&Value> {
-        if self.id == 0 { None } else { Some(&self.pk_value) }
+        if self.id == 0 {
+            None
+        } else {
+            Some(&self.pk_value)
+        }
     }
     fn set_pk(&mut self, value: Value) {
-        if let Value::Int(id) = &value { self.id = *id; }
+        if let Value::Int(id) = &value {
+            self.id = *id;
+        }
         self.pk_value = value;
     }
-    fn pk_field_name() -> &'static str { "id" }
+    fn pk_field_name() -> &'static str {
+        "id"
+    }
     fn field_values(&self) -> Vec<(&'static str, Value)> {
         vec![
             ("id", Value::Int(self.id)),
@@ -196,18 +248,27 @@ impl Model for HookedProduct {
     }
     fn from_row(row: &Row) -> Result<Self, DjangoError> {
         let id: i64 = row.get("id")?;
-        Ok(HookedProduct { pk_value: Value::Int(id), id, name: row.get("name")?, count: row.get("count")? })
+        Ok(HookedProduct {
+            pk_value: Value::Int(id),
+            id,
+            name: row.get("name")?,
+            count: row.get("count")?,
+        })
     }
 }
 
 impl ModelLifecycleHooks for HookedProduct {
     fn on_pre_save(&self) -> DjangoResult<()> {
         if self.name.is_empty() {
-            return Err(DjangoError::DatabaseError("Name cannot be empty".to_string()));
+            return Err(DjangoError::DatabaseError(
+                "Name cannot be empty".to_string(),
+            ));
         }
         Ok(())
     }
-    fn on_pre_delete(&self) -> DjangoResult<()> { Ok(()) }
+    fn on_pre_delete(&self) -> DjangoResult<()> {
+        Ok(())
+    }
 }
 
 // ── Helper functions ──────────────────────────────────────────────────
@@ -238,8 +299,16 @@ async fn seed_users(db: &SqliteBackend) {
         ("Diana", 28, "diana@example.com"),
         ("Eve", 22, "eve@example.com"),
     ] {
-        db.execute("INSERT INTO auth_user (name, age, email) VALUES (?, ?, ?)",
-            &[Value::from(name), Value::from(age as i64), Value::from(email)]).await.unwrap();
+        db.execute(
+            "INSERT INTO auth_user (name, age, email) VALUES (?, ?, ?)",
+            &[
+                Value::from(name),
+                Value::from(age as i64),
+                Value::from(email),
+            ],
+        )
+        .await
+        .unwrap();
     }
 }
 
@@ -261,7 +330,11 @@ async fn test_qs_execute_filter_exact() {
     let db = setup_user_db().await;
     seed_users(&db).await;
     let mgr = django_rs_db::Manager::<User>::new();
-    let users = mgr.filter(Q::filter("name", Lookup::Exact(Value::from("Alice")))).execute_query(&db).await.unwrap();
+    let users = mgr
+        .filter(Q::filter("name", Lookup::Exact(Value::from("Alice"))))
+        .execute_query(&db)
+        .await
+        .unwrap();
     assert_eq!(users.len(), 1);
     assert_eq!(users[0].name, "Alice");
     assert_eq!(users[0].age, 30);
@@ -273,7 +346,9 @@ async fn test_qs_execute_filter_gt() {
     seed_users(&db).await;
     let users = django_rs_db::Manager::<User>::new()
         .filter(Q::filter("age", Lookup::Gt(Value::from(28))))
-        .execute_query(&db).await.unwrap();
+        .execute_query(&db)
+        .await
+        .unwrap();
     assert_eq!(users.len(), 2);
 }
 
@@ -283,7 +358,9 @@ async fn test_qs_execute_filter_gte() {
     seed_users(&db).await;
     let users = django_rs_db::Manager::<User>::new()
         .filter(Q::filter("age", Lookup::Gte(Value::from(28))))
-        .execute_query(&db).await.unwrap();
+        .execute_query(&db)
+        .await
+        .unwrap();
     assert_eq!(users.len(), 3);
 }
 
@@ -293,7 +370,9 @@ async fn test_qs_execute_filter_lt() {
     seed_users(&db).await;
     let users = django_rs_db::Manager::<User>::new()
         .filter(Q::filter("age", Lookup::Lt(Value::from(26))))
-        .execute_query(&db).await.unwrap();
+        .execute_query(&db)
+        .await
+        .unwrap();
     assert_eq!(users.len(), 2);
 }
 
@@ -303,7 +382,9 @@ async fn test_qs_execute_filter_lte() {
     seed_users(&db).await;
     let users = django_rs_db::Manager::<User>::new()
         .filter(Q::filter("age", Lookup::Lte(Value::from(25))))
-        .execute_query(&db).await.unwrap();
+        .execute_query(&db)
+        .await
+        .unwrap();
     assert_eq!(users.len(), 2);
 }
 
@@ -313,7 +394,9 @@ async fn test_qs_execute_filter_contains() {
     seed_users(&db).await;
     let users = django_rs_db::Manager::<User>::new()
         .filter(Q::filter("name", Lookup::Contains("li".to_string())))
-        .execute_query(&db).await.unwrap();
+        .execute_query(&db)
+        .await
+        .unwrap();
     assert_eq!(users.len(), 2); // Alice, Charlie
 }
 
@@ -323,7 +406,9 @@ async fn test_qs_execute_filter_startswith() {
     seed_users(&db).await;
     let users = django_rs_db::Manager::<User>::new()
         .filter(Q::filter("name", Lookup::StartsWith("Ch".to_string())))
-        .execute_query(&db).await.unwrap();
+        .execute_query(&db)
+        .await
+        .unwrap();
     assert_eq!(users.len(), 1);
     assert_eq!(users[0].name, "Charlie");
 }
@@ -334,7 +419,9 @@ async fn test_qs_execute_filter_endswith() {
     seed_users(&db).await;
     let users = django_rs_db::Manager::<User>::new()
         .filter(Q::filter("name", Lookup::EndsWith("e".to_string())))
-        .execute_query(&db).await.unwrap();
+        .execute_query(&db)
+        .await
+        .unwrap();
     assert_eq!(users.len(), 3); // Alice, Charlie, Eve
 }
 
@@ -343,8 +430,13 @@ async fn test_qs_execute_filter_in() {
     let db = setup_user_db().await;
     seed_users(&db).await;
     let users = django_rs_db::Manager::<User>::new()
-        .filter(Q::filter("name", Lookup::In(vec![Value::from("Alice"), Value::from("Bob")])))
-        .execute_query(&db).await.unwrap();
+        .filter(Q::filter(
+            "name",
+            Lookup::In(vec![Value::from("Alice"), Value::from("Bob")]),
+        ))
+        .execute_query(&db)
+        .await
+        .unwrap();
     assert_eq!(users.len(), 2);
 }
 
@@ -353,8 +445,13 @@ async fn test_qs_execute_filter_range() {
     let db = setup_user_db().await;
     seed_users(&db).await;
     let users = django_rs_db::Manager::<User>::new()
-        .filter(Q::filter("age", Lookup::Range(Value::from(25), Value::from(30))))
-        .execute_query(&db).await.unwrap();
+        .filter(Q::filter(
+            "age",
+            Lookup::Range(Value::from(25), Value::from(30)),
+        ))
+        .execute_query(&db)
+        .await
+        .unwrap();
     assert_eq!(users.len(), 3);
 }
 
@@ -363,8 +460,13 @@ async fn test_qs_execute_filter_and() {
     let db = setup_user_db().await;
     seed_users(&db).await;
     let users = django_rs_db::Manager::<User>::new()
-        .filter(Q::filter("age", Lookup::Gte(Value::from(25))) & Q::filter("age", Lookup::Lte(Value::from(30))))
-        .execute_query(&db).await.unwrap();
+        .filter(
+            Q::filter("age", Lookup::Gte(Value::from(25)))
+                & Q::filter("age", Lookup::Lte(Value::from(30))),
+        )
+        .execute_query(&db)
+        .await
+        .unwrap();
     assert_eq!(users.len(), 3);
 }
 
@@ -373,8 +475,13 @@ async fn test_qs_execute_filter_or() {
     let db = setup_user_db().await;
     seed_users(&db).await;
     let users = django_rs_db::Manager::<User>::new()
-        .filter(Q::filter("name", Lookup::Exact(Value::from("Alice"))) | Q::filter("name", Lookup::Exact(Value::from("Eve"))))
-        .execute_query(&db).await.unwrap();
+        .filter(
+            Q::filter("name", Lookup::Exact(Value::from("Alice")))
+                | Q::filter("name", Lookup::Exact(Value::from("Eve"))),
+        )
+        .execute_query(&db)
+        .await
+        .unwrap();
     assert_eq!(users.len(), 2);
 }
 
@@ -384,7 +491,9 @@ async fn test_qs_execute_exclude() {
     seed_users(&db).await;
     let users = django_rs_db::Manager::<User>::new()
         .exclude(Q::filter("name", Lookup::Exact(Value::from("Alice"))))
-        .execute_query(&db).await.unwrap();
+        .execute_query(&db)
+        .await
+        .unwrap();
     assert_eq!(users.len(), 4);
     assert!(users.iter().all(|u| u.name != "Alice"));
 }
@@ -393,9 +502,12 @@ async fn test_qs_execute_exclude() {
 async fn test_qs_execute_order_asc() {
     let db = setup_user_db().await;
     seed_users(&db).await;
-    let users = django_rs_db::Manager::<User>::new().all()
+    let users = django_rs_db::Manager::<User>::new()
+        .all()
         .order_by(vec![OrderBy::asc("name")])
-        .execute_query(&db).await.unwrap();
+        .execute_query(&db)
+        .await
+        .unwrap();
     assert_eq!(users[0].name, "Alice");
     assert_eq!(users[4].name, "Eve");
 }
@@ -404,9 +516,12 @@ async fn test_qs_execute_order_asc() {
 async fn test_qs_execute_order_desc() {
     let db = setup_user_db().await;
     seed_users(&db).await;
-    let users = django_rs_db::Manager::<User>::new().all()
+    let users = django_rs_db::Manager::<User>::new()
+        .all()
         .order_by(vec![OrderBy::desc("age")])
-        .execute_query(&db).await.unwrap();
+        .execute_query(&db)
+        .await
+        .unwrap();
     assert_eq!(users[0].name, "Charlie");
     assert_eq!(users[4].name, "Eve");
 }
@@ -415,10 +530,13 @@ async fn test_qs_execute_order_desc() {
 async fn test_qs_execute_limit() {
     let db = setup_user_db().await;
     seed_users(&db).await;
-    let users = django_rs_db::Manager::<User>::new().all()
+    let users = django_rs_db::Manager::<User>::new()
+        .all()
         .order_by(vec![OrderBy::asc("name")])
         .limit(2)
-        .execute_query(&db).await.unwrap();
+        .execute_query(&db)
+        .await
+        .unwrap();
     assert_eq!(users.len(), 2);
     assert_eq!(users[0].name, "Alice");
     assert_eq!(users[1].name, "Bob");
@@ -428,10 +546,14 @@ async fn test_qs_execute_limit() {
 async fn test_qs_execute_offset() {
     let db = setup_user_db().await;
     seed_users(&db).await;
-    let users = django_rs_db::Manager::<User>::new().all()
+    let users = django_rs_db::Manager::<User>::new()
+        .all()
         .order_by(vec![OrderBy::asc("name")])
-        .limit(2).offset(2)
-        .execute_query(&db).await.unwrap();
+        .limit(2)
+        .offset(2)
+        .execute_query(&db)
+        .await
+        .unwrap();
     assert_eq!(users.len(), 2);
     assert_eq!(users[0].name, "Charlie");
     assert_eq!(users[1].name, "Diana");
@@ -441,14 +563,22 @@ async fn test_qs_execute_offset() {
 async fn test_qs_execute_none() {
     let db = setup_user_db().await;
     seed_users(&db).await;
-    let users = django_rs_db::Manager::<User>::new().none().execute_query(&db).await.unwrap();
+    let users = django_rs_db::Manager::<User>::new()
+        .none()
+        .execute_query(&db)
+        .await
+        .unwrap();
     assert!(users.is_empty());
 }
 
 #[tokio::test]
 async fn test_qs_execute_empty_table() {
     let db = setup_user_db().await;
-    let users = django_rs_db::Manager::<User>::new().all().execute_query(&db).await.unwrap();
+    let users = django_rs_db::Manager::<User>::new()
+        .all()
+        .execute_query(&db)
+        .await
+        .unwrap();
     assert!(users.is_empty());
 }
 
@@ -456,11 +586,14 @@ async fn test_qs_execute_empty_table() {
 async fn test_qs_execute_chained_filters() {
     let db = setup_user_db().await;
     seed_users(&db).await;
-    let users = django_rs_db::Manager::<User>::new().all()
+    let users = django_rs_db::Manager::<User>::new()
+        .all()
         .filter(Q::filter("age", Lookup::Gte(Value::from(25))))
         .filter(Q::filter("age", Lookup::Lte(Value::from(30))))
         .order_by(vec![OrderBy::asc("name")])
-        .execute_query(&db).await.unwrap();
+        .execute_query(&db)
+        .await
+        .unwrap();
     assert_eq!(users.len(), 3);
     assert_eq!(users[0].name, "Alice");
     assert_eq!(users[1].name, "Bob");
@@ -471,11 +604,14 @@ async fn test_qs_execute_chained_filters() {
 async fn test_qs_execute_reverse() {
     let db = setup_user_db().await;
     seed_users(&db).await;
-    let users = django_rs_db::Manager::<User>::new().all()
+    let users = django_rs_db::Manager::<User>::new()
+        .all()
         .order_by(vec![OrderBy::asc("name")])
         .reverse()
         .limit(2)
-        .execute_query(&db).await.unwrap();
+        .execute_query(&db)
+        .await
+        .unwrap();
     assert_eq!(users[0].name, "Eve");
     assert_eq!(users[1].name, "Diana");
 }
@@ -486,7 +622,14 @@ async fn test_qs_execute_reverse() {
 async fn test_qs_count_all() {
     let db = setup_user_db().await;
     seed_users(&db).await;
-    assert_eq!(django_rs_db::Manager::<User>::new().all().count_exec(&db).await.unwrap(), 5);
+    assert_eq!(
+        django_rs_db::Manager::<User>::new()
+            .all()
+            .count_exec(&db)
+            .await
+            .unwrap(),
+        5
+    );
 }
 
 #[tokio::test]
@@ -495,20 +638,36 @@ async fn test_qs_count_filtered() {
     seed_users(&db).await;
     let c = django_rs_db::Manager::<User>::new()
         .filter(Q::filter("age", Lookup::Gt(Value::from(28))))
-        .count_exec(&db).await.unwrap();
+        .count_exec(&db)
+        .await
+        .unwrap();
     assert_eq!(c, 2);
 }
 
 #[tokio::test]
 async fn test_qs_count_none() {
     let db = setup_user_db().await;
-    assert_eq!(django_rs_db::Manager::<User>::new().none().count_exec(&db).await.unwrap(), 0);
+    assert_eq!(
+        django_rs_db::Manager::<User>::new()
+            .none()
+            .count_exec(&db)
+            .await
+            .unwrap(),
+        0
+    );
 }
 
 #[tokio::test]
 async fn test_qs_count_empty() {
     let db = setup_user_db().await;
-    assert_eq!(django_rs_db::Manager::<User>::new().all().count_exec(&db).await.unwrap(), 0);
+    assert_eq!(
+        django_rs_db::Manager::<User>::new()
+            .all()
+            .count_exec(&db)
+            .await
+            .unwrap(),
+        0
+    );
 }
 
 // ── exists_exec ───────────────────────────────────────────────────────
@@ -519,7 +678,9 @@ async fn test_qs_exists_true() {
     seed_users(&db).await;
     assert!(django_rs_db::Manager::<User>::new()
         .filter(Q::filter("name", Lookup::Exact(Value::from("Alice"))))
-        .exists_exec(&db).await.unwrap());
+        .exists_exec(&db)
+        .await
+        .unwrap());
 }
 
 #[tokio::test]
@@ -528,19 +689,29 @@ async fn test_qs_exists_false() {
     seed_users(&db).await;
     assert!(!django_rs_db::Manager::<User>::new()
         .filter(Q::filter("name", Lookup::Exact(Value::from("Nobody"))))
-        .exists_exec(&db).await.unwrap());
+        .exists_exec(&db)
+        .await
+        .unwrap());
 }
 
 #[tokio::test]
 async fn test_qs_exists_none() {
     let db = setup_user_db().await;
-    assert!(!django_rs_db::Manager::<User>::new().none().exists_exec(&db).await.unwrap());
+    assert!(!django_rs_db::Manager::<User>::new()
+        .none()
+        .exists_exec(&db)
+        .await
+        .unwrap());
 }
 
 #[tokio::test]
 async fn test_qs_exists_empty() {
     let db = setup_user_db().await;
-    assert!(!django_rs_db::Manager::<User>::new().all().exists_exec(&db).await.unwrap());
+    assert!(!django_rs_db::Manager::<User>::new()
+        .all()
+        .exists_exec(&db)
+        .await
+        .unwrap());
 }
 
 // ── first_exec ────────────────────────────────────────────────────────
@@ -549,16 +720,24 @@ async fn test_qs_exists_empty() {
 async fn test_qs_first_some() {
     let db = setup_user_db().await;
     seed_users(&db).await;
-    let u = django_rs_db::Manager::<User>::new().all()
+    let u = django_rs_db::Manager::<User>::new()
+        .all()
         .order_by(vec![OrderBy::asc("name")])
-        .first_exec(&db).await.unwrap();
+        .first_exec(&db)
+        .await
+        .unwrap();
     assert_eq!(u.unwrap().name, "Alice");
 }
 
 #[tokio::test]
 async fn test_qs_first_none() {
     let db = setup_user_db().await;
-    assert!(django_rs_db::Manager::<User>::new().all().first_exec(&db).await.unwrap().is_none());
+    assert!(django_rs_db::Manager::<User>::new()
+        .all()
+        .first_exec(&db)
+        .await
+        .unwrap()
+        .is_none());
 }
 
 #[tokio::test]
@@ -567,7 +746,9 @@ async fn test_qs_first_with_filter() {
     seed_users(&db).await;
     let u = django_rs_db::Manager::<User>::new()
         .filter(Q::filter("age", Lookup::Gt(Value::from(30))))
-        .first_exec(&db).await.unwrap();
+        .first_exec(&db)
+        .await
+        .unwrap();
     assert_eq!(u.unwrap().name, "Charlie");
 }
 
@@ -575,7 +756,12 @@ async fn test_qs_first_with_filter() {
 async fn test_qs_first_none_qs() {
     let db = setup_user_db().await;
     seed_users(&db).await;
-    assert!(django_rs_db::Manager::<User>::new().none().first_exec(&db).await.unwrap().is_none());
+    assert!(django_rs_db::Manager::<User>::new()
+        .none()
+        .first_exec(&db)
+        .await
+        .unwrap()
+        .is_none());
 }
 
 // ── get_exec ──────────────────────────────────────────────────────────
@@ -586,7 +772,9 @@ async fn test_qs_get_found() {
     seed_users(&db).await;
     let u = django_rs_db::Manager::<User>::new()
         .filter(Q::filter("name", Lookup::Exact(Value::from("Alice"))))
-        .get_exec(&db).await.unwrap();
+        .get_exec(&db)
+        .await
+        .unwrap();
     assert_eq!(u.name, "Alice");
     assert_eq!(u.age, 30);
 }
@@ -597,7 +785,8 @@ async fn test_qs_get_not_found() {
     seed_users(&db).await;
     let r = django_rs_db::Manager::<User>::new()
         .filter(Q::filter("name", Lookup::Exact(Value::from("Nobody"))))
-        .get_exec(&db).await;
+        .get_exec(&db)
+        .await;
     assert!(matches!(r, Err(DjangoError::DoesNotExist(_))));
 }
 
@@ -607,14 +796,18 @@ async fn test_qs_get_multiple() {
     seed_users(&db).await;
     let r = django_rs_db::Manager::<User>::new()
         .filter(Q::filter("age", Lookup::Gt(Value::from(24))))
-        .get_exec(&db).await;
+        .get_exec(&db)
+        .await;
     assert!(matches!(r, Err(DjangoError::MultipleObjectsReturned(_))));
 }
 
 #[tokio::test]
 async fn test_qs_get_none_qs() {
     let db = setup_user_db().await;
-    let r = django_rs_db::Manager::<User>::new().none().get_exec(&db).await;
+    let r = django_rs_db::Manager::<User>::new()
+        .none()
+        .get_exec(&db)
+        .await;
     assert!(matches!(r, Err(DjangoError::DoesNotExist(_))));
 }
 
@@ -625,11 +818,18 @@ async fn test_qs_update_single() {
     let db = setup_user_db().await;
     seed_users(&db).await;
     let mgr = django_rs_db::Manager::<User>::new();
-    let a = mgr.filter(Q::filter("name", Lookup::Exact(Value::from("Alice"))))
+    let a = mgr
+        .filter(Q::filter("name", Lookup::Exact(Value::from("Alice"))))
         .update(vec![("age", Value::from(31))])
-        .update_exec(&db).await.unwrap();
+        .update_exec(&db)
+        .await
+        .unwrap();
     assert_eq!(a, 1);
-    let u = mgr.filter(Q::filter("name", Lookup::Exact(Value::from("Alice")))).get_exec(&db).await.unwrap();
+    let u = mgr
+        .filter(Q::filter("name", Lookup::Exact(Value::from("Alice"))))
+        .get_exec(&db)
+        .await
+        .unwrap();
     assert_eq!(u.age, 31);
 }
 
@@ -640,7 +840,9 @@ async fn test_qs_update_multiple() {
     let a = django_rs_db::Manager::<User>::new()
         .filter(Q::filter("age", Lookup::Lt(Value::from(30))))
         .update(vec![("email", Value::from("updated@test.com"))])
-        .update_exec(&db).await.unwrap();
+        .update_exec(&db)
+        .await
+        .unwrap();
     assert_eq!(a, 3);
 }
 
@@ -651,7 +853,9 @@ async fn test_qs_update_no_match() {
     let a = django_rs_db::Manager::<User>::new()
         .filter(Q::filter("name", Lookup::Exact(Value::from("Nobody"))))
         .update(vec![("age", Value::from(99))])
-        .update_exec(&db).await.unwrap();
+        .update_exec(&db)
+        .await
+        .unwrap();
     assert_eq!(a, 0);
 }
 
@@ -659,16 +863,23 @@ async fn test_qs_update_no_match() {
 async fn test_qs_update_none_qs() {
     let db = setup_user_db().await;
     seed_users(&db).await;
-    let a = django_rs_db::Manager::<User>::new().none()
+    let a = django_rs_db::Manager::<User>::new()
+        .none()
         .update(vec![("age", Value::from(99))])
-        .update_exec(&db).await.unwrap();
+        .update_exec(&db)
+        .await
+        .unwrap();
     assert_eq!(a, 0);
 }
 
 #[tokio::test]
 async fn test_qs_update_no_pending() {
     let db = setup_user_db().await;
-    assert!(django_rs_db::Manager::<User>::new().all().update_exec(&db).await.is_err());
+    assert!(django_rs_db::Manager::<User>::new()
+        .all()
+        .update_exec(&db)
+        .await
+        .is_err());
 }
 
 // ── delete_exec ───────────────────────────────────────────────────────
@@ -678,8 +889,12 @@ async fn test_qs_delete_single() {
     let db = setup_user_db().await;
     seed_users(&db).await;
     let mgr = django_rs_db::Manager::<User>::new();
-    let a = mgr.filter(Q::filter("name", Lookup::Exact(Value::from("Alice"))))
-        .delete().delete_exec(&db).await.unwrap();
+    let a = mgr
+        .filter(Q::filter("name", Lookup::Exact(Value::from("Alice"))))
+        .delete()
+        .delete_exec(&db)
+        .await
+        .unwrap();
     assert_eq!(a, 1);
     assert_eq!(mgr.all().count_exec(&db).await.unwrap(), 4);
 }
@@ -689,8 +904,12 @@ async fn test_qs_delete_multiple() {
     let db = setup_user_db().await;
     seed_users(&db).await;
     let mgr = django_rs_db::Manager::<User>::new();
-    let a = mgr.filter(Q::filter("age", Lookup::Lt(Value::from(30))))
-        .delete().delete_exec(&db).await.unwrap();
+    let a = mgr
+        .filter(Q::filter("age", Lookup::Lt(Value::from(30))))
+        .delete()
+        .delete_exec(&db)
+        .await
+        .unwrap();
     assert_eq!(a, 3);
     assert_eq!(mgr.all().count_exec(&db).await.unwrap(), 2);
 }
@@ -709,13 +928,25 @@ async fn test_qs_delete_all() {
 async fn test_qs_delete_none_qs() {
     let db = setup_user_db().await;
     seed_users(&db).await;
-    assert_eq!(django_rs_db::Manager::<User>::new().none().delete().delete_exec(&db).await.unwrap(), 0);
+    assert_eq!(
+        django_rs_db::Manager::<User>::new()
+            .none()
+            .delete()
+            .delete_exec(&db)
+            .await
+            .unwrap(),
+        0
+    );
 }
 
 #[tokio::test]
 async fn test_qs_delete_no_pending() {
     let db = setup_user_db().await;
-    assert!(django_rs_db::Manager::<User>::new().all().delete_exec(&db).await.is_err());
+    assert!(django_rs_db::Manager::<User>::new()
+        .all()
+        .delete_exec(&db)
+        .await
+        .is_err());
 }
 
 // ── create_exec ───────────────────────────────────────────────────────
@@ -724,11 +955,15 @@ async fn test_qs_delete_no_pending() {
 async fn test_qs_create_exec() {
     let db = setup_user_db().await;
     let mgr = django_rs_db::Manager::<User>::new();
-    let pk = mgr.create(vec![
-        ("name", Value::from("TestUser")),
-        ("age", Value::from(42)),
-        ("email", Value::from("test@test.com")),
-    ]).create_exec(&db).await.unwrap();
+    let pk = mgr
+        .create(vec![
+            ("name", Value::from("TestUser")),
+            ("age", Value::from(42)),
+            ("email", Value::from("test@test.com")),
+        ])
+        .create_exec(&db)
+        .await
+        .unwrap();
     assert_eq!(pk, Value::Int(1));
     assert_eq!(mgr.all().count_exec(&db).await.unwrap(), 1);
 }
@@ -736,7 +971,11 @@ async fn test_qs_create_exec() {
 #[tokio::test]
 async fn test_qs_create_exec_no_pending() {
     let db = setup_user_db().await;
-    assert!(django_rs_db::Manager::<User>::new().all().create_exec(&db).await.is_err());
+    assert!(django_rs_db::Manager::<User>::new()
+        .all()
+        .create_exec(&db)
+        .await
+        .is_err());
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -769,7 +1008,9 @@ async fn test_create_and_query_back() {
     create_model(&mut p, &db).await.unwrap();
     let fetched = django_rs_db::Manager::<Product>::new()
         .filter(Q::filter("id", Lookup::Exact(Value::from(p.id))))
-        .get_exec(&db).await.unwrap();
+        .get_exec(&db)
+        .await
+        .unwrap();
     assert_eq!(fetched.name, "Gadget");
     assert!((fetched.price - 29.99).abs() < f64::EPSILON);
 }
@@ -791,7 +1032,9 @@ async fn test_save_model_update() {
     save_model(&mut p, &db).await.unwrap();
     let fetched = django_rs_db::Manager::<Product>::new()
         .filter(Q::filter("id", Lookup::Exact(Value::from(p.id))))
-        .get_exec(&db).await.unwrap();
+        .get_exec(&db)
+        .await
+        .unwrap();
     assert!((fetched.price - 12.99).abs() < f64::EPSILON);
 }
 
@@ -802,7 +1045,14 @@ async fn test_delete_model_basic() {
     create_model(&mut p, &db).await.unwrap();
     let a = delete_model(&p, &db).await.unwrap();
     assert_eq!(a, 1);
-    assert_eq!(django_rs_db::Manager::<Product>::new().all().count_exec(&db).await.unwrap(), 0);
+    assert_eq!(
+        django_rs_db::Manager::<Product>::new()
+            .all()
+            .count_exec(&db)
+            .await
+            .unwrap(),
+        0
+    );
 }
 
 #[tokio::test]
@@ -817,7 +1067,12 @@ async fn test_refresh_model() {
     let db = setup_product_db().await;
     let mut p = Product::new("Gizmo", 5.99);
     create_model(&mut p, &db).await.unwrap();
-    db.execute("UPDATE shop_product SET price = 7.99 WHERE id = ?", &[Value::from(p.id)]).await.unwrap();
+    db.execute(
+        "UPDATE shop_product SET price = 7.99 WHERE id = ?",
+        &[Value::from(p.id)],
+    )
+    .await
+    .unwrap();
     assert!((p.price - 5.99).abs() < f64::EPSILON);
     refresh_model(&mut p, &db).await.unwrap();
     assert!((p.price - 7.99).abs() < f64::EPSILON);
@@ -843,20 +1098,34 @@ async fn test_full_crud_lifecycle() {
     create_model(&mut p3, &db).await.unwrap();
     assert_eq!(mgr.all().count_exec(&db).await.unwrap(), 3);
 
-    let all = mgr.all().order_by(vec![OrderBy::asc("name")]).execute_query(&db).await.unwrap();
+    let all = mgr
+        .all()
+        .order_by(vec![OrderBy::asc("name")])
+        .execute_query(&db)
+        .await
+        .unwrap();
     assert_eq!(all[0].name, "Keyboard");
     assert_eq!(all[1].name, "Laptop");
     assert_eq!(all[2].name, "Mouse");
 
     p2.price = 19.99;
     save_model(&mut p2, &db).await.unwrap();
-    let updated = mgr.filter(Q::filter("name", Lookup::Exact(Value::from("Mouse")))).get_exec(&db).await.unwrap();
+    let updated = mgr
+        .filter(Q::filter("name", Lookup::Exact(Value::from("Mouse"))))
+        .get_exec(&db)
+        .await
+        .unwrap();
     assert!((updated.price - 19.99).abs() < f64::EPSILON);
 
     delete_model(&p1, &db).await.unwrap();
     assert_eq!(mgr.all().count_exec(&db).await.unwrap(), 2);
 
-    let remaining = mgr.all().order_by(vec![OrderBy::asc("name")]).execute_query(&db).await.unwrap();
+    let remaining = mgr
+        .all()
+        .order_by(vec![OrderBy::asc("name")])
+        .execute_query(&db)
+        .await
+        .unwrap();
     assert_eq!(remaining.len(), 2);
     assert_eq!(remaining[0].name, "Keyboard");
     assert_eq!(remaining[1].name, "Mouse");
@@ -869,32 +1138,60 @@ async fn test_full_crud_lifecycle() {
 #[tokio::test]
 async fn test_hooks_pre_save_rejects_empty() {
     let db = setup_hooked_db().await;
-    let mut m = HookedProduct { pk_value: Value::Null, id: 0, name: String::new(), count: 0 };
-    assert!(django_rs_db::executor::create_model_with_hooks(&mut m, &db).await.is_err());
+    let mut m = HookedProduct {
+        pk_value: Value::Null,
+        id: 0,
+        name: String::new(),
+        count: 0,
+    };
+    assert!(django_rs_db::executor::create_model_with_hooks(&mut m, &db)
+        .await
+        .is_err());
 }
 
 #[tokio::test]
 async fn test_hooks_pre_save_allows_valid() {
     let db = setup_hooked_db().await;
-    let mut m = HookedProduct { pk_value: Value::Null, id: 0, name: "Valid".to_string(), count: 0 };
-    django_rs_db::executor::create_model_with_hooks(&mut m, &db).await.unwrap();
+    let mut m = HookedProduct {
+        pk_value: Value::Null,
+        id: 0,
+        name: "Valid".to_string(),
+        count: 0,
+    };
+    django_rs_db::executor::create_model_with_hooks(&mut m, &db)
+        .await
+        .unwrap();
     assert!(m.id > 0);
 }
 
 #[tokio::test]
 async fn test_hooks_save_with_hooks() {
     let db = setup_hooked_db().await;
-    let mut m = HookedProduct { pk_value: Value::Null, id: 0, name: "Test".to_string(), count: 0 };
-    django_rs_db::executor::save_model_with_hooks(&mut m, &db).await.unwrap();
+    let mut m = HookedProduct {
+        pk_value: Value::Null,
+        id: 0,
+        name: "Test".to_string(),
+        count: 0,
+    };
+    django_rs_db::executor::save_model_with_hooks(&mut m, &db)
+        .await
+        .unwrap();
     assert!(m.id > 0);
 }
 
 #[tokio::test]
 async fn test_hooks_delete_with_hooks() {
     let db = setup_hooked_db().await;
-    let mut m = HookedProduct { pk_value: Value::Null, id: 0, name: "ToDelete".to_string(), count: 0 };
+    let mut m = HookedProduct {
+        pk_value: Value::Null,
+        id: 0,
+        name: "ToDelete".to_string(),
+        count: 0,
+    };
     create_model(&mut m, &db).await.unwrap();
-    let a = django_rs_db::executor::delete_model_with_hooks(&m, &db).await.unwrap();
+    let a = django_rs_db::executor::delete_model_with_hooks(&m, &db)
+        .await
+        .unwrap();
     assert_eq!(a, 1);
 }
 
@@ -912,26 +1209,60 @@ async fn test_executor_backend_type() {
 #[tokio::test]
 async fn test_executor_insert_returning_id() {
     let db = SqliteBackend::memory().unwrap();
-    db.execute("CREATE TABLE t (id INTEGER PRIMARY KEY AUTOINCREMENT, val TEXT)", &[]).await.unwrap();
+    db.execute(
+        "CREATE TABLE t (id INTEGER PRIMARY KEY AUTOINCREMENT, val TEXT)",
+        &[],
+    )
+    .await
+    .unwrap();
     let ex: &dyn DbExecutor = &db;
-    assert_eq!(ex.insert_returning_id("INSERT INTO t (val) VALUES (?)", &[Value::from("a")]).await.unwrap(), Value::Int(1));
-    assert_eq!(ex.insert_returning_id("INSERT INTO t (val) VALUES (?)", &[Value::from("b")]).await.unwrap(), Value::Int(2));
+    assert_eq!(
+        ex.insert_returning_id("INSERT INTO t (val) VALUES (?)", &[Value::from("a")])
+            .await
+            .unwrap(),
+        Value::Int(1)
+    );
+    assert_eq!(
+        ex.insert_returning_id("INSERT INTO t (val) VALUES (?)", &[Value::from("b")])
+            .await
+            .unwrap(),
+        Value::Int(2)
+    );
 }
 
 #[tokio::test]
 async fn test_executor_execute_sql() {
     let db = SqliteBackend::memory().unwrap();
-    db.execute("CREATE TABLE t (id INTEGER PRIMARY KEY AUTOINCREMENT, val TEXT)", &[]).await.unwrap();
+    db.execute(
+        "CREATE TABLE t (id INTEGER PRIMARY KEY AUTOINCREMENT, val TEXT)",
+        &[],
+    )
+    .await
+    .unwrap();
     let ex: &dyn DbExecutor = &db;
-    assert_eq!(ex.execute_sql("INSERT INTO t (val) VALUES (?)", &[Value::from("x")]).await.unwrap(), 1);
+    assert_eq!(
+        ex.execute_sql("INSERT INTO t (val) VALUES (?)", &[Value::from("x")])
+            .await
+            .unwrap(),
+        1
+    );
 }
 
 #[tokio::test]
 async fn test_executor_query() {
     let db = SqliteBackend::memory().unwrap();
-    db.execute("CREATE TABLE t (id INTEGER PRIMARY KEY AUTOINCREMENT, val TEXT)", &[]).await.unwrap();
-    db.execute("INSERT INTO t (val) VALUES (?)", &[Value::from("a")]).await.unwrap();
-    db.execute("INSERT INTO t (val) VALUES (?)", &[Value::from("b")]).await.unwrap();
+    db.execute(
+        "CREATE TABLE t (id INTEGER PRIMARY KEY AUTOINCREMENT, val TEXT)",
+        &[],
+    )
+    .await
+    .unwrap();
+    db.execute("INSERT INTO t (val) VALUES (?)", &[Value::from("a")])
+        .await
+        .unwrap();
+    db.execute("INSERT INTO t (val) VALUES (?)", &[Value::from("b")])
+        .await
+        .unwrap();
     let ex: &dyn DbExecutor = &db;
     let rows = ex.query("SELECT * FROM t ORDER BY id", &[]).await.unwrap();
     assert_eq!(rows.len(), 2);
@@ -941,19 +1272,35 @@ async fn test_executor_query() {
 #[tokio::test]
 async fn test_executor_query_one_found() {
     let db = SqliteBackend::memory().unwrap();
-    db.execute("CREATE TABLE t (id INTEGER PRIMARY KEY AUTOINCREMENT, val TEXT)", &[]).await.unwrap();
-    db.execute("INSERT INTO t (val) VALUES (?)", &[Value::from("only")]).await.unwrap();
+    db.execute(
+        "CREATE TABLE t (id INTEGER PRIMARY KEY AUTOINCREMENT, val TEXT)",
+        &[],
+    )
+    .await
+    .unwrap();
+    db.execute("INSERT INTO t (val) VALUES (?)", &[Value::from("only")])
+        .await
+        .unwrap();
     let ex: &dyn DbExecutor = &db;
-    let row = ex.query_one("SELECT val FROM t WHERE id = ?", &[Value::from(1)]).await.unwrap();
+    let row = ex
+        .query_one("SELECT val FROM t WHERE id = ?", &[Value::from(1)])
+        .await
+        .unwrap();
     assert_eq!(row.get::<String>("val").unwrap(), "only");
 }
 
 #[tokio::test]
 async fn test_executor_query_one_not_found() {
     let db = SqliteBackend::memory().unwrap();
-    db.execute("CREATE TABLE t (id INTEGER PRIMARY KEY AUTOINCREMENT)", &[]).await.unwrap();
+    db.execute("CREATE TABLE t (id INTEGER PRIMARY KEY AUTOINCREMENT)", &[])
+        .await
+        .unwrap();
     let ex: &dyn DbExecutor = &db;
-    assert!(matches!(ex.query_one("SELECT id FROM t WHERE id = ?", &[Value::from(999)]).await, Err(DjangoError::DoesNotExist(_))));
+    assert!(matches!(
+        ex.query_one("SELECT id FROM t WHERE id = ?", &[Value::from(999)])
+            .await,
+        Err(DjangoError::DoesNotExist(_))
+    ));
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -964,12 +1311,18 @@ async fn test_executor_query_one_not_found() {
 async fn test_complex_filter_chain() {
     let db = setup_user_db().await;
     seed_users(&db).await;
-    let users = django_rs_db::Manager::<User>::new().all()
-        .filter(Q::filter("name", Lookup::Contains("li".to_string())) | Q::filter("name", Lookup::Contains("ob".to_string())))
+    let users = django_rs_db::Manager::<User>::new()
+        .all()
+        .filter(
+            Q::filter("name", Lookup::Contains("li".to_string()))
+                | Q::filter("name", Lookup::Contains("ob".to_string())),
+        )
         .filter(Q::filter("age", Lookup::Gte(Value::from(25))))
         .exclude(Q::filter("age", Lookup::Gt(Value::from(32))))
         .order_by(vec![OrderBy::asc("name")])
-        .execute_query(&db).await.unwrap();
+        .execute_query(&db)
+        .await
+        .unwrap();
     assert_eq!(users.len(), 2);
     assert_eq!(users[0].name, "Alice");
     assert_eq!(users[1].name, "Bob");
@@ -980,9 +1333,30 @@ async fn test_pagination() {
     let db = setup_user_db().await;
     seed_users(&db).await;
     let mgr = django_rs_db::Manager::<User>::new();
-    let p1 = mgr.all().order_by(vec![OrderBy::asc("name")]).limit(2).offset(0).execute_query(&db).await.unwrap();
-    let p2 = mgr.all().order_by(vec![OrderBy::asc("name")]).limit(2).offset(2).execute_query(&db).await.unwrap();
-    let p3 = mgr.all().order_by(vec![OrderBy::asc("name")]).limit(2).offset(4).execute_query(&db).await.unwrap();
+    let p1 = mgr
+        .all()
+        .order_by(vec![OrderBy::asc("name")])
+        .limit(2)
+        .offset(0)
+        .execute_query(&db)
+        .await
+        .unwrap();
+    let p2 = mgr
+        .all()
+        .order_by(vec![OrderBy::asc("name")])
+        .limit(2)
+        .offset(2)
+        .execute_query(&db)
+        .await
+        .unwrap();
+    let p3 = mgr
+        .all()
+        .order_by(vec![OrderBy::asc("name")])
+        .limit(2)
+        .offset(4)
+        .execute_query(&db)
+        .await
+        .unwrap();
     assert_eq!(p1.len(), 2);
     assert_eq!(p2.len(), 2);
     assert_eq!(p3.len(), 1);
@@ -994,40 +1368,93 @@ async fn test_pagination() {
 #[tokio::test]
 async fn test_isnull_filter() {
     let db = SqliteBackend::memory().unwrap();
-    db.execute("CREATE TABLE nt (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, bio TEXT)", &[]).await.unwrap();
-    db.execute("INSERT INTO nt (name, bio) VALUES (?, ?)", &[Value::from("A"), Value::from("Has bio")]).await.unwrap();
-    db.execute("INSERT INTO nt (name, bio) VALUES (?, ?)", &[Value::from("B"), Value::Null]).await.unwrap();
+    db.execute(
+        "CREATE TABLE nt (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, bio TEXT)",
+        &[],
+    )
+    .await
+    .unwrap();
+    db.execute(
+        "INSERT INTO nt (name, bio) VALUES (?, ?)",
+        &[Value::from("A"), Value::from("Has bio")],
+    )
+    .await
+    .unwrap();
+    db.execute(
+        "INSERT INTO nt (name, bio) VALUES (?, ?)",
+        &[Value::from("B"), Value::Null],
+    )
+    .await
+    .unwrap();
 
     #[derive(Debug)]
-    struct NullUser { id: i64, name: String, bio: Option<String> }
+    struct NullUser {
+        id: i64,
+        name: String,
+        bio: Option<String>,
+    }
     impl Model for NullUser {
         fn meta() -> &'static ModelMeta {
             use std::sync::LazyLock;
             static META: LazyLock<ModelMeta> = LazyLock::new(|| ModelMeta {
-                app_label: "test", model_name: "nulluser", db_table: "nt".to_string(),
-                verbose_name: "nu".to_string(), verbose_name_plural: "nus".to_string(),
-                ordering: vec![], unique_together: vec![], indexes: vec![], abstract_model: false, fields: vec![], constraints: vec![],
+                app_label: "test",
+                model_name: "nulluser",
+                db_table: "nt".to_string(),
+                verbose_name: "nu".to_string(),
+                verbose_name_plural: "nus".to_string(),
+                ordering: vec![],
+                unique_together: vec![],
+                indexes: vec![],
+                abstract_model: false,
+                fields: vec![],
+                constraints: vec![],
                 inheritance_type: InheritanceType::None,
             });
             &META
         }
-        fn table_name() -> &'static str { "nt" }
-        fn app_label() -> &'static str { "test" }
-        fn pk(&self) -> Option<&Value> { None }
-        fn set_pk(&mut self, value: Value) { if let Value::Int(id) = value { self.id = id; } }
+        fn table_name() -> &'static str {
+            "nt"
+        }
+        fn app_label() -> &'static str {
+            "test"
+        }
+        fn pk(&self) -> Option<&Value> {
+            None
+        }
+        fn set_pk(&mut self, value: Value) {
+            if let Value::Int(id) = value {
+                self.id = id;
+            }
+        }
         fn field_values(&self) -> Vec<(&'static str, Value)> {
-            vec![("id", Value::Int(self.id)), ("name", Value::String(self.name.clone())), ("bio", Value::from(self.bio.clone()))]
+            vec![
+                ("id", Value::Int(self.id)),
+                ("name", Value::String(self.name.clone())),
+                ("bio", Value::from(self.bio.clone())),
+            ]
         }
         fn from_row(row: &Row) -> Result<Self, DjangoError> {
-            Ok(NullUser { id: row.get("id")?, name: row.get("name")?, bio: row.get("bio")? })
+            Ok(NullUser {
+                id: row.get("id")?,
+                name: row.get("name")?,
+                bio: row.get("bio")?,
+            })
         }
     }
 
     let mgr = django_rs_db::Manager::<NullUser>::new();
-    let with = mgr.filter(Q::filter("bio", Lookup::IsNull(false))).execute_query(&db).await.unwrap();
+    let with = mgr
+        .filter(Q::filter("bio", Lookup::IsNull(false)))
+        .execute_query(&db)
+        .await
+        .unwrap();
     assert_eq!(with.len(), 1);
     assert_eq!(with[0].name, "A");
-    let without = mgr.filter(Q::filter("bio", Lookup::IsNull(true))).execute_query(&db).await.unwrap();
+    let without = mgr
+        .filter(Q::filter("bio", Lookup::IsNull(true)))
+        .execute_query(&db)
+        .await
+        .unwrap();
     assert_eq!(without.len(), 1);
     assert_eq!(without[0].name, "B");
 }
@@ -1040,7 +1467,14 @@ async fn test_many_creates() {
         create_model(&mut p, &db).await.unwrap();
         assert_eq!(p.id, (i + 1) as i64);
     }
-    assert_eq!(django_rs_db::Manager::<Product>::new().all().count_exec(&db).await.unwrap(), 20);
+    assert_eq!(
+        django_rs_db::Manager::<Product>::new()
+            .all()
+            .count_exec(&db)
+            .await
+            .unwrap(),
+        20
+    );
 }
 
 #[tokio::test]
@@ -1049,7 +1483,9 @@ async fn test_update_nonexistent() {
     let a = django_rs_db::Manager::<User>::new()
         .filter(Q::filter("id", Lookup::Exact(Value::from(999))))
         .update(vec![("name", Value::from("Ghost"))])
-        .update_exec(&db).await.unwrap();
+        .update_exec(&db)
+        .await
+        .unwrap();
     assert_eq!(a, 0);
 }
 
@@ -1058,7 +1494,10 @@ async fn test_delete_nonexistent() {
     let db = setup_user_db().await;
     let a = django_rs_db::Manager::<User>::new()
         .filter(Q::filter("id", Lookup::Exact(Value::from(999))))
-        .delete().delete_exec(&db).await.unwrap();
+        .delete()
+        .delete_exec(&db)
+        .await
+        .unwrap();
     assert_eq!(a, 0);
 }
 
@@ -1069,7 +1508,9 @@ async fn test_create_and_immediate_get() {
     create_model(&mut p, &db).await.unwrap();
     let f = django_rs_db::Manager::<Product>::new()
         .filter(Q::filter("id", Lookup::Exact(Value::from(p.id))))
-        .get_exec(&db).await.unwrap();
+        .get_exec(&db)
+        .await
+        .unwrap();
     assert_eq!(f.name, "Immediate");
 }
 
@@ -1082,7 +1523,11 @@ async fn test_create_update_delete_cycle() {
     assert_eq!(mgr.all().count_exec(&db).await.unwrap(), 1);
     p.name = "Updated".to_string();
     save_model(&mut p, &db).await.unwrap();
-    let f = mgr.filter(Q::filter("id", Lookup::Exact(Value::from(p.id)))).get_exec(&db).await.unwrap();
+    let f = mgr
+        .filter(Q::filter("id", Lookup::Exact(Value::from(p.id))))
+        .get_exec(&db)
+        .await
+        .unwrap();
     assert_eq!(f.name, "Updated");
     delete_model(&p, &db).await.unwrap();
     assert_eq!(mgr.all().count_exec(&db).await.unwrap(), 0);
@@ -1110,13 +1555,23 @@ fn test_model_pk_field_name() {
 
 #[test]
 fn test_model_field_values() {
-    let u = User { id: 1, name: "T".to_string(), age: 25, email: "t@t.com".to_string() };
+    let u = User {
+        id: 1,
+        name: "T".to_string(),
+        age: 25,
+        email: "t@t.com".to_string(),
+    };
     assert_eq!(u.field_values().len(), 4);
 }
 
 #[test]
 fn test_model_non_pk_field_values() {
-    let u = User { id: 1, name: "T".to_string(), age: 25, email: "t@t.com".to_string() };
+    let u = User {
+        id: 1,
+        name: "T".to_string(),
+        age: 25,
+        email: "t@t.com".to_string(),
+    };
     let npk = u.non_pk_field_values();
     assert_eq!(npk.len(), 3);
     assert!(npk.iter().all(|(n, _)| *n != "id"));
@@ -1126,7 +1581,12 @@ fn test_model_non_pk_field_values() {
 fn test_model_from_row() {
     let row = Row::new(
         vec!["id".into(), "name".into(), "age".into(), "email".into()],
-        vec![Value::Int(1), Value::String("A".into()), Value::Int(30), Value::String("a@a.com".into())],
+        vec![
+            Value::Int(1),
+            Value::String("A".into()),
+            Value::Int(30),
+            Value::String("a@a.com".into()),
+        ],
     );
     let u = User::from_row(&row).unwrap();
     assert_eq!(u.id, 1);
@@ -1135,7 +1595,12 @@ fn test_model_from_row() {
 
 #[test]
 fn test_model_set_pk() {
-    let mut u = User { id: 0, name: "T".to_string(), age: 0, email: String::new() };
+    let mut u = User {
+        id: 0,
+        name: "T".to_string(),
+        age: 0,
+        email: String::new(),
+    };
     u.set_pk(Value::Int(42));
     assert_eq!(u.id, 42);
 }
@@ -1186,7 +1651,10 @@ async fn test_union_all_keeps_duplicates() {
 
     let combined = all1.union_all(some);
     let (sql, _params) = combined.to_sql(django_rs_db::DatabaseBackendType::SQLite);
-    assert!(sql.contains("UNION ALL"), "SQL should contain UNION ALL: {sql}");
+    assert!(
+        sql.contains("UNION ALL"),
+        "SQL should contain UNION ALL: {sql}"
+    );
 
     let results = combined.execute_query(&db).await.unwrap();
     // 5 + 4 = 9 (duplicates preserved)
@@ -1223,7 +1691,10 @@ async fn test_intersect_basic() {
 
     let combined = older.intersection(younger);
     let (sql, _params) = combined.to_sql(django_rs_db::DatabaseBackendType::SQLite);
-    assert!(sql.contains("INTERSECT"), "SQL should contain INTERSECT: {sql}");
+    assert!(
+        sql.contains("INTERSECT"),
+        "SQL should contain INTERSECT: {sql}"
+    );
 
     let results = combined.execute_query(&db).await.unwrap();
     // Intersection: Alice(30), Bob(25), Diana(28) = 3
@@ -1259,7 +1730,10 @@ async fn test_union_with_limit() {
     let young = mgr.filter(Q::filter("age", Lookup::Lt(Value::from(26))));
     let old = mgr.filter(Q::filter("age", Lookup::Gt(Value::from(30))));
 
-    let combined = young.union(old).order_by(vec![OrderBy::asc("name")]).limit(2);
+    let combined = young
+        .union(old)
+        .order_by(vec![OrderBy::asc("name")])
+        .limit(2);
     let results = combined.execute_query(&db).await.unwrap();
     assert_eq!(results.len(), 2);
 }
@@ -1344,15 +1818,27 @@ impl Model for Post {
         });
         &META
     }
-    fn table_name() -> &'static str { "blog_post" }
-    fn app_label() -> &'static str { "blog" }
+    fn table_name() -> &'static str {
+        "blog_post"
+    }
+    fn app_label() -> &'static str {
+        "blog"
+    }
     fn pk(&self) -> Option<&Value> {
-        if self.id == 0 { None } else { None }
+        if self.id == 0 {
+            None
+        } else {
+            None
+        }
     }
     fn set_pk(&mut self, value: Value) {
-        if let Value::Int(id) = value { self.id = id; }
+        if let Value::Int(id) = value {
+            self.id = id;
+        }
     }
-    fn pk_field_name() -> &'static str { "id" }
+    fn pk_field_name() -> &'static str {
+        "id"
+    }
     fn field_values(&self) -> Vec<(&'static str, Value)> {
         vec![
             ("id", Value::Int(self.id)),
@@ -1390,19 +1876,23 @@ async fn seed_posts(db: &SqliteBackend) {
     ] {
         db.execute(
             "INSERT INTO auth_user (name, age, email) VALUES (?, ?, ?)",
-            &[Value::from(name), Value::from(age as i64), Value::from(email)],
-        ).await.unwrap();
+            &[
+                Value::from(name),
+                Value::from(age as i64),
+                Value::from(email),
+            ],
+        )
+        .await
+        .unwrap();
     }
     // Insert posts
-    for (title, author_id) in [
-        ("First Post", 1),
-        ("Second Post", 1),
-        ("Third Post", 2),
-    ] {
+    for (title, author_id) in [("First Post", 1), ("Second Post", 1), ("Third Post", 2)] {
         db.execute(
             "INSERT INTO blog_post (title, author_id) VALUES (?, ?)",
             &[Value::from(title), Value::from(author_id as i64)],
-        ).await.unwrap();
+        )
+        .await
+        .unwrap();
     }
 }
 
@@ -1414,20 +1904,24 @@ async fn test_select_related_join_query() {
     use django_rs_db::query::compiler::SelectRelatedField;
 
     let mgr = django_rs_db::Manager::<Post>::new();
-    let qs = mgr.all().select_related_with(vec![
-        SelectRelatedField {
-            field_name: "author".to_string(),
-            related_table: "auth_user".to_string(),
-            fk_column: "author_id".to_string(),
-            related_column: "id".to_string(),
-            alias: "author".to_string(),
-        },
-    ]);
+    let qs = mgr.all().select_related_with(vec![SelectRelatedField {
+        field_name: "author".to_string(),
+        related_table: "auth_user".to_string(),
+        fk_column: "author_id".to_string(),
+        related_column: "id".to_string(),
+        alias: "author".to_string(),
+    }]);
 
     let (sql, _params) = qs.to_sql(django_rs_db::DatabaseBackendType::SQLite);
     // Should produce a LEFT JOIN (or LEFT OUTER JOIN)
-    assert!(sql.contains("LEFT JOIN"), "SQL should contain LEFT JOIN: {sql}");
-    assert!(sql.contains("auth_user"), "SQL should reference auth_user: {sql}");
+    assert!(
+        sql.contains("LEFT JOIN"),
+        "SQL should contain LEFT JOIN: {sql}"
+    );
+    assert!(
+        sql.contains("auth_user"),
+        "SQL should reference auth_user: {sql}"
+    );
 
     // Execute and verify we get all 3 posts
     let results = qs.execute_query(&db).await.unwrap();
@@ -1442,16 +1936,15 @@ async fn test_select_related_with_filter() {
     use django_rs_db::query::compiler::SelectRelatedField;
 
     let mgr = django_rs_db::Manager::<Post>::new();
-    let qs = mgr.filter(Q::filter("author_id", Lookup::Exact(Value::from(1i64))))
-        .select_related_with(vec![
-            SelectRelatedField {
-                field_name: "author".to_string(),
-                related_table: "auth_user".to_string(),
-                fk_column: "author_id".to_string(),
-                related_column: "id".to_string(),
-                alias: "author".to_string(),
-            },
-        ]);
+    let qs = mgr
+        .filter(Q::filter("author_id", Lookup::Exact(Value::from(1i64))))
+        .select_related_with(vec![SelectRelatedField {
+            field_name: "author".to_string(),
+            related_table: "auth_user".to_string(),
+            fk_column: "author_id".to_string(),
+            related_column: "id".to_string(),
+            alias: "author".to_string(),
+        }]);
 
     let results = qs.execute_query(&db).await.unwrap();
     // Alice has 2 posts
@@ -1471,26 +1964,25 @@ async fn test_prefetch_related_batch_query() {
     use django_rs_db::query::compiler::PrefetchRelatedField;
 
     let mgr = django_rs_db::Manager::<User>::new();
-    let qs = mgr.all().prefetch_related_with(vec![
-        PrefetchRelatedField {
-            field_name: "posts".to_string(),
-            related_table: "blog_post".to_string(),
-            source_column: "id".to_string(),
-            related_column: "author_id".to_string(),
-        },
-    ]);
+    let qs = mgr.all().prefetch_related_with(vec![PrefetchRelatedField {
+        field_name: "posts".to_string(),
+        related_table: "blog_post".to_string(),
+        source_column: "id".to_string(),
+        related_column: "author_id".to_string(),
+    }]);
 
     // Compile and verify the prefetch SQL is generated
     let compiler = django_rs_db::SqlCompiler::new(django_rs_db::DatabaseBackendType::SQLite);
     let pk_values = vec![Value::Int(1), Value::Int(2)];
-    let prefetch_queries = compiler.compile_prefetch_queries(
-        &qs.query().prefetch_related,
-        &pk_values,
-    );
+    let prefetch_queries =
+        compiler.compile_prefetch_queries(&qs.query().prefetch_related, &pk_values);
     assert_eq!(prefetch_queries.len(), 1);
     let (field_name, sql, params) = &prefetch_queries[0];
     assert_eq!(field_name, "posts");
-    assert!(sql.contains("blog_post"), "Prefetch SQL should reference blog_post: {sql}");
+    assert!(
+        sql.contains("blog_post"),
+        "Prefetch SQL should reference blog_post: {sql}"
+    );
     assert!(sql.contains("IN"), "Prefetch SQL should contain IN: {sql}");
     assert_eq!(params.len(), 2);
 }
@@ -1500,14 +1992,12 @@ async fn test_prefetch_related_empty_result() {
     use django_rs_db::query::compiler::PrefetchRelatedField;
 
     let compiler = django_rs_db::SqlCompiler::new(django_rs_db::DatabaseBackendType::SQLite);
-    let prefetch_fields = vec![
-        PrefetchRelatedField {
-            field_name: "posts".to_string(),
-            related_table: "blog_post".to_string(),
-            source_column: "id".to_string(),
-            related_column: "author_id".to_string(),
-        },
-    ];
+    let prefetch_fields = vec![PrefetchRelatedField {
+        field_name: "posts".to_string(),
+        related_table: "blog_post".to_string(),
+        source_column: "id".to_string(),
+        related_column: "author_id".to_string(),
+    }];
 
     // With empty PK values, no queries should be generated
     let queries = compiler.compile_prefetch_queries(&prefetch_fields, &[]);
@@ -1559,16 +2049,28 @@ impl Model for Restaurant {
         &META
     }
 
-    fn table_name() -> &'static str { "dining_restaurant" }
-    fn app_label() -> &'static str { "dining" }
+    fn table_name() -> &'static str {
+        "dining_restaurant"
+    }
+    fn app_label() -> &'static str {
+        "dining"
+    }
 
     fn pk(&self) -> Option<&Value> {
-        if self.id == 0 { None } else { None }
+        if self.id == 0 {
+            None
+        } else {
+            None
+        }
     }
     fn set_pk(&mut self, value: Value) {
-        if let Value::Int(id) = value { self.id = id; }
+        if let Value::Int(id) = value {
+            self.id = id;
+        }
     }
-    fn pk_field_name() -> &'static str { "id" }
+    fn pk_field_name() -> &'static str {
+        "id"
+    }
 
     fn field_values(&self) -> Vec<(&'static str, Value)> {
         vec![
@@ -1649,16 +2151,28 @@ impl Model for ProxyUser {
         &META
     }
 
-    fn table_name() -> &'static str { "auth_proxyuser" }
-    fn app_label() -> &'static str { "auth" }
+    fn table_name() -> &'static str {
+        "auth_proxyuser"
+    }
+    fn app_label() -> &'static str {
+        "auth"
+    }
 
     fn pk(&self) -> Option<&Value> {
-        if self.id == 0 { None } else { None }
+        if self.id == 0 {
+            None
+        } else {
+            None
+        }
     }
     fn set_pk(&mut self, value: Value) {
-        if let Value::Int(id) = value { self.id = id; }
+        if let Value::Int(id) = value {
+            self.id = id;
+        }
     }
-    fn pk_field_name() -> &'static str { "id" }
+    fn pk_field_name() -> &'static str {
+        "id"
+    }
 
     fn field_values(&self) -> Vec<(&'static str, Value)> {
         vec![
@@ -1707,15 +2221,23 @@ async fn seed_inheritance(db: &SqliteBackend) {
     ] {
         db.execute(
             "INSERT INTO auth_user (name, age, email) VALUES (?, ?, ?)",
-            &[Value::from(name), Value::from(age as i64), Value::from(email)],
-        ).await.unwrap();
+            &[
+                Value::from(name),
+                Value::from(age as i64),
+                Value::from(email),
+            ],
+        )
+        .await
+        .unwrap();
     }
     // Insert child records
     for (user_id, cuisine) in [(1, "Italian"), (2, "Japanese"), (3, "Mexican")] {
         db.execute(
             "INSERT INTO dining_restaurant (user_id, cuisine) VALUES (?, ?)",
             &[Value::from(user_id as i64), Value::from(cuisine)],
-        ).await.unwrap();
+        )
+        .await
+        .unwrap();
     }
 }
 
@@ -1733,8 +2255,14 @@ async fn test_multi_table_inheritance_query() {
 
     let (sql, _params) = qs.to_sql(django_rs_db::DatabaseBackendType::SQLite);
     // Multi-table inheritance produces an INNER JOIN
-    assert!(sql.contains("INNER JOIN"), "SQL should contain INNER JOIN: {sql}");
-    assert!(sql.contains("auth_user"), "SQL should reference parent table: {sql}");
+    assert!(
+        sql.contains("INNER JOIN"),
+        "SQL should contain INNER JOIN: {sql}"
+    );
+    assert!(
+        sql.contains("auth_user"),
+        "SQL should reference parent table: {sql}"
+    );
 
     let results = qs.execute_query(&db).await.unwrap();
     assert_eq!(results.len(), 3);
@@ -1746,7 +2274,8 @@ async fn test_multi_table_inheritance_filtered() {
     seed_inheritance(&db).await;
 
     let mgr = django_rs_db::Manager::<Restaurant>::new();
-    let qs = mgr.filter(Q::filter("cuisine", Lookup::Exact(Value::from("Italian"))))
+    let qs = mgr
+        .filter(Q::filter("cuisine", Lookup::Exact(Value::from("Italian"))))
         .set_inheritance(InheritanceType::MultiTable {
             parent_table: "auth_user".to_string(),
             parent_link_column: "user_id".to_string(),
@@ -1788,7 +2317,10 @@ async fn test_proxy_model_reads_parent_table() {
 
     let (sql, _params) = qs.to_sql(django_rs_db::DatabaseBackendType::SQLite);
     // Proxy model rewrites the table name to the parent table
-    assert!(sql.contains("auth_user"), "SQL should reference parent table auth_user: {sql}");
+    assert!(
+        sql.contains("auth_user"),
+        "SQL should reference parent table auth_user: {sql}"
+    );
 
     let results = qs.execute_query(&db).await.unwrap();
     assert_eq!(results.len(), 5);
@@ -1800,7 +2332,8 @@ async fn test_proxy_model_with_filter() {
     seed_users(&db).await;
 
     let mgr = django_rs_db::Manager::<ProxyUser>::new();
-    let qs = mgr.filter(Q::filter("age", Lookup::Gte(Value::from(30))))
+    let qs = mgr
+        .filter(Q::filter("age", Lookup::Gte(Value::from(30))))
         .set_inheritance(InheritanceType::Proxy {
             parent_table: "auth_user".to_string(),
         });
@@ -1830,7 +2363,8 @@ async fn test_proxy_model_exists() {
     seed_users(&db).await;
 
     let mgr = django_rs_db::Manager::<ProxyUser>::new();
-    let qs = mgr.filter(Q::filter("name", Lookup::Exact(Value::from("Alice"))))
+    let qs = mgr
+        .filter(Q::filter("name", Lookup::Exact(Value::from("Alice"))))
         .set_inheritance(InheritanceType::Proxy {
             parent_table: "auth_user".to_string(),
         });
@@ -1864,15 +2398,22 @@ fn test_proxy_user_inheritance_type() {
 
 #[test]
 fn test_default_parent_field_values_empty() {
-    let u = User { id: 1, name: "T".to_string(), age: 25, email: "t@t.com".to_string() };
+    let u = User {
+        id: 1,
+        name: "T".to_string(),
+        age: 25,
+        email: "t@t.com".to_string(),
+    };
     assert!(u.parent_field_values().is_empty());
 }
 
 #[test]
 fn test_restaurant_parent_field_values() {
     let r = Restaurant {
-        id: 1, user_id: 1,
-        name: "Test".to_string(), age: 30,
+        id: 1,
+        user_id: 1,
+        name: "Test".to_string(),
+        age: 30,
         email: "test@test.com".to_string(),
         cuisine: "Italian".to_string(),
     };
@@ -1886,8 +2427,10 @@ fn test_restaurant_parent_field_values() {
 #[test]
 fn test_restaurant_child_field_values() {
     let r = Restaurant {
-        id: 1, user_id: 1,
-        name: "Test".to_string(), age: 30,
+        id: 1,
+        user_id: 1,
+        name: "Test".to_string(),
+        age: 30,
         email: "test@test.com".to_string(),
         cuisine: "Italian".to_string(),
     };
@@ -1899,7 +2442,12 @@ fn test_restaurant_child_field_values() {
 
 #[test]
 fn test_default_child_field_values_same_as_non_pk() {
-    let u = User { id: 1, name: "T".to_string(), age: 25, email: "t@t.com".to_string() };
+    let u = User {
+        id: 1,
+        name: "T".to_string(),
+        age: 25,
+        email: "t@t.com".to_string(),
+    };
     let child_fv = u.child_field_values();
     let non_pk_fv = u.non_pk_field_values();
     assert_eq!(child_fv.len(), non_pk_fv.len());
@@ -1917,22 +2465,26 @@ fn test_compile_parent_insert() {
     ];
     let (sql, params) = compiler.compile_parent_insert("auth_user", &fields);
     assert!(sql.contains("INSERT INTO"), "Should be an INSERT: {sql}");
-    assert!(sql.contains("auth_user"), "Should reference parent table: {sql}");
+    assert!(
+        sql.contains("auth_user"),
+        "Should reference parent table: {sql}"
+    );
     assert_eq!(params.len(), 3);
 }
 
 #[test]
 fn test_compile_parent_update() {
     let compiler = django_rs_db::SqlCompiler::new(django_rs_db::DatabaseBackendType::SQLite);
-    let fields: Vec<(&str, Value)> = vec![
-        ("name", Value::from("Updated Restaurant")),
-    ];
+    let fields: Vec<(&str, Value)> = vec![("name", Value::from("Updated Restaurant"))];
     let where_clause = django_rs_db::WhereNode::Condition {
         column: "id".to_string(),
         lookup: Lookup::Exact(Value::from(1i64)),
     };
     let (sql, params) = compiler.compile_parent_update("auth_user", &fields, &where_clause);
     assert!(sql.contains("UPDATE"), "Should be an UPDATE: {sql}");
-    assert!(sql.contains("auth_user"), "Should reference parent table: {sql}");
+    assert!(
+        sql.contains("auth_user"),
+        "Should reference parent table: {sql}"
+    );
     assert!(params.len() >= 2); // at least the field value and the WHERE param
 }

@@ -65,13 +65,11 @@ async fn main() {
             FieldSchema::new("title", "CharField")
                 .max_length(200)
                 .label("Title"),
-            FieldSchema::new("content", "TextField")
-                .label("Content"),
+            FieldSchema::new("content", "TextField").label("Content"),
             FieldSchema::new("author", "CharField")
                 .max_length(100)
                 .label("Author"),
-            FieldSchema::new("published", "BooleanField")
-                .label("Published"),
+            FieldSchema::new("published", "BooleanField").label("Published"),
             FieldSchema::new("created_at", "DateTimeField")
                 .label("Created at")
                 .read_only(),
@@ -88,13 +86,11 @@ async fn main() {
         .list_per_page(25)
         .fields_schema(vec![
             FieldSchema::new("id", "BigAutoField").primary_key(),
-            FieldSchema::new("post_id", "BigIntegerField")
-                .label("Post ID"),
+            FieldSchema::new("post_id", "BigIntegerField").label("Post ID"),
             FieldSchema::new("author", "CharField")
                 .max_length(100)
                 .label("Author"),
-            FieldSchema::new("content", "TextField")
-                .label("Content"),
+            FieldSchema::new("content", "TextField").label("Content"),
             FieldSchema::new("created_at", "DateTimeField")
                 .label("Created at")
                 .read_only(),
@@ -117,10 +113,8 @@ async fn main() {
             FieldSchema::new("email", "EmailField")
                 .max_length(254)
                 .label("Email address"),
-            FieldSchema::new("is_staff", "BooleanField")
-                .label("Staff status"),
-            FieldSchema::new("is_active", "BooleanField")
-                .label("Active"),
+            FieldSchema::new("is_staff", "BooleanField").label("Staff status"),
+            FieldSchema::new("is_active", "BooleanField").label("Active"),
         ]);
 
     let mut site = AdminSite::new("django-rs Blog Admin")
@@ -154,8 +148,9 @@ async fn main() {
     // Serve the React SPA with fallback to index.html for client-side routing.
     // With `base: '/admin/'` in vite.config.ts, all asset paths are prefixed
     // with /admin/ so everything is served from the single nest_service.
-    let spa_service = ServeDir::new(&spa_dir)
-        .fallback(tower_http::services::ServeFile::new(spa_dir.join("index.html")));
+    let spa_service = ServeDir::new(&spa_dir).fallback(tower_http::services::ServeFile::new(
+        spa_dir.join("index.html"),
+    ));
 
     // Axum's `nest()` doesn't forward `/api/admin/` (with trailing slash)
     // to the nested router's `/` route. Add an explicit redirect so the
@@ -164,9 +159,7 @@ async fn main() {
         .nest("/api/admin", admin_router)
         .route(
             "/api/admin/",
-            axum::routing::get(|| async {
-                axum::response::Redirect::temporary("/api/admin")
-            }),
+            axum::routing::get(|| async { axum::response::Redirect::temporary("/api/admin") }),
         )
         .nest_service("/admin", spa_service);
 
@@ -183,20 +176,19 @@ async fn main() {
 
 /// Seeds sample blog data into the in-memory database.
 async fn seed_data(db: &InMemoryAdminDb) {
-    let post_admin = ModelAdmin::new("blog", "post")
-        .fields_schema(vec![
-            FieldSchema::new("id", "BigAutoField").primary_key(),
-        ]);
+    let post_admin =
+        ModelAdmin::new("blog", "post")
+            .fields_schema(vec![FieldSchema::new("id", "BigAutoField").primary_key()]);
 
-    let comment_admin = ModelAdmin::new("blog", "comment")
-        .fields_schema(vec![
-            FieldSchema::new("id", "BigAutoField").primary_key(),
-        ]);
+    let comment_admin = ModelAdmin::new("blog", "comment").fields_schema(vec![FieldSchema::new(
+        "id",
+        "BigAutoField",
+    )
+    .primary_key()]);
 
-    let user_admin = ModelAdmin::new("auth", "user")
-        .fields_schema(vec![
-            FieldSchema::new("id", "BigAutoField").primary_key(),
-        ]);
+    let user_admin =
+        ModelAdmin::new("auth", "user")
+            .fields_schema(vec![FieldSchema::new("id", "BigAutoField").primary_key()]);
 
     // ── Users ──
     for (username, email, is_staff) in [
@@ -227,16 +219,35 @@ async fn seed_data(db: &InMemoryAdminDb) {
         data.insert("content".to_string(), serde_json::json!(content));
         data.insert("author".to_string(), serde_json::json!(author));
         data.insert("published".to_string(), serde_json::json!(published));
-        data.insert("created_at".to_string(), serde_json::json!(chrono::Utc::now().to_rfc3339()));
+        data.insert(
+            "created_at".to_string(),
+            serde_json::json!(chrono::Utc::now().to_rfc3339()),
+        );
         db.create_object(&post_admin, &data).await.unwrap();
     }
 
     // ── Comments ──
     let comments = [
-        (1, "bob", "Great introduction to Rust! Very helpful for beginners."),
-        (1, "alice", "I'd love to see a follow-up post about ownership and borrowing."),
-        (2, "admin", "Axum is quickly becoming my favorite web framework."),
-        (2, "bob", "The Tower middleware ecosystem is really powerful."),
+        (
+            1,
+            "bob",
+            "Great introduction to Rust! Very helpful for beginners.",
+        ),
+        (
+            1,
+            "alice",
+            "I'd love to see a follow-up post about ownership and borrowing.",
+        ),
+        (
+            2,
+            "admin",
+            "Axum is quickly becoming my favorite web framework.",
+        ),
+        (
+            2,
+            "bob",
+            "The Tower middleware ecosystem is really powerful.",
+        ),
         (3, "alice", "This is exactly what the Rust ecosystem needs!"),
         (3, "bob", "Can't wait to try django-rs for my next project."),
         (4, "bob", "Finally, an async explanation that makes sense."),
@@ -247,7 +258,10 @@ async fn seed_data(db: &InMemoryAdminDb) {
         data.insert("post_id".to_string(), serde_json::json!(post_id));
         data.insert("author".to_string(), serde_json::json!(author));
         data.insert("content".to_string(), serde_json::json!(content));
-        data.insert("created_at".to_string(), serde_json::json!(chrono::Utc::now().to_rfc3339()));
+        data.insert(
+            "created_at".to_string(),
+            serde_json::json!(chrono::Utc::now().to_rfc3339()),
+        );
         db.create_object(&comment_admin, &data).await.unwrap();
     }
 }

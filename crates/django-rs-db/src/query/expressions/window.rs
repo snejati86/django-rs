@@ -258,11 +258,17 @@ mod tests {
 
     #[test]
     fn test_window_frame_bound_sql() {
-        assert_eq!(WindowFrameBound::UnboundedPreceding.to_sql(), "UNBOUNDED PRECEDING");
+        assert_eq!(
+            WindowFrameBound::UnboundedPreceding.to_sql(),
+            "UNBOUNDED PRECEDING"
+        );
         assert_eq!(WindowFrameBound::Preceding(3).to_sql(), "3 PRECEDING");
         assert_eq!(WindowFrameBound::CurrentRow.to_sql(), "CURRENT ROW");
         assert_eq!(WindowFrameBound::Following(2).to_sql(), "2 FOLLOWING");
-        assert_eq!(WindowFrameBound::UnboundedFollowing.to_sql(), "UNBOUNDED FOLLOWING");
+        assert_eq!(
+            WindowFrameBound::UnboundedFollowing.to_sql(),
+            "UNBOUNDED FOLLOWING"
+        );
     }
 
     #[test]
@@ -271,7 +277,10 @@ mod tests {
             WindowFrameBound::UnboundedPreceding,
             WindowFrameBound::CurrentRow,
         );
-        assert_eq!(frame.to_sql(), "ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW");
+        assert_eq!(
+            frame.to_sql(),
+            "ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW"
+        );
     }
 
     #[test]
@@ -280,7 +289,10 @@ mod tests {
             WindowFrameBound::CurrentRow,
             WindowFrameBound::UnboundedFollowing,
         );
-        assert_eq!(frame.to_sql(), "RANGE BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING");
+        assert_eq!(
+            frame.to_sql(),
+            "RANGE BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING"
+        );
     }
 
     #[test]
@@ -299,7 +311,10 @@ mod tests {
             WindowFrameBound::UnboundedPreceding,
             WindowFrameBound::CurrentRow,
         );
-        assert_eq!(frame.to_sql(), "GROUPS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW");
+        assert_eq!(
+            frame.to_sql(),
+            "GROUPS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW"
+        );
     }
 
     #[test]
@@ -329,8 +344,8 @@ mod tests {
 
     #[test]
     fn test_rank_with_order() {
-        let window = WindowExpression::new(WindowFunction::Rank)
-            .order_by(vec![("score".to_string(), true)]);
+        let window =
+            WindowExpression::new(WindowFunction::Rank).order_by(vec![("score".to_string(), true)]);
         let expr = window.into_expression();
         let compiler = pg();
         let mut params = Vec::new();
@@ -412,9 +427,9 @@ mod tests {
 
     #[test]
     fn test_first_value() {
-        let window = WindowExpression::new(WindowFunction::FirstValue(
-            Box::new(Expression::col("name")),
-        ))
+        let window = WindowExpression::new(WindowFunction::FirstValue(Box::new(Expression::col(
+            "name",
+        ))))
         .partition_by(vec!["dept".to_string()])
         .order_by(vec![("hire_date".to_string(), false)]);
         let expr = window.into_expression();
@@ -429,9 +444,9 @@ mod tests {
 
     #[test]
     fn test_last_value() {
-        let window = WindowExpression::new(WindowFunction::LastValue(
-            Box::new(Expression::col("price")),
-        ))
+        let window = WindowExpression::new(WindowFunction::LastValue(Box::new(Expression::col(
+            "price",
+        ))))
         .order_by(vec![("date".to_string(), false)])
         .frame(WindowFrame::rows(
             WindowFrameBound::UnboundedPreceding,
@@ -512,9 +527,9 @@ mod tests {
 
     #[test]
     fn test_window_with_frame() {
-        let window = WindowExpression::new(WindowFunction::Aggregate(
-            Box::new(Expression::aggregate(AggregateFunc::Avg, Expression::col("price"))),
-        ))
+        let window = WindowExpression::new(WindowFunction::Aggregate(Box::new(
+            Expression::aggregate(AggregateFunc::Avg, Expression::col("price")),
+        )))
         .order_by(vec![("date".to_string(), false)])
         .frame(WindowFrame::rows(
             WindowFrameBound::Preceding(7),
@@ -547,19 +562,15 @@ mod tests {
 
     #[test]
     fn test_window_multiple_order_by() {
-        let window = WindowExpression::new(WindowFunction::Rank)
-            .order_by(vec![
-                ("score".to_string(), true),
-                ("name".to_string(), false),
-            ]);
+        let window = WindowExpression::new(WindowFunction::Rank).order_by(vec![
+            ("score".to_string(), true),
+            ("name".to_string(), false),
+        ]);
         let expr = window.into_expression();
         let compiler = pg();
         let mut params = Vec::new();
         let sql = compiler.compile_expression(&expr, &mut params);
-        assert_eq!(
-            sql,
-            "RANK() OVER (ORDER BY \"score\" DESC, \"name\" ASC)"
-        );
+        assert_eq!(sql, "RANK() OVER (ORDER BY \"score\" DESC, \"name\" ASC)");
     }
 
     #[test]
@@ -579,9 +590,9 @@ mod tests {
 
     #[test]
     fn test_window_partition_only() {
-        let window = WindowExpression::new(WindowFunction::Aggregate(
-            Box::new(Expression::aggregate(AggregateFunc::Count, Expression::col("id"))),
-        ))
+        let window = WindowExpression::new(WindowFunction::Aggregate(Box::new(
+            Expression::aggregate(AggregateFunc::Count, Expression::col("id")),
+        )))
         .partition_by(vec!["category".to_string()]);
         let expr = window.into_expression();
         let compiler = pg();

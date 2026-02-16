@@ -69,10 +69,9 @@ impl QueryDict {
                     continue;
                 }
 
-                let (key, value) = pair.find('=').map_or(
-                    (pair, ""),
-                    |eq_pos| (&pair[..eq_pos], &pair[eq_pos + 1..]),
-                );
+                let (key, value) = pair
+                    .find('=')
+                    .map_or((pair, ""), |eq_pos| (&pair[..eq_pos], &pair[eq_pos + 1..]));
 
                 let decoded_key = percent_decode(key);
                 let decoded_value = percent_decode(value);
@@ -171,7 +170,6 @@ impl QueryDict {
         &self.encoding
     }
 
-
     /// Returns the number of distinct keys.
     pub fn len(&self) -> usize {
         self.data.len()
@@ -210,11 +208,7 @@ fn percent_decode(input: &str) -> String {
 /// Percent-encodes a string for use in a URL query.
 fn percent_encode(input: &str) -> String {
     // Encode using the query encoding set (allows some chars unencoded)
-    percent_encoding::utf8_percent_encode(
-        input,
-        percent_encoding::NON_ALPHANUMERIC,
-    )
-    .to_string()
+    percent_encoding::utf8_percent_encode(input, percent_encoding::NON_ALPHANUMERIC).to_string()
 }
 
 #[cfg(test)]

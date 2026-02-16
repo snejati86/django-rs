@@ -108,7 +108,6 @@ impl Default for CacheSettings {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Settings {
     // ── Core ─────────────────────────────────────────────────────────
-
     /// Whether debug mode is enabled.
     pub debug: bool,
     /// The secret key used for cryptographic signing.
@@ -121,12 +120,10 @@ pub struct Settings {
     pub root_urlconf: String,
 
     // ── Database ─────────────────────────────────────────────────────
-
     /// Database configurations, keyed by alias (e.g. "default").
     pub databases: HashMap<String, DatabaseSettings>,
 
     // ── Static files ─────────────────────────────────────────────────
-
     /// URL prefix for static files.
     pub static_url: String,
     /// Absolute path to the directory where `collectstatic` will place files.
@@ -135,24 +132,20 @@ pub struct Settings {
     pub staticfiles_dirs: Vec<PathBuf>,
 
     // ── Media ────────────────────────────────────────────────────────
-
     /// URL prefix for user-uploaded media files.
     pub media_url: String,
     /// Absolute path to the directory for user-uploaded files.
     pub media_root: Option<PathBuf>,
 
     // ── Templates ────────────────────────────────────────────────────
-
     /// Template engine configurations.
     pub templates: Vec<TemplateSettings>,
 
     // ── Middleware ────────────────────────────────────────────────────
-
     /// Ordered list of middleware dotted paths.
     pub middleware: Vec<String>,
 
     // ── Auth ─────────────────────────────────────────────────────────
-
     /// The model to use for the user (e.g. "auth.User").
     pub auth_user_model: String,
     /// Authentication backend dotted paths.
@@ -161,7 +154,6 @@ pub struct Settings {
     pub password_hashers: Vec<String>,
 
     // ── Security ─────────────────────────────────────────────────────
-
     /// The name of the CSRF cookie.
     pub csrf_cookie_name: String,
     /// Origins that are trusted for CSRF checks.
@@ -176,7 +168,6 @@ pub struct Settings {
     pub session_cookie_age: u64,
 
     // ── Internationalization ─────────────────────────────────────────
-
     /// The language code (e.g. "en-us").
     pub language_code: String,
     /// The default time zone (e.g. "UTC").
@@ -185,7 +176,6 @@ pub struct Settings {
     pub use_tz: bool,
 
     // ── Email ────────────────────────────────────────────────────────
-
     /// The email backend dotted path.
     pub email_backend: String,
     /// The SMTP host.
@@ -194,17 +184,14 @@ pub struct Settings {
     pub email_port: u16,
 
     // ── Logging ──────────────────────────────────────────────────────
-
     /// The log level (e.g. "info", "debug", "warn").
     pub log_level: String,
 
     // ── Cache ────────────────────────────────────────────────────────
-
     /// Cache backend configurations, keyed by alias (e.g. "default").
     pub caches: HashMap<String, CacheSettings>,
 
     // ── Escape hatch ─────────────────────────────────────────────────
-
     /// Custom settings that don't fit into the above categories.
     pub extra: HashMap<String, serde_json::Value>,
 }
@@ -250,9 +237,7 @@ impl Default for Settings {
 
             // Auth
             auth_user_model: "auth.User".to_string(),
-            authentication_backends: vec![
-                "django_rs.auth.backends.ModelBackend".to_string(),
-            ],
+            authentication_backends: vec!["django_rs.auth.backends.ModelBackend".to_string()],
             password_hashers: vec![
                 "django_rs.auth.hashers.Argon2PasswordHasher".to_string(),
                 "django_rs.auth.hashers.BCryptPasswordHasher".to_string(),

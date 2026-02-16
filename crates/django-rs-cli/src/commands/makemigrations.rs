@@ -107,9 +107,7 @@ impl ManagementCommand for MakemigrationsCommand {
                 };
 
                 if dry_run {
-                    tracing::info!(
-                        "Would create: {app_label}/migrations/{migration_name}.json"
-                    );
+                    tracing::info!("Would create: {app_label}/migrations/{migration_name}.json");
                 } else {
                     let path = django_rs_db_migrations::serializer::migration_file_path(
                         std::path::Path::new(migrations_dir),

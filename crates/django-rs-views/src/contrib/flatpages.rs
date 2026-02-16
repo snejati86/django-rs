@@ -119,9 +119,9 @@ impl FlatPageRegistry {
     /// Returns the page if it matches the URL and either has no site
     /// restriction or includes the given site ID.
     pub fn get_by_url_for_site(&self, url: &str, site_id: u64) -> Option<&FlatPage> {
-        self.pages.get(url).filter(|page| {
-            page.sites.is_empty() || page.sites.contains(&site_id)
-        })
+        self.pages
+            .get(url)
+            .filter(|page| page.sites.is_empty() || page.sites.contains(&site_id))
     }
 
     /// Returns the number of registered pages.
@@ -303,22 +303,19 @@ mod tests {
 
     #[test]
     fn test_flatpage_with_template() {
-        let page = FlatPage::new("/test/", "Test", "content")
-            .with_template("custom/template.html");
+        let page = FlatPage::new("/test/", "Test", "content").with_template("custom/template.html");
         assert_eq!(page.template_name, "custom/template.html");
     }
 
     #[test]
     fn test_flatpage_with_sites() {
-        let page = FlatPage::new("/test/", "Test", "content")
-            .with_sites(vec![1, 2, 3]);
+        let page = FlatPage::new("/test/", "Test", "content").with_sites(vec![1, 2, 3]);
         assert_eq!(page.sites, vec![1, 2, 3]);
     }
 
     #[test]
     fn test_flatpage_with_registration_required() {
-        let page = FlatPage::new("/test/", "Test", "content")
-            .with_registration_required(true);
+        let page = FlatPage::new("/test/", "Test", "content").with_registration_required(true);
         assert!(page.registration_required);
     }
 
@@ -368,10 +365,7 @@ mod tests {
     #[test]
     fn test_registry_get_by_url_for_site() {
         let mut registry = FlatPageRegistry::new();
-        registry.register(
-            FlatPage::new("/about/", "About", "content")
-                .with_sites(vec![1, 2]),
-        );
+        registry.register(FlatPage::new("/about/", "About", "content").with_sites(vec![1, 2]));
 
         assert!(registry.get_by_url_for_site("/about/", 1).is_some());
         assert!(registry.get_by_url_for_site("/about/", 2).is_some());
@@ -453,9 +447,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_middleware_ignores_non_404() {
-        let mw = FlatpageFallbackMiddleware::from_pages(vec![
-            FlatPage::new("/about/", "About", "content"),
-        ]);
+        let mw = FlatpageFallbackMiddleware::from_pages(vec![FlatPage::new(
+            "/about/", "About", "content",
+        )]);
 
         let request = HttpRequest::builder().path("/about/").build();
         let response = HttpResponse::ok("ok");
@@ -465,9 +459,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_middleware_serves_flatpage_on_404() {
-        let mw = FlatpageFallbackMiddleware::from_pages(vec![
-            FlatPage::new("/about/", "About Us", "<p>About content</p>"),
-        ]);
+        let mw = FlatpageFallbackMiddleware::from_pages(vec![FlatPage::new(
+            "/about/",
+            "About Us",
+            "<p>About content</p>",
+        )]);
 
         let request = HttpRequest::builder().path("/about/").build();
         let response = HttpResponse::not_found("Not Found");
@@ -481,9 +477,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_middleware_no_matching_flatpage() {
-        let mw = FlatpageFallbackMiddleware::from_pages(vec![
-            FlatPage::new("/about/", "About", "content"),
-        ]);
+        let mw = FlatpageFallbackMiddleware::from_pages(vec![FlatPage::new(
+            "/about/", "About", "content",
+        )]);
 
         let request = HttpRequest::builder().path("/unknown/").build();
         let response = HttpResponse::not_found("Not Found");
@@ -494,10 +490,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_middleware_registration_required_not_authenticated() {
-        let mw = FlatpageFallbackMiddleware::from_pages(vec![
-            FlatPage::new("/private/", "Private", "secret")
-                .with_registration_required(true),
-        ]);
+        let mw = FlatpageFallbackMiddleware::from_pages(vec![FlatPage::new(
+            "/private/",
+            "Private",
+            "secret",
+        )
+        .with_registration_required(true)]);
 
         let request = HttpRequest::builder().path("/private/").build();
         let response = HttpResponse::not_found("Not Found");
@@ -509,10 +507,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_middleware_registration_required_authenticated() {
-        let mw = FlatpageFallbackMiddleware::from_pages(vec![
-            FlatPage::new("/private/", "Private", "secret content")
-                .with_registration_required(true),
-        ]);
+        let mw = FlatpageFallbackMiddleware::from_pages(vec![FlatPage::new(
+            "/private/",
+            "Private",
+            "secret content",
+        )
+        .with_registration_required(true)]);
 
         let request = HttpRequest::builder()
             .path("/private/")

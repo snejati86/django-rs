@@ -118,9 +118,8 @@ pub enum SerializableOperation {
 impl SerializableMigration {
     /// Serializes this migration to a JSON string.
     pub fn to_json(&self) -> Result<String, DjangoError> {
-        serde_json::to_string_pretty(self).map_err(|e| {
-            DjangoError::DatabaseError(format!("Failed to serialize migration: {e}"))
-        })
+        serde_json::to_string_pretty(self)
+            .map_err(|e| DjangoError::DatabaseError(format!("Failed to serialize migration: {e}")))
     }
 
     /// Deserializes a migration from a JSON string.
@@ -168,9 +167,8 @@ impl SerializableMigration {
                 DjangoError::DatabaseError(format!("Failed to create directory: {e}"))
             })?;
         }
-        std::fs::write(path, json).map_err(|e| {
-            DjangoError::DatabaseError(format!("Failed to write migration file: {e}"))
-        })
+        std::fs::write(path, json)
+            .map_err(|e| DjangoError::DatabaseError(format!("Failed to write migration file: {e}")))
     }
 
     /// Reads a migration from a file.
@@ -352,10 +350,7 @@ impl SerializableOperation {
 ///
 /// If `custom_name` is provided, uses that. Otherwise generates an auto name
 /// based on the migration number and current timestamp.
-pub fn generate_migration_name(
-    number: u32,
-    custom_name: Option<&str>,
-) -> String {
+pub fn generate_migration_name(number: u32, custom_name: Option<&str>) -> String {
     if let Some(name) = custom_name {
         format!("{number:04}_{name}")
     } else {
@@ -399,11 +394,7 @@ pub fn next_migration_number(migrations_dir: &Path, app_label: &str) -> u32 {
 }
 
 /// Returns the path where a migration file should be written.
-pub fn migration_file_path(
-    migrations_dir: &Path,
-    app_label: &str,
-    name: &str,
-) -> PathBuf {
+pub fn migration_file_path(migrations_dir: &Path, app_label: &str, name: &str) -> PathBuf {
     migrations_dir.join(app_label).join(format!("{name}.json"))
 }
 
@@ -487,7 +478,7 @@ mod tests {
                         name: Some("idx_email".into()),
                         fields: vec!["email".into()],
                         unique: true,
-                    index_type: IndexType::default(),
+                        index_type: IndexType::default(),
                     },
                 },
                 SerializableOperation::RemoveIndex {
@@ -680,10 +671,8 @@ mod tests {
 
     #[test]
     fn test_next_migration_number_with_files() {
-        let dir = std::env::temp_dir().join(format!(
-            "django_rs_test_serial_{}",
-            std::process::id()
-        ));
+        let dir =
+            std::env::temp_dir().join(format!("django_rs_test_serial_{}", std::process::id()));
         let app_dir = dir.join("myapp");
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&app_dir).unwrap();
@@ -700,25 +689,16 @@ mod tests {
 
     #[test]
     fn test_migration_file_path() {
-        let path = migration_file_path(
-            Path::new("/migrations"),
-            "blog",
-            "0001_initial",
-        );
-        assert_eq!(
-            path,
-            PathBuf::from("/migrations/blog/0001_initial.json")
-        );
+        let path = migration_file_path(Path::new("/migrations"), "blog", "0001_initial");
+        assert_eq!(path, PathBuf::from("/migrations/blog/0001_initial.json"));
     }
 
     // ── Write and read from file ─────────────────────────────────────
 
     #[test]
     fn test_write_and_read_file() {
-        let dir = std::env::temp_dir().join(format!(
-            "django_rs_test_serial_rw_{}",
-            std::process::id()
-        ));
+        let dir =
+            std::env::temp_dir().join(format!("django_rs_test_serial_rw_{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
 
         let migration = SerializableMigration {
@@ -833,7 +813,7 @@ mod tests {
             name: Some("idx_email".into()),
             fields: vec!["email".into()],
             unique: true,
-                    index_type: IndexType::default(),
+            index_type: IndexType::default(),
         };
         let json = serde_json::to_string(&index).unwrap();
         let deserialized: Index = serde_json::from_str(&json).unwrap();

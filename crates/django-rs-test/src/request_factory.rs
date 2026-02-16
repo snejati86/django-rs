@@ -57,8 +57,7 @@ impl RequestFactory {
     /// Adds a default META entry that will be included in all requests.
     #[must_use]
     pub fn with_default_meta(mut self, key: &str, value: &str) -> Self {
-        self.default_meta
-            .insert(key.to_string(), value.to_string());
+        self.default_meta.insert(key.to_string(), value.to_string());
         self
     }
 
@@ -130,10 +129,7 @@ impl RequestFactory {
         meta.insert("USER_USERNAME".to_string(), user.username.clone());
         meta.insert("USER_EMAIL".to_string(), user.email.clone());
         meta.insert("USER_IS_AUTHENTICATED".to_string(), "true".to_string());
-        meta.insert(
-            "USER_IS_STAFF".to_string(),
-            user.is_staff.to_string(),
-        );
+        meta.insert("USER_IS_STAFF".to_string(), user.is_staff.to_string());
         meta.insert(
             "USER_IS_SUPERUSER".to_string(),
             user.is_superuser.to_string(),
@@ -330,23 +326,18 @@ mod tests {
 
         let req = factory.get("/api/");
         assert_eq!(
-            req.headers()
-                .get("accept")
-                .and_then(|v| v.to_str().ok()),
+            req.headers().get("accept").and_then(|v| v.to_str().ok()),
             Some("application/json")
         );
         assert_eq!(
-            req.headers()
-                .get("x-custom")
-                .and_then(|v| v.to_str().ok()),
+            req.headers().get("x-custom").and_then(|v| v.to_str().ok()),
             Some("test-value")
         );
     }
 
     #[test]
     fn test_factory_default_meta() {
-        let factory = RequestFactory::new()
-            .with_default_meta("REMOTE_ADDR", "192.168.1.1");
+        let factory = RequestFactory::new().with_default_meta("REMOTE_ADDR", "192.168.1.1");
 
         let req = factory.get("/");
         assert_eq!(req.meta().get("REMOTE_ADDR").unwrap(), "192.168.1.1");

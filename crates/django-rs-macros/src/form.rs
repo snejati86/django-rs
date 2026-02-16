@@ -94,10 +94,8 @@ pub fn derive_form_impl(input: DeriveInput) -> TokenStream {
         .fields;
 
     // Generate FormFieldDef entries
-    let field_def_tokens: Vec<TokenStream> = fields
-        .iter()
-        .map(|f| generate_form_field_def(f))
-        .collect();
+    let field_def_tokens: Vec<TokenStream> =
+        fields.iter().map(|f| generate_form_field_def(f)).collect();
 
     let expanded = quote! {
         impl #struct_name {
@@ -172,8 +170,14 @@ fn infer_form_field_type(f: &FormFieldOpts) -> TokenStream {
             "email" => return quote! { django_rs_forms::fields::FormFieldType::Email },
             "url" => return quote! { django_rs_forms::fields::FormFieldType::Url },
             "integer" => {
-                let min = f.min_value.map(|v| quote! { Some(#v) }).unwrap_or(quote! { None });
-                let max = f.max_value.map(|v| quote! { Some(#v) }).unwrap_or(quote! { None });
+                let min = f
+                    .min_value
+                    .map(|v| quote! { Some(#v) })
+                    .unwrap_or(quote! { None });
+                let max = f
+                    .max_value
+                    .map(|v| quote! { Some(#v) })
+                    .unwrap_or(quote! { None });
                 return quote! {
                     django_rs_forms::fields::FormFieldType::Integer {
                         min_value: #min,
@@ -214,8 +218,14 @@ fn infer_form_field_type(f: &FormFieldOpts) -> TokenStream {
 
     match type_str.as_str() {
         "String" => {
-            let min_len = f.min_length.map(|v| quote! { Some(#v) }).unwrap_or(quote! { None });
-            let max_len = f.max_length.map(|v| quote! { Some(#v) }).unwrap_or(quote! { None });
+            let min_len = f
+                .min_length
+                .map(|v| quote! { Some(#v) })
+                .unwrap_or(quote! { None });
+            let max_len = f
+                .max_length
+                .map(|v| quote! { Some(#v) })
+                .unwrap_or(quote! { None });
             quote! {
                 django_rs_forms::fields::FormFieldType::Char {
                     min_length: #min_len,
@@ -225,8 +235,14 @@ fn infer_form_field_type(f: &FormFieldOpts) -> TokenStream {
             }
         }
         "i32" | "i64" | "i16" => {
-            let min = f.min_value.map(|v| quote! { Some(#v) }).unwrap_or(quote! { None });
-            let max = f.max_value.map(|v| quote! { Some(#v) }).unwrap_or(quote! { None });
+            let min = f
+                .min_value
+                .map(|v| quote! { Some(#v) })
+                .unwrap_or(quote! { None });
+            let max = f
+                .max_value
+                .map(|v| quote! { Some(#v) })
+                .unwrap_or(quote! { None });
             quote! {
                 django_rs_forms::fields::FormFieldType::Integer {
                     min_value: #min,
@@ -253,8 +269,14 @@ fn infer_form_field_type(f: &FormFieldOpts) -> TokenStream {
             } else if type_str.contains("Uuid") {
                 quote! { django_rs_forms::fields::FormFieldType::Uuid }
             } else {
-                let min_len = f.min_length.map(|v| quote! { Some(#v) }).unwrap_or(quote! { None });
-                let max_len = f.max_length.map(|v| quote! { Some(#v) }).unwrap_or(quote! { None });
+                let min_len = f
+                    .min_length
+                    .map(|v| quote! { Some(#v) })
+                    .unwrap_or(quote! { None });
+                let max_len = f
+                    .max_length
+                    .map(|v| quote! { Some(#v) })
+                    .unwrap_or(quote! { None });
                 quote! {
                     django_rs_forms::fields::FormFieldType::Char {
                         min_length: #min_len,

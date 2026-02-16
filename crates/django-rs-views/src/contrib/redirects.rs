@@ -104,9 +104,9 @@ impl RedirectRegistry {
 
     /// Looks up a redirect by old path, optionally filtering by site ID.
     pub fn get_redirect(&self, old_path: &str) -> Option<&Redirect> {
-        self.redirects.get(old_path).and_then(|redirects| {
-            redirects.first()
-        })
+        self.redirects
+            .get(old_path)
+            .and_then(|redirects| redirects.first())
     }
 
     /// Looks up a redirect by old path and site ID.
@@ -232,11 +232,8 @@ impl Middleware for RedirectFallbackMiddleware {
         if let Some(redirect) = self.registry.get_redirect(path) {
             if redirect.is_permanent {
                 let mut resp = HttpResponse::new(http::StatusCode::MOVED_PERMANENTLY, "");
-                if let Ok(value) =
-                    http::header::HeaderValue::from_str(&redirect.new_path)
-                {
-                    resp.headers_mut()
-                        .insert(http::header::LOCATION, value);
+                if let Ok(value) = http::header::HeaderValue::from_str(&redirect.new_path) {
+                    resp.headers_mut().insert(http::header::LOCATION, value);
                 }
                 return resp;
             }
@@ -366,9 +363,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_middleware_ignores_non_404() {
-        let mw = RedirectFallbackMiddleware::from_registry(vec![
-            Redirect::permanent("/old/", "/new/"),
-        ]);
+        let mw =
+            RedirectFallbackMiddleware::from_registry(vec![Redirect::permanent("/old/", "/new/")]);
 
         let mut request = HttpRequest::builder().path("/old/").build();
         assert!(mw.process_request(&mut request).await.is_none());
@@ -380,9 +376,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_middleware_permanent_redirect_on_404() {
-        let mw = RedirectFallbackMiddleware::from_registry(vec![
-            Redirect::permanent("/old/", "/new/"),
-        ]);
+        let mw =
+            RedirectFallbackMiddleware::from_registry(vec![Redirect::permanent("/old/", "/new/")]);
 
         let request = HttpRequest::builder().path("/old/").build();
         let response = HttpResponse::not_found("Not Found");
@@ -390,16 +385,21 @@ mod tests {
 
         assert_eq!(result.status(), http::StatusCode::MOVED_PERMANENTLY);
         assert_eq!(
-            result.headers().get(http::header::LOCATION).unwrap().to_str().unwrap(),
+            result
+                .headers()
+                .get(http::header::LOCATION)
+                .unwrap()
+                .to_str()
+                .unwrap(),
             "/new/"
         );
     }
 
     #[tokio::test]
     async fn test_middleware_temporary_redirect_on_404() {
-        let mw = RedirectFallbackMiddleware::from_registry(vec![
-            Redirect::temporary("/promo/", "/sale/"),
-        ]);
+        let mw = RedirectFallbackMiddleware::from_registry(vec![Redirect::temporary(
+            "/promo/", "/sale/",
+        )]);
 
         let request = HttpRequest::builder().path("/promo/").build();
         let response = HttpResponse::not_found("Not Found");
@@ -407,16 +407,20 @@ mod tests {
 
         assert_eq!(result.status(), http::StatusCode::FOUND);
         assert_eq!(
-            result.headers().get(http::header::LOCATION).unwrap().to_str().unwrap(),
+            result
+                .headers()
+                .get(http::header::LOCATION)
+                .unwrap()
+                .to_str()
+                .unwrap(),
             "/sale/"
         );
     }
 
     #[tokio::test]
     async fn test_middleware_no_matching_redirect() {
-        let mw = RedirectFallbackMiddleware::from_registry(vec![
-            Redirect::permanent("/old/", "/new/"),
-        ]);
+        let mw =
+            RedirectFallbackMiddleware::from_registry(vec![Redirect::permanent("/old/", "/new/")]);
 
         let request = HttpRequest::builder().path("/unknown/").build();
         let response = HttpResponse::not_found("Not Found");

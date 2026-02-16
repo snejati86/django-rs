@@ -97,10 +97,7 @@ impl BoundField {
         if label_id.is_empty() {
             format!("<label>{}</label>", self.field.label)
         } else {
-            format!(
-                r#"<label for="{label_id}">{}</label>"#,
-                self.field.label
-            )
+            format!(r#"<label for="{label_id}">{}</label>"#, self.field.label)
         }
     }
 

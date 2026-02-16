@@ -187,11 +187,7 @@ impl DefaultTokenGenerator {
 
         format!(
             "{}:{}:{}:{}:{}",
-            user.username,
-            user.base.password,
-            last_login,
-            user.base.is_active,
-            timestamp
+            user.username, user.base.password, last_login, user.base.is_active, timestamp
         )
     }
 }
@@ -248,10 +244,12 @@ fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
 /// Hex-encodes a byte slice.
 fn hex_encode(bytes: &[u8]) -> String {
     use std::fmt::Write;
-    bytes.iter().fold(String::with_capacity(bytes.len() * 2), |mut s, b| {
-        let _ = write!(s, "{b:02x}");
-        s
-    })
+    bytes
+        .iter()
+        .fold(String::with_capacity(bytes.len() * 2), |mut s, b| {
+            let _ = write!(s, "{b:02x}");
+            s
+        })
 }
 
 // ── Auth View Functions ──────────────────────────────────────────────
@@ -355,9 +353,7 @@ pub async fn login_view(
                 });
                 HttpResponse::bad_request(body.to_string())
             }
-            Err(_) => {
-                HttpResponse::server_error("An error occurred during authentication.")
-            }
+            Err(_) => HttpResponse::server_error("An error occurred during authentication."),
         }
     } else {
         HttpResponse::not_allowed(&["GET", "POST"])
@@ -369,10 +365,7 @@ pub async fn login_view(
 /// Only accepts POST requests (to prevent CSRF via GET).
 ///
 /// This mirrors Django's `LogoutView`.
-pub async fn logout_view(
-    mut request: HttpRequest,
-    config: &LogoutConfig,
-) -> HttpResponse {
+pub async fn logout_view(mut request: HttpRequest, config: &LogoutConfig) -> HttpResponse {
     if *request.method() == http::Method::POST {
         session_auth::logout_from_session(&mut request);
         HttpResponseRedirect::new(&config.next_page)

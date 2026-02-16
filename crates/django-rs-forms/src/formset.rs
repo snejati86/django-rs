@@ -111,10 +111,7 @@ impl FormSet {
 
     /// Returns the number of initial (pre-populated) forms.
     pub fn initial_form_count(&self) -> usize {
-        self.forms
-            .iter()
-            .filter(|f| f.is_bound())
-            .count()
+        self.forms.iter().filter(|f| f.is_bound()).count()
     }
 
     /// Returns the management form data as a `HashMap`.
@@ -199,17 +196,13 @@ impl FormSet {
 
         // Formset-level validation
         if self.forms.len() < self.min_num {
-            self.non_form_errors.push(format!(
-                "Please submit at least {} forms.",
-                self.min_num
-            ));
+            self.non_form_errors
+                .push(format!("Please submit at least {} forms.", self.min_num));
             all_valid = false;
         }
         if self.forms.len() > self.max_num {
-            self.non_form_errors.push(format!(
-                "Please submit at most {} forms.",
-                self.max_num
-            ));
+            self.non_form_errors
+                .push(format!("Please submit at most {} forms.", self.max_num));
             all_valid = false;
         }
 
@@ -233,11 +226,7 @@ impl FormSet {
         let form_contexts: Vec<ContextValue> = self
             .forms
             .iter()
-            .map(|f| ContextValue::Dict(
-                f.as_context()
-                    .into_iter()
-                    .collect(),
-            ))
+            .map(|f| ContextValue::Dict(f.as_context().into_iter().collect()))
             .collect();
         ctx.insert("forms".to_string(), ContextValue::List(form_contexts));
 
@@ -261,10 +250,7 @@ impl FormSet {
             "can_delete".to_string(),
             ContextValue::Bool(self.can_delete),
         );
-        ctx.insert(
-            "can_order".to_string(),
-            ContextValue::Bool(self.can_order),
-        );
+        ctx.insert("can_order".to_string(), ContextValue::Bool(self.can_order));
 
         ctx
     }
@@ -274,11 +260,7 @@ impl FormSet {
 ///
 /// This is a convenience function for creating formsets with a given number
 /// of forms, similar to Django's `formset_factory`.
-pub fn create_formset<F>(
-    form_factory: F,
-    initial_count: usize,
-    extra: usize,
-) -> FormSet
+pub fn create_formset<F>(form_factory: F, initial_count: usize, extra: usize) -> FormSet
 where
     F: Fn(usize) -> Box<dyn Form>,
 {
@@ -336,24 +318,20 @@ mod tests {
     use crate::form::BaseForm;
 
     fn make_simple_form() -> BaseForm {
-        BaseForm::new(vec![
-            FormFieldDef::new(
-                "name",
-                FormFieldType::Char {
-                    min_length: None,
-                    max_length: None,
-                    strip: false,
-                },
-            ),
-        ])
+        BaseForm::new(vec![FormFieldDef::new(
+            "name",
+            FormFieldType::Char {
+                min_length: None,
+                max_length: None,
+                strip: false,
+            },
+        )])
     }
 
     #[test]
     fn test_formset_new() {
-        let forms: Vec<Box<dyn Form>> = vec![
-            Box::new(make_simple_form()),
-            Box::new(make_simple_form()),
-        ];
+        let forms: Vec<Box<dyn Form>> =
+            vec![Box::new(make_simple_form()), Box::new(make_simple_form())];
         let fs = FormSet::new(forms);
         assert_eq!(fs.total_form_count(), 2);
         assert_eq!(fs.initial_form_count(), 0); // Not bound yet
@@ -378,10 +356,8 @@ mod tests {
 
     #[test]
     fn test_management_form_data() {
-        let forms: Vec<Box<dyn Form>> = vec![
-            Box::new(make_simple_form()),
-            Box::new(make_simple_form()),
-        ];
+        let forms: Vec<Box<dyn Form>> =
+            vec![Box::new(make_simple_form()), Box::new(make_simple_form())];
         let fs = FormSet::new(forms).with_min_num(1).with_max_num(5);
         let data = fs.management_form_data();
         assert_eq!(data.get("form-TOTAL_FORMS"), Some(&"2".to_string()));
@@ -408,8 +384,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_formset_min_num_validation() {
-        let mut fs = FormSet::new(vec![])
-            .with_min_num(2);
+        let mut fs = FormSet::new(vec![]).with_min_num(2);
         fs.is_bound = true; // simulate binding
         assert!(!fs.is_valid().await);
         assert!(fs.non_form_errors()[0].contains("at least 2"));
@@ -417,10 +392,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_formset_max_num_validation() {
-        let forms: Vec<Box<dyn Form>> = (0..5).map(|_| {
-            let f: Box<dyn Form> = Box::new(make_simple_form());
-            f
-        }).collect();
+        let forms: Vec<Box<dyn Form>> = (0..5)
+            .map(|_| {
+                let f: Box<dyn Form> = Box::new(make_simple_form());
+                f
+            })
+            .collect();
         let mut fs = FormSet::new(forms).with_max_num(3);
         fs.is_bound = true;
         assert!(!fs.is_valid().await);
@@ -431,8 +408,8 @@ mod tests {
     fn test_create_formset() {
         let fs = create_formset(
             |_i| Box::new(make_simple_form()),
-            2,  // initial
-            1,  // extra
+            2, // initial
+            1, // extra
         );
         assert_eq!(fs.total_form_count(), 3);
         assert_eq!(fs.extra, 1);
@@ -447,9 +424,7 @@ mod tests {
 
     #[test]
     fn test_formset_as_context() {
-        let forms: Vec<Box<dyn Form>> = vec![
-            Box::new(make_simple_form()),
-        ];
+        let forms: Vec<Box<dyn Form>> = vec![Box::new(make_simple_form())];
         let fs = FormSet::new(forms).with_can_delete(true);
         let ctx = fs.as_context();
         assert!(ctx.contains_key("forms"));
@@ -463,10 +438,7 @@ mod tests {
             panic!("Expected forms to be a list");
         }
 
-        assert_eq!(
-            ctx.get("can_delete"),
-            Some(&ContextValue::Bool(true))
-        );
+        assert_eq!(ctx.get("can_delete"), Some(&ContextValue::Bool(true)));
     }
 
     #[test]
@@ -477,9 +449,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_formset_all_forms_valid() {
-        let forms: Vec<Box<dyn Form>> = vec![
-            Box::new(make_simple_form()),
-        ];
+        let forms: Vec<Box<dyn Form>> = vec![Box::new(make_simple_form())];
         let mut fs = FormSet::new(forms);
         // Bind each form individually
         let _qd = QueryDict::parse("form-0-name=Alice");

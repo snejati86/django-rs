@@ -33,10 +33,7 @@ impl Expression {
     /// Resolves this expression against a context, returning a `ContextValue`.
     pub fn resolve(&self, context: &Context) -> ContextValue {
         match self {
-            Self::Variable(name) => context
-                .get(name)
-                .cloned()
-                .unwrap_or(ContextValue::None),
+            Self::Variable(name) => context.get(name).cloned().unwrap_or(ContextValue::None),
             Self::StringLiteral(s) => ContextValue::String(s.clone()),
             Self::NumericLiteral(n) => {
                 if n.fract() == 0.0 {
@@ -499,11 +496,12 @@ impl<'a> ParserState<'a> {
                 Ok(Some(Node::ExtendsNode { parent }))
             }
             "block" => {
-                let name = args.first().ok_or_else(|| {
-                    DjangoError::TemplateSyntaxError(
-                        "{% block %} requires a name".to_string(),
-                    )
-                })?.clone();
+                let name = args
+                    .first()
+                    .ok_or_else(|| {
+                        DjangoError::TemplateSyntaxError("{% block %} requires a name".to_string())
+                    })?
+                    .clone();
                 self.pos += 1;
                 let content = self.parse_nodes(&["endblock"])?;
                 self.pos += 1; // skip endblock
@@ -577,12 +575,15 @@ impl<'a> ParserState<'a> {
                 // Collect all text between blocktrans and endblocktrans
                 let body = self.parse_nodes(&["endblocktrans"])?;
                 self.pos += 1; // skip endblocktrans
-                // Flatten body nodes into a single text string
+                               // Flatten body nodes into a single text string
                 let mut content = String::new();
                 for node in &body {
                     match node {
                         Node::Text(t) => content.push_str(t),
-                        Node::Variable { expression: Expression::Variable(name), .. } => {
+                        Node::Variable {
+                            expression: Expression::Variable(name),
+                            ..
+                        } => {
                             content.push_str(&format!("%({name})"));
                         }
                         _ => {}
@@ -800,12 +801,9 @@ impl<'a> ParserState<'a> {
     }
 
     fn parse_firstof(&mut self, args: &[String]) -> Result<Option<Node>, DjangoError> {
-        let values: Result<Vec<Expression>, _> =
-            args.iter().map(|a| parse_expression(a)).collect();
+        let values: Result<Vec<Expression>, _> = args.iter().map(|a| parse_expression(a)).collect();
         self.pos += 1;
-        Ok(Some(Node::FirstOfNode {
-            values: values?,
-        }))
+        Ok(Some(Node::FirstOfNode { values: values? }))
     }
 
     fn parse_url(&mut self, args: &[String]) -> Result<Option<Node>, DjangoError> {
@@ -1290,7 +1288,12 @@ fn render_node(
                         .get(var_name)
                         .map(|v| v.to_display_string())
                         .unwrap_or_default();
-                    result = format!("{}{}{}", &result[..abs_start], replacement, &result[abs_end + 1..]);
+                    result = format!(
+                        "{}{}{}",
+                        &result[..abs_start],
+                        replacement,
+                        &result[abs_end + 1..]
+                    );
                     search_from = abs_start + replacement.len();
                 } else {
                     break;
@@ -1341,10 +1344,7 @@ fn render_for_node(
             context.set(&loop_vars[0], item.clone());
         } else if let ContextValue::List(inner) = item {
             for (j, var) in loop_vars.iter().enumerate() {
-                context.set(
-                    var,
-                    inner.get(j).cloned().unwrap_or(ContextValue::None),
-                );
+                context.set(var, inner.get(j).cloned().unwrap_or(ContextValue::None));
             }
         } else if loop_vars.len() == 2 {
             if let ContextValue::Dict(_) = &items {
@@ -1363,7 +1363,10 @@ fn render_for_node(
 
         // Build forloop context
         let mut forloop = HashMap::new();
-        forloop.insert("counter".to_string(), ContextValue::Integer((idx + 1) as i64));
+        forloop.insert(
+            "counter".to_string(),
+            ContextValue::Integer((idx + 1) as i64),
+        );
         forloop.insert("counter0".to_string(), ContextValue::Integer(idx as i64));
         forloop.insert(
             "revcounter".to_string(),
@@ -1421,7 +1424,11 @@ fn format_django_date(dt: &chrono::DateTime<chrono::Local>, format: &str) -> Str
             'D' => result.push_str(&dt.format("%a").to_string()),
             'l' => result.push_str(&dt.format("%A").to_string()),
             'P' => {
-                let hour = dt.format("%I").to_string().trim_start_matches('0').to_string();
+                let hour = dt
+                    .format("%I")
+                    .to_string()
+                    .trim_start_matches('0')
+                    .to_string();
                 let minute = dt.format("%M").to_string();
                 let ampm = dt.format("%P").to_string();
                 if minute == "00" {
@@ -1432,7 +1439,11 @@ fn format_django_date(dt: &chrono::DateTime<chrono::Local>, format: &str) -> Str
             }
             'A' => result.push_str(&dt.format("%p").to_string()),
             'f' => {
-                let hour = dt.format("%I").to_string().trim_start_matches('0').to_string();
+                let hour = dt
+                    .format("%I")
+                    .to_string()
+                    .trim_start_matches('0')
+                    .to_string();
                 let minute = dt.format("%M").to_string();
                 if minute == "00" {
                     result.push_str(&hour);
@@ -1593,8 +1604,7 @@ mod tests {
 
     #[test]
     fn test_parse_block_def() {
-        let tokens =
-            tokenize("{% block content %}Hello{% endblock %}").unwrap();
+        let tokens = tokenize("{% block content %}Hello{% endblock %}").unwrap();
         let template = parse("test.html", &tokens).unwrap();
         assert_eq!(template.nodes.len(), 1);
         assert!(matches!(&template.nodes[0], Node::BlockDefNode { name, .. } if name == "content"));
@@ -1693,8 +1703,7 @@ mod tests {
 
     #[test]
     fn test_if_condition_and() {
-        let cond =
-            parse_if_condition(&["a".into(), "and".into(), "b".into()]).unwrap();
+        let cond = parse_if_condition(&["a".into(), "and".into(), "b".into()]).unwrap();
         let mut ctx = Context::new();
         ctx.set("a", ContextValue::Bool(true));
         ctx.set("b", ContextValue::Bool(true));
@@ -1703,8 +1712,7 @@ mod tests {
 
     #[test]
     fn test_if_condition_or() {
-        let cond =
-            parse_if_condition(&["a".into(), "or".into(), "b".into()]).unwrap();
+        let cond = parse_if_condition(&["a".into(), "or".into(), "b".into()]).unwrap();
         let mut ctx = Context::new();
         ctx.set("a", ContextValue::Bool(false));
         ctx.set("b", ContextValue::Bool(true));
@@ -1713,8 +1721,7 @@ mod tests {
 
     #[test]
     fn test_if_condition_not() {
-        let cond =
-            parse_if_condition(&["not".into(), "a".into()]).unwrap();
+        let cond = parse_if_condition(&["not".into(), "a".into()]).unwrap();
         let mut ctx = Context::new();
         ctx.set("a", ContextValue::Bool(false));
         assert!(cond.evaluate(&ctx));
@@ -1722,8 +1729,7 @@ mod tests {
 
     #[test]
     fn test_if_condition_in() {
-        let cond =
-            parse_if_condition(&["x".into(), "in".into(), "items".into()]).unwrap();
+        let cond = parse_if_condition(&["x".into(), "in".into(), "items".into()]).unwrap();
         let mut ctx = Context::new();
         ctx.set("x", ContextValue::from("a"));
         ctx.set(
@@ -1735,13 +1741,8 @@ mod tests {
 
     #[test]
     fn test_if_condition_not_in() {
-        let cond = parse_if_condition(&[
-            "x".into(),
-            "not".into(),
-            "in".into(),
-            "items".into(),
-        ])
-        .unwrap();
+        let cond =
+            parse_if_condition(&["x".into(), "not".into(), "in".into(), "items".into()]).unwrap();
         let mut ctx = Context::new();
         ctx.set("x", ContextValue::from("c"));
         ctx.set(
@@ -1765,9 +1766,10 @@ mod tests {
 
     #[test]
     fn test_trans_tag_with_translation() {
-        django_rs_core::i18n::catalog::register_translations("trans_test_lang", vec![
-            ("Welcome", "Bienvenue"),
-        ]);
+        django_rs_core::i18n::catalog::register_translations(
+            "trans_test_lang",
+            vec![("Welcome", "Bienvenue")],
+        );
         django_rs_core::i18n::activate("trans_test_lang");
 
         let engine = crate::engine::Engine::new();
@@ -1794,7 +1796,10 @@ mod tests {
     fn test_blocktrans_tag_no_translation() {
         django_rs_core::i18n::deactivate();
         let engine = crate::engine::Engine::new();
-        engine.add_string_template("test.html", "{% blocktrans %}Hello World{% endblocktrans %}");
+        engine.add_string_template(
+            "test.html",
+            "{% blocktrans %}Hello World{% endblocktrans %}",
+        );
         let mut ctx = Context::new();
         let result = engine.render_to_string("test.html", &mut ctx).unwrap();
         assert_eq!(result, "Hello World");
@@ -1802,13 +1807,17 @@ mod tests {
 
     #[test]
     fn test_blocktrans_tag_with_translation() {
-        django_rs_core::i18n::catalog::register_translations("blocktrans_test_lang", vec![
-            ("Good morning", "Buenos días"),
-        ]);
+        django_rs_core::i18n::catalog::register_translations(
+            "blocktrans_test_lang",
+            vec![("Good morning", "Buenos días")],
+        );
         django_rs_core::i18n::activate("blocktrans_test_lang");
 
         let engine = crate::engine::Engine::new();
-        engine.add_string_template("test.html", "{% blocktrans %}Good morning{% endblocktrans %}");
+        engine.add_string_template(
+            "test.html",
+            "{% blocktrans %}Good morning{% endblocktrans %}",
+        );
         let mut ctx = Context::new();
         let result = engine.render_to_string("test.html", &mut ctx).unwrap();
         assert_eq!(result, "Buenos días");

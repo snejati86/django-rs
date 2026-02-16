@@ -621,7 +621,11 @@ mod tests {
 
     #[test]
     fn test_greatest() {
-        let expr = greatest(vec![Expression::col("a"), Expression::col("b"), Expression::col("c")]);
+        let expr = greatest(vec![
+            Expression::col("a"),
+            Expression::col("b"),
+            Expression::col("c"),
+        ]);
         let (sql, params) = compile(&expr);
         assert_eq!(sql, "GREATEST(\"a\", \"b\", \"c\")");
         assert!(params.is_empty());
@@ -1230,10 +1234,9 @@ mod tests {
     #[test]
     fn test_function_in_annotation() {
         let mut query = Query::new("users");
-        query.annotations.insert(
-            "name_upper".to_string(),
-            upper(Expression::col("name")),
-        );
+        query
+            .annotations
+            .insert("name_upper".to_string(), upper(Expression::col("name")));
         let compiler = pg();
         let (sql, _) = compiler.compile_select(&query);
         assert!(sql.contains("UPPER(\"name\") AS \"name_upper\""));

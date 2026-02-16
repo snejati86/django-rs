@@ -348,12 +348,7 @@ mod tests {
 
     #[test]
     fn test_email_message_new() {
-        let email = EmailMessage::new(
-            "Hello",
-            "World",
-            "a@b.com",
-            vec!["c@d.com".to_string()],
-        );
+        let email = EmailMessage::new("Hello", "World", "a@b.com", vec!["c@d.com".to_string()]);
         assert_eq!(email.subject, "Hello");
         assert_eq!(email.body, "World");
         assert!(email.cc.is_empty());

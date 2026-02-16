@@ -18,8 +18,7 @@ pub fn setup_logging(settings: &Settings) {
     use tracing_subscriber::fmt;
     use tracing_subscriber::EnvFilter;
 
-    let filter = EnvFilter::try_new(&settings.log_level)
-        .unwrap_or_else(|_| EnvFilter::new("info"));
+    let filter = EnvFilter::try_new(&settings.log_level).unwrap_or_else(|_| EnvFilter::new("info"));
 
     if settings.debug {
         fmt::Subscriber::builder()

@@ -100,9 +100,8 @@ impl MigrationLoader {
 
     /// Discovers migration files for a single app.
     fn discover_app(&mut self, app_label: &str, app_dir: &Path) -> Result<(), DjangoError> {
-        let entries = std::fs::read_dir(app_dir).map_err(|e| {
-            DjangoError::DatabaseError(format!("Cannot read app directory: {e}"))
-        })?;
+        let entries = std::fs::read_dir(app_dir)
+            .map_err(|e| DjangoError::DatabaseError(format!("Cannot read app directory: {e}")))?;
 
         for entry in entries {
             let entry = entry.map_err(|e| {
@@ -134,13 +133,11 @@ impl MigrationLoader {
         name: &str,
         path: &Path,
     ) -> Result<MigrationFileInfo, DjangoError> {
-        let content = std::fs::read_to_string(path).map_err(|e| {
-            DjangoError::DatabaseError(format!("Cannot read migration file: {e}"))
-        })?;
+        let content = std::fs::read_to_string(path)
+            .map_err(|e| DjangoError::DatabaseError(format!("Cannot read migration file: {e}")))?;
 
-        let json: serde_json::Value = serde_json::from_str(&content).map_err(|e| {
-            DjangoError::DatabaseError(format!("Invalid migration JSON: {e}"))
-        })?;
+        let json: serde_json::Value = serde_json::from_str(&content)
+            .map_err(|e| DjangoError::DatabaseError(format!("Invalid migration JSON: {e}")))?;
 
         let initial = json
             .get("initial")
@@ -210,9 +207,7 @@ impl MigrationLoader {
     ///
     /// This is useful for testing and for programmatic migration definitions
     /// that don't come from the filesystem.
-    pub fn graph_from_migrations(
-        migrations: &[&Migration],
-    ) -> Result<MigrationGraph, DjangoError> {
+    pub fn graph_from_migrations(migrations: &[&Migration]) -> Result<MigrationGraph, DjangoError> {
         let mut graph = MigrationGraph::new();
 
         for m in migrations {
@@ -319,14 +314,8 @@ mod tests {
         assert_eq!(graph.len(), 2);
 
         let order = graph.topological_order().unwrap();
-        let pos_1 = order
-            .iter()
-            .position(|k| k.1 == "0001_initial")
-            .unwrap();
-        let pos_2 = order
-            .iter()
-            .position(|k| k.1 == "0002_add_title")
-            .unwrap();
+        let pos_1 = order.iter().position(|k| k.1 == "0001_initial").unwrap();
+        let pos_2 = order.iter().position(|k| k.1 == "0002_add_title").unwrap();
         assert!(pos_1 < pos_2);
         cleanup(&dir);
     }
@@ -376,14 +365,8 @@ mod tests {
         let mut loader = MigrationLoader::new(&dir);
         let graph = loader.load().unwrap();
         let order = graph.topological_order().unwrap();
-        let pos_auth = order
-            .iter()
-            .position(|k| k.0 == "auth")
-            .unwrap();
-        let pos_blog = order
-            .iter()
-            .position(|k| k.0 == "blog")
-            .unwrap();
+        let pos_auth = order.iter().position(|k| k.0 == "auth").unwrap();
+        let pos_blog = order.iter().position(|k| k.0 == "blog").unwrap();
         assert!(pos_auth < pos_blog);
         cleanup(&dir);
     }
@@ -406,19 +389,12 @@ mod tests {
     #[test]
     fn test_graph_from_migrations_chain() {
         let m1 = Migration::new("blog", "0001_initial").initial();
-        let m2 = Migration::new("blog", "0002_add_title")
-            .depends_on("blog", "0001_initial");
+        let m2 = Migration::new("blog", "0002_add_title").depends_on("blog", "0001_initial");
         let graph = MigrationLoader::graph_from_migrations(&[&m1, &m2]).unwrap();
         assert_eq!(graph.len(), 2);
         let order = graph.topological_order().unwrap();
-        let pos_1 = order
-            .iter()
-            .position(|k| k.1 == "0001_initial")
-            .unwrap();
-        let pos_2 = order
-            .iter()
-            .position(|k| k.1 == "0002_add_title")
-            .unwrap();
+        let pos_1 = order.iter().position(|k| k.1 == "0001_initial").unwrap();
+        let pos_2 = order.iter().position(|k| k.1 == "0002_add_title").unwrap();
         assert!(pos_1 < pos_2);
     }
 

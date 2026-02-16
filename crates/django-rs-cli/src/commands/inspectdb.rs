@@ -82,7 +82,8 @@ pub fn sql_type_to_field_type(sql_type: &str) -> &'static str {
         "SmallIntegerField"
     } else if upper.starts_with("BOOL") {
         "BooleanField"
-    } else if upper.starts_with("FLOAT") || upper.starts_with("DOUBLE") || upper.starts_with("REAL") {
+    } else if upper.starts_with("FLOAT") || upper.starts_with("DOUBLE") || upper.starts_with("REAL")
+    {
         "FloatField"
     } else if upper.starts_with("DECIMAL") || upper.starts_with("NUMERIC") {
         "DecimalField"
@@ -116,7 +117,11 @@ pub fn generate_model_code(table: &TableInfo) -> String {
     let mut code = String::new();
 
     // Struct definition
-    let _ = writeln!(code, "/// Auto-generated model for the `{}` table.", table.name);
+    let _ = writeln!(
+        code,
+        "/// Auto-generated model for the `{}` table.",
+        table.name
+    );
     let _ = writeln!(code, "pub struct {struct_name} {{");
 
     for col in &table.columns {
@@ -174,7 +179,14 @@ impl ManagementCommand for InspectdbCommand {
         if tables.is_empty() {
             tracing::info!("Inspecting all tables");
         } else {
-            tracing::info!("Inspecting tables: {}", tables.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", "));
+            tracing::info!(
+                "Inspecting tables: {}",
+                tables
+                    .iter()
+                    .map(|s| s.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            );
         }
 
         // In a full implementation, this would connect to the database and
@@ -271,15 +283,13 @@ mod tests {
     fn test_generate_model_code_with_nullable_pk() {
         let table = TableInfo {
             name: "test".to_string(),
-            columns: vec![
-                ColumnInfo {
-                    name: "id".to_string(),
-                    data_type: "INTEGER".to_string(),
-                    nullable: true,
-                    primary_key: true,
-                    foreign_key: None,
-                },
-            ],
+            columns: vec![ColumnInfo {
+                name: "id".to_string(),
+                data_type: "INTEGER".to_string(),
+                nullable: true,
+                primary_key: true,
+                foreign_key: None,
+            }],
         };
 
         let code = generate_model_code(&table);
@@ -292,6 +302,9 @@ mod tests {
     fn test_command_metadata() {
         let cmd = InspectdbCommand;
         assert_eq!(cmd.name(), "inspectdb");
-        assert_eq!(cmd.help(), "Inspect database and generate Model definitions");
+        assert_eq!(
+            cmd.help(),
+            "Inspect database and generate Model definitions"
+        );
     }
 }

@@ -83,7 +83,10 @@ impl Group {
 
     /// Returns all permission codenames in `"content_type.codename"` format.
     pub fn get_permissions(&self) -> HashSet<String> {
-        self.permissions.iter().map(Permission::full_codename).collect()
+        self.permissions
+            .iter()
+            .map(Permission::full_codename)
+            .collect()
     }
 }
 
@@ -145,10 +148,7 @@ pub fn get_all_permissions(user: &AbstractUser) -> HashSet<String> {
 /// Returns all permissions for a user including permissions from specified groups.
 ///
 /// This function resolves group memberships against a provided list of groups.
-pub fn get_all_permissions_with_groups(
-    user: &AbstractUser,
-    groups: &[Group],
-) -> HashSet<String> {
+pub fn get_all_permissions_with_groups(user: &AbstractUser, groups: &[Group]) -> HashSet<String> {
     let mut perms = get_all_permissions(user);
 
     // Add permissions from groups the user belongs to
@@ -272,7 +272,11 @@ mod tests {
     #[test]
     fn test_group_remove_permission() {
         let mut group = Group::new("editors");
-        group.add_permission(Permission::new("change_post", "Can change post", "blog.post"));
+        group.add_permission(Permission::new(
+            "change_post",
+            "Can change post",
+            "blog.post",
+        ));
         group.add_permission(Permission::new("add_post", "Can add post", "blog.post"));
         group.remove_permission("change_post");
         assert_eq!(group.permissions.len(), 1);
@@ -282,7 +286,11 @@ mod tests {
     #[test]
     fn test_group_get_permissions() {
         let mut group = Group::new("editors");
-        group.add_permission(Permission::new("change_post", "Can change post", "blog.post"));
+        group.add_permission(Permission::new(
+            "change_post",
+            "Can change post",
+            "blog.post",
+        ));
         group.add_permission(Permission::new("add_post", "Can add post", "blog.post"));
         let perms = group.get_permissions();
         assert_eq!(perms.len(), 2);
@@ -438,7 +446,11 @@ mod tests {
         let mut editors = Group::new("editors");
         editors.add_permission(Permission::new("change_post", "Can change", "blog.post"));
 
-        assert!(has_perm_with_groups(&user, "blog.post.change_post", &[editors]));
+        assert!(has_perm_with_groups(
+            &user,
+            "blog.post.change_post",
+            &[editors]
+        ));
     }
 
     #[test]
@@ -450,7 +462,11 @@ mod tests {
         let mut editors = Group::new("editors");
         editors.add_permission(Permission::new("change_post", "Can change", "blog.post"));
 
-        assert!(!has_perm_with_groups(&user, "blog.post.change_post", &[editors]));
+        assert!(!has_perm_with_groups(
+            &user,
+            "blog.post.change_post",
+            &[editors]
+        ));
     }
 
     // ── generate_default_permissions tests ──────────────────────────

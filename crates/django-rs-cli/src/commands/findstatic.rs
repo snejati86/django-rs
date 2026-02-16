@@ -63,11 +63,9 @@ impl ManagementCommand for FindstaticCommand {
         matches: &clap::ArgMatches,
         settings: &Settings,
     ) -> Result<(), DjangoError> {
-        let filename = matches
-            .get_one::<String>("staticfile")
-            .ok_or_else(|| {
-                DjangoError::ConfigurationError("staticfile argument is required".to_string())
-            })?;
+        let filename = matches.get_one::<String>("staticfile").ok_or_else(|| {
+            DjangoError::ConfigurationError("staticfile argument is required".to_string())
+        })?;
         let show_all = matches.get_flag("all");
 
         let found = find_static_file(filename, &settings.staticfiles_dirs);

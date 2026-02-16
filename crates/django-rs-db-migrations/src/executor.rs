@@ -148,12 +148,9 @@ impl MigrationExecutor {
                 }
 
                 // Find the target position
-                let target_pos = order
-                    .iter()
-                    .position(|k| k == target_key)
-                    .ok_or_else(|| {
-                        DjangoError::DatabaseError("Target not in topological order".into())
-                    })?;
+                let target_pos = order.iter().position(|k| k == target_key).ok_or_else(|| {
+                    DjangoError::DatabaseError("Target not in topological order".into())
+                })?;
 
                 // Filter to same app
                 let app_label = &target_key.0;
@@ -163,9 +160,7 @@ impl MigrationExecutor {
                     .filter(|(_, k)| &k.0 == app_label)
                     .collect();
 
-                let target_app_pos = app_migrations
-                    .iter()
-                    .position(|(_, k)| *k == target_key);
+                let target_app_pos = app_migrations.iter().position(|(_, k)| *k == target_key);
 
                 // Apply unapplied up to target
                 for (global_pos, key) in &app_migrations {
@@ -177,9 +172,7 @@ impl MigrationExecutor {
                 // Reverse applied migrations after target
                 if let Some(tap) = target_app_pos {
                     for (_global_pos, key) in app_migrations.iter().rev() {
-                        let key_app_pos = app_migrations
-                            .iter()
-                            .position(|(_, k)| k == key);
+                        let key_app_pos = app_migrations.iter().position(|(_, k)| k == key);
                         if let Some(pos) = key_app_pos {
                             if pos > tap && applied.contains(key) {
                                 plan.add_step(MigrationStep::backward(
@@ -371,15 +364,13 @@ impl MigrationRecorder {
     /// Uses SQLite-compatible syntax (INTEGER PRIMARY KEY AUTOINCREMENT).
     /// For PostgreSQL, use `ensure_schema_sql_pg()`.
     pub fn ensure_schema_sql() -> Vec<String> {
-        vec![
-            "CREATE TABLE IF NOT EXISTS \"django_migrations\" (\
+        vec!["CREATE TABLE IF NOT EXISTS \"django_migrations\" (\
                 \"id\" BIGSERIAL PRIMARY KEY, \
                 \"app\" VARCHAR(255) NOT NULL, \
                 \"name\" VARCHAR(255) NOT NULL, \
                 \"applied\" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP\
             )"
-            .to_string(),
-        ]
+        .to_string()]
     }
 
     /// Returns the SQLite-compatible SQL to create the `django_migrations` table.
@@ -433,10 +424,7 @@ impl MigrationRecorder {
     /// Ensures the `django_migrations` table exists in the database.
     ///
     /// Detects the backend type and uses the appropriate DDL syntax.
-    pub async fn ensure_table(
-        &self,
-        backend: &dyn DatabaseBackend,
-    ) -> Result<(), DjangoError> {
+    pub async fn ensure_table(&self, backend: &dyn DatabaseBackend) -> Result<(), DjangoError> {
         let sql = match backend.vendor() {
             "sqlite" => Self::ensure_schema_sql_sqlite().to_string(),
             _ => Self::ensure_schema_sql()[0].clone(),
@@ -449,27 +437,21 @@ impl MigrationRecorder {
     ///
     /// Reads all rows from `django_migrations` and populates the applied set.
     /// If the table does not exist, it is created first.
-    pub async fn load_from_db(
-        &mut self,
-        backend: &dyn DatabaseBackend,
-    ) -> Result<(), DjangoError> {
+    pub async fn load_from_db(&mut self, backend: &dyn DatabaseBackend) -> Result<(), DjangoError> {
         self.ensure_table(backend).await?;
 
         let rows = backend
-            .query(
-                "SELECT \"app\", \"name\" FROM \"django_migrations\"",
-                &[],
-            )
+            .query("SELECT \"app\", \"name\" FROM \"django_migrations\"", &[])
             .await?;
 
         self.applied_migrations.clear();
         for row in &rows {
-            let app: String = row.get("app").map_err(|_| {
-                DjangoError::DatabaseError("Missing 'app' column".into())
-            })?;
-            let name: String = row.get("name").map_err(|_| {
-                DjangoError::DatabaseError("Missing 'name' column".into())
-            })?;
+            let app: String = row
+                .get("app")
+                .map_err(|_| DjangoError::DatabaseError("Missing 'app' column".into()))?;
+            let name: String = row
+                .get("name")
+                .map_err(|_| DjangoError::DatabaseError("Missing 'name' column".into()))?;
             self.applied_migrations.insert((app, name));
         }
 
@@ -506,7 +488,7 @@ mod tests {
     use super::*;
     use crate::autodetect::{MigrationFieldDef, ModelOptions};
     use crate::migration::MigrationGraph;
-    use crate::operations::{CreateModel, AddField, RunSQL};
+    use crate::operations::{AddField, CreateModel, RunSQL};
     use crate::schema_editor::PostgresSchemaEditor;
     use django_rs_db::fields::FieldType;
 
@@ -609,7 +591,10 @@ mod tests {
         graph.add_node("blog", "0001", true);
         graph.add_node("blog", "0002", false);
         graph
-            .add_dependency(("blog".into(), "0002".into()), ("blog".into(), "0001".into()))
+            .add_dependency(
+                ("blog".into(), "0002".into()),
+                ("blog".into(), "0001".into()),
+            )
             .unwrap();
 
         let executor = MigrationExecutor::new(Box::new(PostgresSchemaEditor));
@@ -625,7 +610,10 @@ mod tests {
         graph.add_node("blog", "0001", true);
         graph.add_node("blog", "0002", false);
         graph
-            .add_dependency(("blog".into(), "0002".into()), ("blog".into(), "0001".into()))
+            .add_dependency(
+                ("blog".into(), "0002".into()),
+                ("blog".into(), "0001".into()),
+            )
             .unwrap();
 
         let mut recorder = MigrationRecorder::new();
@@ -657,10 +645,16 @@ mod tests {
         graph.add_node("blog", "0002", false);
         graph.add_node("blog", "0003", false);
         graph
-            .add_dependency(("blog".into(), "0002".into()), ("blog".into(), "0001".into()))
+            .add_dependency(
+                ("blog".into(), "0002".into()),
+                ("blog".into(), "0001".into()),
+            )
             .unwrap();
         graph
-            .add_dependency(("blog".into(), "0003".into()), ("blog".into(), "0002".into()))
+            .add_dependency(
+                ("blog".into(), "0003".into()),
+                ("blog".into(), "0002".into()),
+            )
             .unwrap();
 
         let executor = MigrationExecutor::new(Box::new(PostgresSchemaEditor));
@@ -717,9 +711,7 @@ mod tests {
 
         let ops1: Vec<Box<dyn Operation>> = vec![Box::new(CreateModel {
             name: "post".into(),
-            fields: vec![
-                MigrationFieldDef::new("id", FieldType::BigAutoField).primary_key(),
-            ],
+            fields: vec![MigrationFieldDef::new("id", FieldType::BigAutoField).primary_key()],
             options: ModelOptions::default(),
         })];
 
@@ -770,9 +762,7 @@ mod tests {
         let mut operations2 = std::collections::HashMap::new();
         operations2.insert(("blog".into(), "0001".into()), ops2);
 
-        let sqls = executor
-            .execute_plan(&plan2, &operations2, &state)
-            .unwrap();
+        let sqls = executor.execute_plan(&plan2, &operations2, &state).unwrap();
         assert!(sqls.contains(&"DROP TABLE test".to_string()));
         assert!(!executor
             .recorder()

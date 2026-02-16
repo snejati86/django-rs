@@ -314,19 +314,11 @@ fn test_signal_handler_returns_modified_data() {
     assert_eq!(results.len(), 2);
 
     // First handler: 5 * 2 = 10
-    let doubled = results[0]
-        .as_ref()
-        .unwrap()
-        .downcast_ref::<i32>()
-        .unwrap();
+    let doubled = results[0].as_ref().unwrap().downcast_ref::<i32>().unwrap();
     assert_eq!(*doubled, 10);
 
     // Second handler: 5 + 10 = 15
-    let added = results[1]
-        .as_ref()
-        .unwrap()
-        .downcast_ref::<i32>()
-        .unwrap();
+    let added = results[1].as_ref().unwrap().downcast_ref::<i32>().unwrap();
     assert_eq!(*added, 15);
 }
 

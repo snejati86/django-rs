@@ -104,8 +104,7 @@ fn context_value_to_json(value: &ContextValue) -> serde_json::Value {
         ContextValue::Bool(b) => serde_json::Value::Bool(*b),
         ContextValue::None => serde_json::Value::Null,
         ContextValue::List(items) => {
-            let arr: Vec<serde_json::Value> =
-                items.iter().map(context_value_to_json).collect();
+            let arr: Vec<serde_json::Value> = items.iter().map(context_value_to_json).collect();
             serde_json::Value::Array(arr)
         }
         ContextValue::Dict(map) => {
@@ -248,7 +247,10 @@ impl FormView {
 
         // Add form context
         let form_json = form_context_to_json(form_context);
-        context.insert("form".to_string(), serde_json::to_value(&form_json).unwrap_or_default());
+        context.insert(
+            "form".to_string(),
+            serde_json::to_value(&form_json).unwrap_or_default(),
+        );
 
         // Add errors directly
         context.insert(
@@ -277,7 +279,10 @@ impl FormView {
         let form_json = form_context_to_json(&form_ctx);
 
         let mut context: HashMap<String, serde_json::Value> = HashMap::new();
-        context.insert("form".to_string(), serde_json::to_value(&form_json).unwrap_or_default());
+        context.insert(
+            "form".to_string(),
+            serde_json::to_value(&form_json).unwrap_or_default(),
+        );
 
         // Add initial values
         if !self.initial.is_empty() {
@@ -346,10 +351,10 @@ impl FormView {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::Arc;
     use django_rs_forms::fields::{FormFieldDef, FormFieldType};
     #[allow(unused_imports)]
     use django_rs_forms::form::BaseForm;
+    use std::sync::Arc;
 
     fn make_test_form() -> BaseForm {
         BaseForm::new(vec![
@@ -380,9 +385,7 @@ mod tests {
 
     #[test]
     fn test_extract_post_data_empty() {
-        let request = HttpRequest::builder()
-            .method(http::Method::GET)
-            .build();
+        let request = HttpRequest::builder().method(http::Method::GET).build();
 
         let data = extract_post_data(&request);
         assert!(data.is_empty());
@@ -472,14 +475,8 @@ mod tests {
     #[test]
     fn test_form_context_to_json() {
         let mut ctx = HashMap::new();
-        ctx.insert(
-            "is_bound".to_string(),
-            ContextValue::Bool(true),
-        );
-        ctx.insert(
-            "name".to_string(),
-            ContextValue::String("test".to_string()),
-        );
+        ctx.insert("is_bound".to_string(), ContextValue::Bool(true));
+        ctx.insert("name".to_string(), ContextValue::String("test".to_string()));
 
         let json = form_context_to_json(&ctx);
         assert_eq!(json.get("is_bound"), Some(&serde_json::json!(true)));
@@ -513,14 +510,8 @@ mod tests {
             serde_json::json!("<b>safe</b>")
         );
 
-        let list = ContextValue::List(vec![
-            ContextValue::Integer(1),
-            ContextValue::Integer(2),
-        ]);
-        assert_eq!(
-            context_value_to_json(&list),
-            serde_json::json!([1, 2])
-        );
+        let list = ContextValue::List(vec![ContextValue::Integer(1), ContextValue::Integer(2)]);
+        assert_eq!(context_value_to_json(&list), serde_json::json!([1, 2]));
 
         let mut dict = HashMap::new();
         dict.insert("key".to_string(), ContextValue::String("value".to_string()));
@@ -581,28 +572,25 @@ mod tests {
     // ── FormView tests ──────────────────────────────────────────────
 
     fn make_form_view() -> FormView {
-        FormView::new("contact.html", "/thanks/")
-            .form_factory(Arc::new(|| {
-                BaseForm::new(vec![
-                    FormFieldDef::new(
-                        "name",
-                        FormFieldType::Char {
-                            min_length: Some(1),
-                            max_length: Some(100),
-                            strip: true,
-                        },
-                    ),
-                    FormFieldDef::new("email", FormFieldType::Email),
-                ])
-            }))
+        FormView::new("contact.html", "/thanks/").form_factory(Arc::new(|| {
+            BaseForm::new(vec![
+                FormFieldDef::new(
+                    "name",
+                    FormFieldType::Char {
+                        min_length: Some(1),
+                        max_length: Some(100),
+                        strip: true,
+                    },
+                ),
+                FormFieldDef::new("email", FormFieldType::Email),
+            ])
+        }))
     }
 
     #[tokio::test]
     async fn test_formview_get_renders_form() {
         let view = make_form_view();
-        let request = HttpRequest::builder()
-            .method(http::Method::GET)
-            .build();
+        let request = HttpRequest::builder().method(http::Method::GET).build();
         let response = view.dispatch(&request).await;
         assert_eq!(response.status(), http::StatusCode::OK);
         let body = String::from_utf8(response.content_bytes().unwrap()).unwrap();
@@ -662,9 +650,7 @@ mod tests {
     #[tokio::test]
     async fn test_formview_method_not_allowed() {
         let view = make_form_view();
-        let request = HttpRequest::builder()
-            .method(http::Method::DELETE)
-            .build();
+        let request = HttpRequest::builder().method(http::Method::DELETE).build();
         let response = view.dispatch(&request).await;
         assert_eq!(response.status(), http::StatusCode::METHOD_NOT_ALLOWED);
     }
@@ -672,9 +658,7 @@ mod tests {
     #[tokio::test]
     async fn test_formview_head_renders_form() {
         let view = make_form_view();
-        let request = HttpRequest::builder()
-            .method(http::Method::HEAD)
-            .build();
+        let request = HttpRequest::builder().method(http::Method::HEAD).build();
         let response = view.dispatch(&request).await;
         assert_eq!(response.status(), http::StatusCode::OK);
     }
@@ -696,9 +680,7 @@ mod tests {
         let view = make_form_view()
             .initial("name", "Default Name")
             .initial("email", "default@example.com");
-        let request = HttpRequest::builder()
-            .method(http::Method::GET)
-            .build();
+        let request = HttpRequest::builder().method(http::Method::GET).build();
         let response = view.dispatch(&request).await;
         let body = String::from_utf8(response.content_bytes().unwrap()).unwrap();
         assert!(body.contains("Default Name"));

@@ -118,10 +118,7 @@ impl LogEntry {
         if self.change_message.is_empty() {
             format!("{action}: {}", self.object_repr)
         } else {
-            format!(
-                "{action}: {} - {}",
-                self.object_repr, self.change_message
-            )
+            format!("{action}: {} - {}", self.object_repr, self.change_message)
         }
     }
 }
@@ -308,7 +305,11 @@ impl LogEntryStore for InMemoryLogEntryStore {
             .filter(|e| e.content_type == content_type && e.object_id == object_id)
             .cloned()
             .collect();
-        result.sort_by(|a, b| b.action_time.cmp(&a.action_time).then_with(|| b.id.cmp(&a.id)));
+        result.sort_by(|a, b| {
+            b.action_time
+                .cmp(&a.action_time)
+                .then_with(|| b.id.cmp(&a.id))
+        });
         result
     }
 
@@ -320,7 +321,11 @@ impl LogEntryStore for InMemoryLogEntryStore {
             .filter(|e| e.user_id == user_id)
             .cloned()
             .collect();
-        result.sort_by(|a, b| b.action_time.cmp(&a.action_time).then_with(|| b.id.cmp(&a.id)));
+        result.sort_by(|a, b| {
+            b.action_time
+                .cmp(&a.action_time)
+                .then_with(|| b.id.cmp(&a.id))
+        });
         result
     }
 
@@ -332,7 +337,11 @@ impl LogEntryStore for InMemoryLogEntryStore {
             .filter(|e| e.action_flag == action_flag)
             .cloned()
             .collect();
-        result.sort_by(|a, b| b.action_time.cmp(&a.action_time).then_with(|| b.id.cmp(&a.id)));
+        result.sort_by(|a, b| {
+            b.action_time
+                .cmp(&a.action_time)
+                .then_with(|| b.id.cmp(&a.id))
+        });
         result
     }
 
@@ -340,7 +349,11 @@ impl LogEntryStore for InMemoryLogEntryStore {
     fn recent(&self, limit: usize) -> Vec<LogEntry> {
         let entries = self.entries.read().unwrap();
         let mut result: Vec<LogEntry> = entries.to_vec();
-        result.sort_by(|a, b| b.action_time.cmp(&a.action_time).then_with(|| b.id.cmp(&a.id)));
+        result.sort_by(|a, b| {
+            b.action_time
+                .cmp(&a.action_time)
+                .then_with(|| b.id.cmp(&a.id))
+        });
         result.truncate(limit);
         result
     }
@@ -536,13 +549,7 @@ mod tests {
     #[test]
     fn test_store_log_addition() {
         let store = InMemoryLogEntryStore::new();
-        let entry = store.log_addition(
-            1,
-            "blog.article",
-            "42",
-            "My Article",
-            "Created via admin",
-        );
+        let entry = store.log_addition(1, "blog.article", "42", "My Article", "Created via admin");
         assert_eq!(entry.id, 1);
         assert_eq!(entry.user_id, 1);
         assert_eq!(entry.content_type, "blog.article");
@@ -556,13 +563,7 @@ mod tests {
     #[test]
     fn test_store_log_change() {
         let store = InMemoryLogEntryStore::new();
-        let entry = store.log_change(
-            1,
-            "blog.article",
-            "42",
-            "My Article",
-            "Changed title",
-        );
+        let entry = store.log_change(1, "blog.article", "42", "My Article", "Changed title");
         assert_eq!(entry.action_flag, ActionFlag::Change);
         assert_eq!(entry.change_message, "Changed title");
     }
@@ -570,13 +571,7 @@ mod tests {
     #[test]
     fn test_store_log_deletion() {
         let store = InMemoryLogEntryStore::new();
-        let entry = store.log_deletion(
-            1,
-            "blog.article",
-            "42",
-            "My Article",
-            "",
-        );
+        let entry = store.log_deletion(1, "blog.article", "42", "My Article", "");
         assert_eq!(entry.action_flag, ActionFlag::Deletion);
     }
 

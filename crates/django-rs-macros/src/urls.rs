@@ -100,8 +100,8 @@ mod regex {
         let mut result = String::with_capacity(s.len());
         for c in s.chars() {
             match c {
-                '.' | '+' | '*' | '?' | '(' | ')' | '[' | ']' | '{' | '}' | '\\' | '^'
-                | '$' | '|' => {
+                '.' | '+' | '*' | '?' | '(' | ')' | '[' | ']' | '{' | '}' | '\\' | '^' | '$'
+                | '|' => {
                     result.push('\\');
                     result.push(c);
                 }
@@ -214,10 +214,7 @@ mod tests {
 
     #[test]
     fn test_convert_path_capture() {
-        assert_eq!(
-            convert_pattern("files/<path:rest>"),
-            "^files/(?P<rest>.+)$"
-        );
+        assert_eq!(convert_pattern("files/<path:rest>"), "^files/(?P<rest>.+)$");
     }
 
     #[test]
@@ -229,10 +226,7 @@ mod tests {
 
     #[test]
     fn test_convert_no_type_defaults_to_str() {
-        assert_eq!(
-            convert_pattern("user/<name>/"),
-            "^user/(?P<name>[^/]+)/$"
-        );
+        assert_eq!(convert_pattern("user/<name>/"), "^user/(?P<name>[^/]+)/$");
     }
 
     #[test]

@@ -197,7 +197,12 @@ impl PasswordHasher for Pbkdf2Hasher {
 
             // Derive the key
             let mut dk = [0u8; 32];
-            pbkdf2_hmac::<Hmac<Sha256>>(password.as_bytes(), salt_b64.as_bytes(), iterations, &mut dk);
+            pbkdf2_hmac::<Hmac<Sha256>>(
+                password.as_bytes(),
+                salt_b64.as_bytes(),
+                iterations,
+                &mut dk,
+            );
             let hash_b64 = base64::engine::general_purpose::STANDARD.encode(dk);
 
             // Django-compatible format: algorithm$iterations$salt$hash
@@ -220,9 +225,9 @@ impl PasswordHasher for Pbkdf2Hasher {
                 return Ok(false);
             }
 
-            let iterations: u32 = parts[1]
-                .parse()
-                .map_err(|_| DjangoError::InternalServerError("Invalid iterations in hash".to_string()))?;
+            let iterations: u32 = parts[1].parse().map_err(|_| {
+                DjangoError::InternalServerError("Invalid iterations in hash".to_string())
+            })?;
             let salt = parts[2];
             let stored_hash = parts[3];
 
@@ -230,14 +235,20 @@ impl PasswordHasher for Pbkdf2Hasher {
             pbkdf2_hmac::<Hmac<Sha256>>(password.as_bytes(), salt.as_bytes(), iterations, &mut dk);
             let computed = base64::engine::general_purpose::STANDARD.encode(dk);
 
-            Ok(constant_time_eq(computed.as_bytes(), stored_hash.as_bytes()))
+            Ok(constant_time_eq(
+                computed.as_bytes(),
+                stored_hash.as_bytes(),
+            ))
         })
         .await
         .map_err(|e| DjangoError::InternalServerError(format!("Task join error: {e}")))?
     }
 
     fn must_update(&self, hash: &str) -> bool {
-        if let Some(iter_str) = hash.strip_prefix("pbkdf2_sha256$").and_then(|s| s.split('$').next()) {
+        if let Some(iter_str) = hash
+            .strip_prefix("pbkdf2_sha256$")
+            .and_then(|s| s.split('$').next())
+        {
             if let Ok(stored_iterations) = iter_str.parse::<u32>() {
                 return stored_iterations < self.iterations;
             }
@@ -422,23 +433,109 @@ impl Default for CommonPasswordValidator {
     fn default() -> Self {
         Self {
             common_passwords: vec![
-                "password", "123456", "12345678", "1234", "qwerty", "12345",
-                "dragon", "pussy", "baseball", "football", "letmein", "monkey",
-                "696969", "abc123", "mustang", "michael", "shadow", "master",
-                "jennifer", "111111", "2000", "jordan", "superman", "harley",
-                "1234567", "fuckme", "hunter", "fuckyou", "trustno1", "ranger",
-                "buster", "thomas", "tigger", "robert", "soccer", "fuck",
-                "batman", "test", "pass", "killer", "hockey", "george", "charlie",
-                "andrew", "michelle", "love", "sunshine", "jessica", "asshole",
-                "6969", "pepper", "daniel", "access", "123456789", "654321",
-                "joshua", "maggie", "starwars", "silver", "william", "dallas",
-                "yankees", "123123", "ashley", "666666", "hello", "amanda",
-                "orange", "biteme", "freedom", "computer", "sexy", "thunder",
-                "nicole", "ginger", "heather", "hammer", "summer", "corvette",
-                "taylor", "fucker", "austin", "1111", "merlin", "matthew",
-                "121212", "golfer", "cheese", "princess", "martin", "chelsea",
-                "patrick", "richard", "diamond", "yellow", "bigdog", "secret",
-                "asdfgh", "sparky", "cowboy", "iloveyou", "admin", "password1",
+                "password",
+                "123456",
+                "12345678",
+                "1234",
+                "qwerty",
+                "12345",
+                "dragon",
+                "pussy",
+                "baseball",
+                "football",
+                "letmein",
+                "monkey",
+                "696969",
+                "abc123",
+                "mustang",
+                "michael",
+                "shadow",
+                "master",
+                "jennifer",
+                "111111",
+                "2000",
+                "jordan",
+                "superman",
+                "harley",
+                "1234567",
+                "fuckme",
+                "hunter",
+                "fuckyou",
+                "trustno1",
+                "ranger",
+                "buster",
+                "thomas",
+                "tigger",
+                "robert",
+                "soccer",
+                "fuck",
+                "batman",
+                "test",
+                "pass",
+                "killer",
+                "hockey",
+                "george",
+                "charlie",
+                "andrew",
+                "michelle",
+                "love",
+                "sunshine",
+                "jessica",
+                "asshole",
+                "6969",
+                "pepper",
+                "daniel",
+                "access",
+                "123456789",
+                "654321",
+                "joshua",
+                "maggie",
+                "starwars",
+                "silver",
+                "william",
+                "dallas",
+                "yankees",
+                "123123",
+                "ashley",
+                "666666",
+                "hello",
+                "amanda",
+                "orange",
+                "biteme",
+                "freedom",
+                "computer",
+                "sexy",
+                "thunder",
+                "nicole",
+                "ginger",
+                "heather",
+                "hammer",
+                "summer",
+                "corvette",
+                "taylor",
+                "fucker",
+                "austin",
+                "1111",
+                "merlin",
+                "matthew",
+                "121212",
+                "golfer",
+                "cheese",
+                "princess",
+                "martin",
+                "chelsea",
+                "patrick",
+                "richard",
+                "diamond",
+                "yellow",
+                "bigdog",
+                "secret",
+                "asdfgh",
+                "sparky",
+                "cowboy",
+                "iloveyou",
+                "admin",
+                "password1",
             ]
             .into_iter()
             .map(String::from)
@@ -890,9 +987,7 @@ mod tests {
     #[test]
     fn test_user_attribute_similarity_accept() {
         let v = UserAttributeSimilarityValidator::new();
-        assert!(v
-            .validate_with_attributes("xK9mQ2pL", &["johndoe"])
-            .is_ok());
+        assert!(v.validate_with_attributes("xK9mQ2pL", &["johndoe"]).is_ok());
     }
 
     #[test]

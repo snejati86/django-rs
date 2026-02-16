@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use django_rs_core::Settings;
 use django_rs_http::urls::pattern::path;
-use django_rs_http::urls::resolver::{root, include, URLEntry};
+use django_rs_http::urls::resolver::{include, root, URLEntry};
 use django_rs_http::{HttpRequest, HttpResponse, HttpResponseRedirect};
 use django_rs_template::context::{Context, ContextValue};
 use django_rs_template::engine::Engine;
@@ -186,7 +186,10 @@ async fn test_response_content_type_json() {
     let response = client.get("/api/data/").await;
     assert_eq!(response.status_code(), 200);
     let ct = response.header("content-type").unwrap_or("");
-    assert!(ct.contains("application/json"), "Expected application/json, got: {ct}");
+    assert!(
+        ct.contains("application/json"),
+        "Expected application/json, got: {ct}"
+    );
 }
 
 /// 8. Custom headers in response accessible.
@@ -240,9 +243,7 @@ async fn test_head_request_returns_headers_without_body() {
 /// 10. Nested include() URL routing works end-to-end.
 #[tokio::test]
 async fn test_nested_include_url_routing() {
-    let list_handler: Handler = Arc::new(|_req| {
-        Box::pin(async { HttpResponse::ok("user list") })
-    });
+    let list_handler: Handler = Arc::new(|_req| Box::pin(async { HttpResponse::ok("user list") }));
     let detail_handler: Handler = Arc::new(|req: HttpRequest| {
         Box::pin(async move {
             let rm = req.resolver_match().unwrap();
@@ -297,9 +298,7 @@ async fn test_template_view_renders_html() {
         })
     });
 
-    let patterns = vec![URLEntry::Pattern(
-        path("", handler, Some("home")).unwrap(),
-    )];
+    let patterns = vec![URLEntry::Pattern(path("", handler, Some("home")).unwrap())];
     let resolver = root(patterns).unwrap();
 
     let app = DjangoApp::new(Settings::default()).urls(resolver);
@@ -511,10 +510,7 @@ async fn test_template_inheritance_in_response() {
 #[tokio::test]
 async fn test_template_variables_from_context() {
     let engine = Arc::new(Engine::new());
-    engine.add_string_template(
-        "profile.html",
-        "Name: {{ user_name }}, Age: {{ user_age }}",
-    );
+    engine.add_string_template("profile.html", "Name: {{ user_name }}, Age: {{ user_age }}");
 
     let engine_clone = engine.clone();
     let handler: Handler = Arc::new(move |_req| {
@@ -593,10 +589,7 @@ async fn test_template_auto_escaping_prevents_xss_in_response() {
 #[tokio::test]
 async fn test_context_processors_inject_global_vars() {
     let engine = Arc::new(Engine::new());
-    engine.add_string_template(
-        "with_ctx.html",
-        "DEBUG={{ debug }} STATIC={{ STATIC_URL }}",
-    );
+    engine.add_string_template("with_ctx.html", "DEBUG={{ debug }} STATIC={{ STATIC_URL }}");
 
     let engine_clone = engine.clone();
     let handler: Handler = Arc::new(move |req: HttpRequest| {
@@ -671,7 +664,12 @@ async fn test_pagination_query_parameter() {
             ctx.set("total_pages", ContextValue::Integer(total_pages as i64));
             ctx.set(
                 "items",
-                ContextValue::List(page_items.iter().map(|s| ContextValue::from(s.as_str())).collect()),
+                ContextValue::List(
+                    page_items
+                        .iter()
+                        .map(|s| ContextValue::from(s.as_str()))
+                        .collect(),
+                ),
             );
 
             match eng.render_to_string("paginated.html", &mut ctx) {
@@ -834,9 +832,7 @@ async fn test_multiple_requests_maintain_cookie_state() {
 
     let patterns = vec![
         URLEntry::Pattern(path("set-cookie/", handler, Some("set-cookie")).unwrap()),
-        URLEntry::Pattern(
-            path("check-cookie/", check_handler, Some("check-cookie")).unwrap(),
-        ),
+        URLEntry::Pattern(path("check-cookie/", check_handler, Some("check-cookie")).unwrap()),
     ];
     let resolver = root(patterns).unwrap();
 

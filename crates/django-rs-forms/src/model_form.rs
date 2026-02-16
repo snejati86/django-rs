@@ -132,7 +132,8 @@ pub fn generate_form_fields(config: &ModelFormConfig) -> Vec<FormFieldDef> {
         let mut form_field = FormFieldDef::new(&field_name, form_field_type);
 
         // Required: a field is required if it's not nullable and has no default
-        form_field.required = !model_field.null && !model_field.blank && model_field.default.is_none();
+        form_field.required =
+            !model_field.null && !model_field.blank && model_field.default.is_none();
 
         // Apply overrides
         if let Some(widget) = config.widgets.get(&field_name) {
@@ -257,20 +258,18 @@ mod tests {
             FieldDef::new("content", FieldType::TextField)
                 .verbose_name("Content")
                 .help_text("Article body text"),
-            FieldDef::new("email", FieldType::EmailField)
-                .verbose_name("Author Email"),
-            FieldDef::new("published", FieldType::BooleanField)
-                .default(Value::Bool(false)),
-            FieldDef::new("views", FieldType::IntegerField)
-                .default(Value::Int(0)),
-            FieldDef::new("rating", FieldType::FloatField)
-                .nullable(),
-            FieldDef::new("price", FieldType::DecimalField {
-                max_digits: 10,
-                decimal_places: 2,
-            }),
-            FieldDef::new("publish_date", FieldType::DateField)
-                .nullable(),
+            FieldDef::new("email", FieldType::EmailField).verbose_name("Author Email"),
+            FieldDef::new("published", FieldType::BooleanField).default(Value::Bool(false)),
+            FieldDef::new("views", FieldType::IntegerField).default(Value::Int(0)),
+            FieldDef::new("rating", FieldType::FloatField).nullable(),
+            FieldDef::new(
+                "price",
+                FieldType::DecimalField {
+                    max_digits: 10,
+                    decimal_places: 2,
+                },
+            ),
+            FieldDef::new("publish_date", FieldType::DateField).nullable(),
             FieldDef::new("slug", FieldType::SlugField),
         ],
         constraints: vec![],
@@ -304,8 +303,8 @@ mod tests {
 
     #[test]
     fn test_generate_include_fields() {
-        let config = ModelFormConfig::new(get_test_meta())
-            .with_fields(ModelFormFields::Include(vec![
+        let config =
+            ModelFormConfig::new(get_test_meta()).with_fields(ModelFormFields::Include(vec![
                 "title".into(),
                 "content".into(),
             ]));
@@ -317,8 +316,11 @@ mod tests {
 
     #[test]
     fn test_generate_exclude_fields() {
-        let config = ModelFormConfig::new(get_test_meta())
-            .with_fields(ModelFormFields::Exclude(vec!["content".into(), "email".into()]));
+        let config =
+            ModelFormConfig::new(get_test_meta()).with_fields(ModelFormFields::Exclude(vec![
+                "content".into(),
+                "email".into(),
+            ]));
         let fields = generate_form_fields(&config);
         assert!(!fields.iter().any(|f| f.name == "content"));
         assert!(!fields.iter().any(|f| f.name == "email"));
@@ -331,7 +333,13 @@ mod tests {
         let fields = generate_form_fields(&config);
 
         let title = fields.iter().find(|f| f.name == "title").unwrap();
-        assert!(matches!(title.field_type, FormFieldType::Char { max_length: Some(200), .. }));
+        assert!(matches!(
+            title.field_type,
+            FormFieldType::Char {
+                max_length: Some(200),
+                ..
+            }
+        ));
 
         let email_field = fields.iter().find(|f| f.name == "email").unwrap();
         assert!(matches!(email_field.field_type, FormFieldType::Email));
@@ -346,7 +354,13 @@ mod tests {
         assert!(matches!(rating.field_type, FormFieldType::Float { .. }));
 
         let price = fields.iter().find(|f| f.name == "price").unwrap();
-        assert!(matches!(price.field_type, FormFieldType::Decimal { max_digits: 10, decimal_places: 2 }));
+        assert!(matches!(
+            price.field_type,
+            FormFieldType::Decimal {
+                max_digits: 10,
+                decimal_places: 2
+            }
+        ));
 
         let publish_date = fields.iter().find(|f| f.name == "publish_date").unwrap();
         assert!(matches!(publish_date.field_type, FormFieldType::Date));
@@ -375,8 +389,8 @@ mod tests {
 
     #[test]
     fn test_widget_override() {
-        let config = ModelFormConfig::new(get_test_meta())
-            .with_widget("content", WidgetType::Textarea);
+        let config =
+            ModelFormConfig::new(get_test_meta()).with_widget("content", WidgetType::Textarea);
         let fields = generate_form_fields(&config);
         let content = fields.iter().find(|f| f.name == "content").unwrap();
         assert_eq!(content.widget, WidgetType::Textarea);
@@ -384,8 +398,7 @@ mod tests {
 
     #[test]
     fn test_label_override() {
-        let config = ModelFormConfig::new(get_test_meta())
-            .with_label("title", "Article Title");
+        let config = ModelFormConfig::new(get_test_meta()).with_label("title", "Article Title");
         let fields = generate_form_fields(&config);
         let title = fields.iter().find(|f| f.name == "title").unwrap();
         assert_eq!(title.label, "Article Title");

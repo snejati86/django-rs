@@ -389,11 +389,14 @@ mod tests {
 
     #[test]
     fn test_field_def_is_relation() {
-        let fk = FieldDef::new("author", FieldType::ForeignKey {
-            to: "auth.User".into(),
-            on_delete: OnDelete::Cascade,
-            related_name: None,
-        });
+        let fk = FieldDef::new(
+            "author",
+            FieldType::ForeignKey {
+                to: "auth.User".into(),
+                on_delete: OnDelete::Cascade,
+                related_name: None,
+            },
+        );
         assert!(fk.is_relation());
 
         let text = FieldDef::new("title", FieldType::CharField);
@@ -409,11 +412,18 @@ mod tests {
 
     #[test]
     fn test_decimal_field_type() {
-        let f = FieldDef::new("price", FieldType::DecimalField {
-            max_digits: 10,
-            decimal_places: 2,
-        });
-        if let FieldType::DecimalField { max_digits, decimal_places } = &f.field_type {
+        let f = FieldDef::new(
+            "price",
+            FieldType::DecimalField {
+                max_digits: 10,
+                decimal_places: 2,
+            },
+        );
+        if let FieldType::DecimalField {
+            max_digits,
+            decimal_places,
+        } = &f.field_type
+        {
             assert_eq!(*max_digits, 10);
             assert_eq!(*decimal_places, 2);
         } else {
@@ -425,10 +435,13 @@ mod tests {
 
     #[test]
     fn test_array_field() {
-        let f = FieldDef::new("tags", FieldType::ArrayField {
-            base_field: Box::new(FieldType::CharField),
-            size: None,
-        });
+        let f = FieldDef::new(
+            "tags",
+            FieldType::ArrayField {
+                base_field: Box::new(FieldType::CharField),
+                size: None,
+            },
+        );
         if let FieldType::ArrayField { base_field, size } = &f.field_type {
             assert!(matches!(**base_field, FieldType::CharField));
             assert!(size.is_none());
@@ -439,10 +452,13 @@ mod tests {
 
     #[test]
     fn test_array_field_with_size() {
-        let f = FieldDef::new("scores", FieldType::ArrayField {
-            base_field: Box::new(FieldType::IntegerField),
-            size: Some(10),
-        });
+        let f = FieldDef::new(
+            "scores",
+            FieldType::ArrayField {
+                base_field: Box::new(FieldType::IntegerField),
+                size: Some(10),
+            },
+        );
         if let FieldType::ArrayField { size, .. } = &f.field_type {
             assert_eq!(*size, Some(10));
         } else {
@@ -476,11 +492,14 @@ mod tests {
 
     #[test]
     fn test_generated_field() {
-        let f = FieldDef::new("full_name", FieldType::GeneratedField {
-            expression: "first_name || ' ' || last_name".to_string(),
-            output_field: Box::new(FieldType::CharField),
-            db_persist: true,
-        });
+        let f = FieldDef::new(
+            "full_name",
+            FieldType::GeneratedField {
+                expression: "first_name || ' ' || last_name".to_string(),
+                output_field: Box::new(FieldType::CharField),
+                db_persist: true,
+            },
+        );
         assert!(f.is_generated());
         if let FieldType::GeneratedField {
             expression,
@@ -499,11 +518,14 @@ mod tests {
     #[test]
     fn test_generated_field_not_editable() {
         // Generated fields should typically not be editable.
-        let f = FieldDef::new("total", FieldType::GeneratedField {
-            expression: "price * quantity".to_string(),
-            output_field: Box::new(FieldType::FloatField),
-            db_persist: true,
-        });
+        let f = FieldDef::new(
+            "total",
+            FieldType::GeneratedField {
+                expression: "price * quantity".to_string(),
+                output_field: Box::new(FieldType::FloatField),
+                db_persist: true,
+            },
+        );
         // By default editable is true; user should set it to false.
         assert!(f.is_generated());
     }

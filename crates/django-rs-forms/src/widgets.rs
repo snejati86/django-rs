@@ -99,12 +99,8 @@ pub trait Widget: Send + Sync + fmt::Debug {
     /// - `name` - The HTML `name` attribute
     /// - `value` - The current value to display (if any)
     /// - `attrs` - Additional HTML attributes
-    fn render(
-        &self,
-        name: &str,
-        value: &Option<String>,
-        attrs: &HashMap<String, String>,
-    ) -> String;
+    fn render(&self, name: &str, value: &Option<String>, attrs: &HashMap<String, String>)
+        -> String;
 
     /// Extracts a raw string value from the submitted form data.
     ///
@@ -540,7 +536,9 @@ impl Widget for RadioSelect {
             html.push_str(&format!(
                 r#"<div><input type="radio" name="{name}" value="{val}" id="{option_id}"{checked} />"#
             ));
-            html.push_str(&format!(r#" <label for="{option_id}">{label}</label></div>"#));
+            html.push_str(&format!(
+                r#" <label for="{option_id}">{label}</label></div>"#
+            ));
         }
         html.push_str("</div>");
         html
@@ -595,7 +593,9 @@ impl Widget for CheckboxSelectMultiple {
             html.push_str(&format!(
                 r#"<div><input type="checkbox" name="{name}" value="{val}" id="{option_id}"{checked} />"#
             ));
-            html.push_str(&format!(r#" <label for="{option_id}">{label}</label></div>"#));
+            html.push_str(&format!(
+                r#" <label for="{option_id}">{label}</label></div>"#
+            ));
         }
         html.push_str("</div>");
         html
@@ -801,9 +801,7 @@ pub fn create_widget(widget_type: &WidgetType) -> Box<dyn Widget> {
         WidgetType::Select => Box::new(Select::new(vec![])),
         WidgetType::SelectMultiple => Box::new(SelectMultiple::new(vec![])),
         WidgetType::RadioSelect => Box::new(RadioSelect::new(vec![])),
-        WidgetType::CheckboxSelectMultiple => {
-            Box::new(CheckboxSelectMultiple::new(vec![]))
-        }
+        WidgetType::CheckboxSelectMultiple => Box::new(CheckboxSelectMultiple::new(vec![])),
         WidgetType::DateInput => Box::new(DateInput),
         WidgetType::DateTimeInput => Box::new(DateTimeInputWidget),
         WidgetType::TimeInput => Box::new(TimeInputWidget),
@@ -879,7 +877,11 @@ mod tests {
     #[test]
     fn test_url_input_render() {
         let w = UrlInputWidget;
-        let html = w.render("website", &Some("https://example.com".into()), &empty_attrs());
+        let html = w.render(
+            "website",
+            &Some("https://example.com".into()),
+            &empty_attrs(),
+        );
         assert!(html.contains(r#"type="url""#));
     }
 
@@ -893,9 +895,7 @@ mod tests {
 
     #[test]
     fn test_password_input_render_value() {
-        let w = PasswordInput {
-            render_value: true,
-        };
+        let w = PasswordInput { render_value: true };
         let html = w.render("pass", &Some("secret".into()), &empty_attrs());
         assert!(html.contains(r#"value="secret""#));
     }
@@ -966,10 +966,7 @@ mod tests {
 
     #[test]
     fn test_radio_select_render() {
-        let w = RadioSelect::new(vec![
-            ("1".into(), "One".into()),
-            ("2".into(), "Two".into()),
-        ]);
+        let w = RadioSelect::new(vec![("1".into(), "One".into()), ("2".into(), "Two".into())]);
         let html = w.render("choice", &Some("1".into()), &empty_attrs());
         assert!(html.contains(r#"type="radio""#));
         assert!(html.contains("checked"));

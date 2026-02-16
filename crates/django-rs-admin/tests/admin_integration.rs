@@ -28,8 +28,14 @@ fn article_admin() -> ModelAdmin {
 async fn seed_articles(db: &InMemoryAdminDb, admin: &ModelAdmin, count: usize) {
     for i in 1..=count {
         let mut data = HashMap::new();
-        data.insert("title".to_string(), serde_json::json!(format!("Article {i}")));
-        data.insert("body".to_string(), serde_json::json!(format!("Body text {i}")));
+        data.insert(
+            "title".to_string(),
+            serde_json::json!(format!("Article {i}")),
+        );
+        data.insert(
+            "body".to_string(),
+            serde_json::json!(format!("Body text {i}")),
+        );
         data.insert(
             "status".to_string(),
             serde_json::json!(if i % 2 == 0 { "published" } else { "draft" }),
@@ -178,7 +184,10 @@ async fn test_search_finds_matching_objects() {
     let admin = article_admin();
 
     let mut d1 = HashMap::new();
-    d1.insert("title".to_string(), serde_json::json!("Rust Programming Guide"));
+    d1.insert(
+        "title".to_string(),
+        serde_json::json!("Rust Programming Guide"),
+    );
     d1.insert("body".to_string(), serde_json::json!("Learn Rust"));
     db.create_object(&admin, &d1).await.unwrap();
 
@@ -188,7 +197,10 @@ async fn test_search_finds_matching_objects() {
     db.create_object(&admin, &d2).await.unwrap();
 
     let mut d3 = HashMap::new();
-    d3.insert("title".to_string(), serde_json::json!("Advanced Rust Patterns"));
+    d3.insert(
+        "title".to_string(),
+        serde_json::json!("Advanced Rust Patterns"),
+    );
     d3.insert("body".to_string(), serde_json::json!("Macros and traits"));
     db.create_object(&admin, &d3).await.unwrap();
 
@@ -198,7 +210,11 @@ async fn test_search_finds_matching_objects() {
     // All matches should contain "rust" in title or body (case-insensitive)
     for obj in &result.response.results {
         let title = obj["title"].as_str().unwrap_or_default().to_lowercase();
-        let body = obj.get("body").and_then(|b| b.as_str()).unwrap_or_default().to_lowercase();
+        let body = obj
+            .get("body")
+            .and_then(|b| b.as_str())
+            .unwrap_or_default()
+            .to_lowercase();
         assert!(title.contains("rust") || body.contains("rust"));
     }
 }

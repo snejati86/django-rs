@@ -158,9 +158,9 @@ impl CommandRegistry {
             DjangoError::ConfigurationError("No subcommand specified".to_string())
         })?;
 
-        let cmd = self.get(name).ok_or_else(|| {
-            DjangoError::ConfigurationError(format!("Unknown command: {name}"))
-        })?;
+        let cmd = self
+            .get(name)
+            .ok_or_else(|| DjangoError::ConfigurationError(format!("Unknown command: {name}")))?;
 
         cmd.handle(sub_matches, settings).await
     }
@@ -226,7 +226,9 @@ mod tests {
             _matches: &clap::ArgMatches,
             _settings: &Settings,
         ) -> Result<(), DjangoError> {
-            Err(DjangoError::ConfigurationError("deliberate failure".to_string()))
+            Err(DjangoError::ConfigurationError(
+                "deliberate failure".to_string(),
+            ))
         }
     }
 
@@ -313,9 +315,7 @@ mod tests {
         registry.register(Box::new(TestCommand::new("test")));
 
         let cli = registry.build_cli();
-        let matches = cli
-            .try_get_matches_from(["django-rs", "test"])
-            .unwrap();
+        let matches = cli.try_get_matches_from(["django-rs", "test"]).unwrap();
 
         let settings = Settings::default();
         let result = registry.execute(&matches, &settings).await;
@@ -328,9 +328,7 @@ mod tests {
         registry.register(Box::new(FailingCommand));
 
         let cli = registry.build_cli();
-        let matches = cli
-            .try_get_matches_from(["django-rs", "fail"])
-            .unwrap();
+        let matches = cli.try_get_matches_from(["django-rs", "fail"]).unwrap();
 
         let settings = Settings::default();
         let result = registry.execute(&matches, &settings).await;

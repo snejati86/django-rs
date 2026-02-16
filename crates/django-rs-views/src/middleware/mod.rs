@@ -71,11 +71,8 @@ pub trait Middleware: Send + Sync {
     ///
     /// This is called in reverse middleware order (last added = first to
     /// process the response).
-    async fn process_response(
-        &self,
-        request: &HttpRequest,
-        response: HttpResponse,
-    ) -> HttpResponse;
+    async fn process_response(&self, request: &HttpRequest, response: HttpResponse)
+        -> HttpResponse;
 
     /// Handle an exception that occurred during view processing.
     ///
@@ -142,20 +139,14 @@ impl MiddlewarePipeline {
     ///    on only the middleware that already ran.
     /// 2. Calls the view handler with a rebuilt request.
     /// 3. Calls `process_response` on each middleware in reverse order.
-    pub async fn process(
-        &self,
-        mut request: HttpRequest,
-        handler: &ViewHandler,
-    ) -> HttpResponse {
+    pub async fn process(&self, mut request: HttpRequest, handler: &ViewHandler) -> HttpResponse {
         // Phase 1: process_request (forward order)
         for (i, mw) in self.middlewares.iter().enumerate() {
             if let Some(response) = mw.process_request(&mut request).await {
                 // Short-circuit: run process_response on already-processed middleware
                 let mut resp = response;
                 for j in (0..=i).rev() {
-                    resp = self.middlewares[j]
-                        .process_response(&request, resp)
-                        .await;
+                    resp = self.middlewares[j].process_response(&request, resp).await;
                 }
                 return resp;
             }
@@ -509,7 +500,12 @@ mod tests {
         let response = pipeline.process(request, &handler).await;
 
         assert_eq!(
-            response.headers().get("x-custom").unwrap().to_str().unwrap(),
+            response
+                .headers()
+                .get("x-custom")
+                .unwrap()
+                .to_str()
+                .unwrap(),
             "test-value"
         );
     }
@@ -529,9 +525,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_rebuild_request_preserves_headers() {
-        let request = HttpRequest::builder()
-            .header("x-test", "hello")
-            .build();
+        let request = HttpRequest::builder().header("x-test", "hello").build();
         let rebuilt = rebuild_request(&request);
         assert_eq!(
             rebuilt.headers().get("x-test").unwrap().to_str().unwrap(),

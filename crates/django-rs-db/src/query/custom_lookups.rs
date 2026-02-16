@@ -159,8 +159,7 @@ impl Transform {
 
     /// Applies this transform to a column expression.
     pub fn apply(&self, column_sql: &str, backend: DatabaseBackendType) -> String {
-        self.sql_template(backend)
-            .replace("{column}", column_sql)
+        self.sql_template(backend).replace("{column}", column_sql)
     }
 }
 
@@ -321,10 +320,7 @@ impl LookupRegistry {
         );
 
         // Custom lookup: not equal
-        registry.register_lookup(
-            "ne",
-            CustomLookup::new("ne", "{column} != {value}"),
-        );
+        registry.register_lookup("ne", CustomLookup::new("ne", "{column} != {value}"));
 
         registry
     }
@@ -732,11 +728,7 @@ mod tests {
 
         // Single transform
         let lower = registry.get_transform("lower").unwrap();
-        let sql = registry.apply_transforms(
-            "name",
-            &[lower],
-            DatabaseBackendType::PostgreSQL,
-        );
+        let sql = registry.apply_transforms("name", &[lower], DatabaseBackendType::PostgreSQL);
         assert_eq!(sql, "LOWER(\"name\")");
     }
 
@@ -746,11 +738,8 @@ mod tests {
 
         let trim = registry.get_transform("trim").unwrap();
         let lower = registry.get_transform("lower").unwrap();
-        let sql = registry.apply_transforms(
-            "name",
-            &[trim, lower],
-            DatabaseBackendType::PostgreSQL,
-        );
+        let sql =
+            registry.apply_transforms("name", &[trim, lower], DatabaseBackendType::PostgreSQL);
         assert_eq!(sql, "LOWER(TRIM(\"name\"))");
     }
 
@@ -780,10 +769,8 @@ mod tests {
     fn test_resolve_field_path_with_transform() {
         let registry = LookupRegistry::with_defaults();
 
-        let (field, col_sql, lookup) = registry.resolve_field_path(
-            "name__lower__contains",
-            DatabaseBackendType::PostgreSQL,
-        );
+        let (field, col_sql, lookup) =
+            registry.resolve_field_path("name__lower__contains", DatabaseBackendType::PostgreSQL);
         assert_eq!(field, "name");
         assert_eq!(col_sql, "LOWER(\"name\")");
         assert_eq!(lookup, "contains");
@@ -793,10 +780,8 @@ mod tests {
     fn test_resolve_field_path_chained_transforms() {
         let registry = LookupRegistry::with_defaults();
 
-        let (field, col_sql, lookup) = registry.resolve_field_path(
-            "name__trim__lower__exact",
-            DatabaseBackendType::PostgreSQL,
-        );
+        let (field, col_sql, lookup) = registry
+            .resolve_field_path("name__trim__lower__exact", DatabaseBackendType::PostgreSQL);
         assert_eq!(field, "name");
         assert_eq!(col_sql, "LOWER(TRIM(\"name\"))");
         assert_eq!(lookup, "exact");
@@ -806,10 +791,8 @@ mod tests {
     fn test_resolve_field_path_year_transform_pg() {
         let registry = LookupRegistry::with_defaults();
 
-        let (field, col_sql, lookup) = registry.resolve_field_path(
-            "created_at__year__exact",
-            DatabaseBackendType::PostgreSQL,
-        );
+        let (field, col_sql, lookup) =
+            registry.resolve_field_path("created_at__year__exact", DatabaseBackendType::PostgreSQL);
         assert_eq!(field, "created_at");
         assert_eq!(col_sql, "EXTRACT(YEAR FROM \"created_at\")");
         assert_eq!(lookup, "exact");
@@ -819,15 +802,10 @@ mod tests {
     fn test_resolve_field_path_year_transform_sqlite() {
         let registry = LookupRegistry::with_defaults();
 
-        let (field, col_sql, lookup) = registry.resolve_field_path(
-            "created_at__year__exact",
-            DatabaseBackendType::SQLite,
-        );
+        let (field, col_sql, lookup) =
+            registry.resolve_field_path("created_at__year__exact", DatabaseBackendType::SQLite);
         assert_eq!(field, "created_at");
-        assert_eq!(
-            col_sql,
-            "CAST(strftime('%Y', \"created_at\") AS INTEGER)"
-        );
+        assert_eq!(col_sql, "CAST(strftime('%Y', \"created_at\") AS INTEGER)");
         assert_eq!(lookup, "exact");
     }
 
@@ -915,19 +893,13 @@ mod tests {
         registry.register_lookup("b", CustomLookup::new("b", ""));
         assert_eq!(registry.lookup_count(), 2);
 
-        registry.register_transform(
-            "x",
-            Transform::new("x", "", TransformOutput::String),
-        );
+        registry.register_transform("x", Transform::new("x", "", TransformOutput::String));
         assert_eq!(registry.transform_count(), 1);
     }
 
     #[test]
     fn test_custom_lookup_complex_template() {
-        let lookup = CustomLookup::new(
-            "json_has_key",
-            "{column}::jsonb ? {value}",
-        );
+        let lookup = CustomLookup::new("json_has_key", "{column}::jsonb ? {value}");
         let sql = lookup.compile("data", "$1");
         assert_eq!(sql, "\"data\"::jsonb ? $1");
     }
@@ -951,11 +923,7 @@ mod tests {
     #[test]
     fn test_empty_transforms_applied() {
         let registry = LookupRegistry::new();
-        let sql = registry.apply_transforms(
-            "name",
-            &[],
-            DatabaseBackendType::PostgreSQL,
-        );
+        let sql = registry.apply_transforms("name", &[], DatabaseBackendType::PostgreSQL);
         assert_eq!(sql, "\"name\"");
     }
 }

@@ -86,29 +86,37 @@ impl BlogStore {
 fn post_to_context_value(post: &Post) -> ContextValue {
     let mut dict = HashMap::new();
     dict.insert("id".to_string(), ContextValue::Integer(post.id));
-    dict.insert("title".to_string(), ContextValue::String(post.title.clone()));
-    dict.insert("content".to_string(), ContextValue::String(post.content.clone()));
-    dict.insert("author".to_string(), ContextValue::String(post.author.clone()));
-    dict.insert("created_at".to_string(), ContextValue::String(post.created_at.clone()));
+    dict.insert(
+        "title".to_string(),
+        ContextValue::String(post.title.clone()),
+    );
+    dict.insert(
+        "content".to_string(),
+        ContextValue::String(post.content.clone()),
+    );
+    dict.insert(
+        "author".to_string(),
+        ContextValue::String(post.author.clone()),
+    );
+    dict.insert(
+        "created_at".to_string(),
+        ContextValue::String(post.created_at.clone()),
+    );
     dict.insert("published".to_string(), ContextValue::Bool(post.published));
-    dict.insert("summary".to_string(), ContextValue::String(post.summary().to_string()));
+    dict.insert(
+        "summary".to_string(),
+        ContextValue::String(post.summary().to_string()),
+    );
     ContextValue::Dict(dict)
 }
 
 /// Handler for `GET /posts/` - list all published posts.
 ///
 /// Renders the post list template with all published posts.
-pub fn post_list_view(
-    _request: &HttpRequest,
-    store: &BlogStore,
-    engine: &Engine,
-) -> HttpResponse {
+pub fn post_list_view(_request: &HttpRequest, store: &BlogStore, engine: &Engine) -> HttpResponse {
     let posts = store.published_posts();
 
-    let post_values: Vec<ContextValue> = posts
-        .iter()
-        .map(|p| post_to_context_value(p))
-        .collect();
+    let post_values: Vec<ContextValue> = posts.iter().map(|p| post_to_context_value(p)).collect();
 
     let mut ctx = Context::new();
     ctx.set("posts", ContextValue::List(post_values));

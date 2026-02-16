@@ -180,9 +180,7 @@ mod tests {
     use super::*;
 
     fn make_request(host: &str) -> HttpRequest {
-        HttpRequest::builder()
-            .meta("HTTP_HOST", host)
-            .build()
+        HttpRequest::builder().meta("HTTP_HOST", host).build()
     }
 
     #[test]

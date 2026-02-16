@@ -98,21 +98,16 @@ fn substitute_pattern<S: BuildHasher>(
             // Add the literal prefix
             result.push_str(&remaining[..start]);
 
-            let end = remaining[start..]
-                .find('>')
-                .ok_or_else(|| {
-                    DjangoError::ImproperlyConfigured(format!(
-                        "Unclosed angle bracket in route template: {route}"
-                    ))
-                })?
-                + start;
+            let end = remaining[start..].find('>').ok_or_else(|| {
+                DjangoError::ImproperlyConfigured(format!(
+                    "Unclosed angle bracket in route template: {route}"
+                ))
+            })? + start;
 
             let inner = &remaining[start + 1..end];
 
             // Parse "type:name" or just "name"
-            let param_name = inner
-                .find(':')
-                .map_or(inner, |pos| &inner[pos + 1..]);
+            let param_name = inner.find(':').map_or(inner, |pos| &inner[pos + 1..]);
 
             // Try kwargs first, then fall back to positional args
             if let Some(value) = kwargs.get(param_name) {
@@ -162,7 +157,12 @@ mod tests {
     #[test]
     fn test_reverse_with_kwargs() {
         let patterns = vec![URLEntry::Pattern(
-            path("articles/<int:year>/", dummy_handler(), Some("article-year")).unwrap(),
+            path(
+                "articles/<int:year>/",
+                dummy_handler(),
+                Some("article-year"),
+            )
+            .unwrap(),
         )];
         let resolver = root(patterns).unwrap();
 
@@ -245,7 +245,12 @@ mod tests {
     #[test]
     fn test_reverse_missing_param() {
         let patterns = vec![URLEntry::Pattern(
-            path("articles/<int:year>/", dummy_handler(), Some("article-year")).unwrap(),
+            path(
+                "articles/<int:year>/",
+                dummy_handler(),
+                Some("article-year"),
+            )
+            .unwrap(),
         )];
         let resolver = root(patterns).unwrap();
 
@@ -285,8 +290,7 @@ mod tests {
 
     #[test]
     fn test_substitute_pattern_no_params() {
-        let result =
-            substitute_pattern("articles/", &[], &HashMap::<&str, &str>::new()).unwrap();
+        let result = substitute_pattern("articles/", &[], &HashMap::<&str, &str>::new()).unwrap();
         assert_eq!(result, "articles/");
     }
 
@@ -295,12 +299,7 @@ mod tests {
         let mut kwargs = HashMap::new();
         kwargs.insert("year", "2024");
         kwargs.insert("title", "hello");
-        let result = substitute_pattern(
-            "articles/<int:year>/<slug:title>/",
-            &[],
-            &kwargs,
-        )
-        .unwrap();
+        let result = substitute_pattern("articles/<int:year>/<slug:title>/", &[], &kwargs).unwrap();
         assert_eq!(result, "articles/2024/hello/");
     }
 }

@@ -244,9 +244,7 @@ async fn test_login_required_blocks_anonymous() {
     pipeline.add(AuthenticationMiddleware);
     pipeline.add(LoginRequiredMiddleware::default());
 
-    let request = HttpRequest::builder()
-        .path("/dashboard/")
-        .build();
+    let request = HttpRequest::builder().path("/dashboard/").build();
     let response = pipeline.process(request, &ok_handler()).await;
 
     assert_eq!(response.status(), http::StatusCode::FOUND);
@@ -297,9 +295,7 @@ async fn test_message_middleware_initializes_message_store() {
         })
     });
 
-    let request = HttpRequest::builder()
-        .meta("SESSION_DATA", "{}")
-        .build();
+    let request = HttpRequest::builder().meta("SESSION_DATA", "{}").build();
     let response = pipeline.process(request, &handler).await;
     let body = String::from_utf8(response.content_bytes().unwrap()).unwrap();
     assert!(body.contains("store=true"));
@@ -535,6 +531,9 @@ async fn test_full_pipeline_security_auth_common() {
     // Security headers should be present
     assert!(response.headers().get("x-content-type-options").is_some());
     assert!(response.headers().get("x-frame-options").is_some());
-    assert!(response.headers().get("strict-transport-security").is_some());
+    assert!(response
+        .headers()
+        .get("strict-transport-security")
+        .is_some());
     assert!(response.headers().get("x-xss-protection").is_some());
 }

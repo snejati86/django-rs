@@ -353,10 +353,7 @@ mod tests {
 
     #[test]
     fn test_from_string() {
-        assert_eq!(
-            Value::from("hello"),
-            Value::String("hello".to_string())
-        );
+        assert_eq!(Value::from("hello"), Value::String("hello".to_string()));
         assert_eq!(
             Value::from("hello".to_string()),
             Value::String("hello".to_string())
@@ -365,10 +362,7 @@ mod tests {
 
     #[test]
     fn test_from_bytes() {
-        assert_eq!(
-            Value::from(vec![1_u8, 2, 3]),
-            Value::Bytes(vec![1, 2, 3])
-        );
+        assert_eq!(Value::from(vec![1_u8, 2, 3]), Value::Bytes(vec![1, 2, 3]));
     }
 
     #[test]
@@ -533,12 +527,7 @@ mod tests {
 
     #[test]
     fn test_range_with_bounds() {
-        let v = Value::range_with_bounds(
-            Some(Value::Int(5)),
-            false,
-            Some(Value::Int(15)),
-            true,
-        );
+        let v = Value::range_with_bounds(Some(Value::Int(5)), false, Some(Value::Int(15)), true);
         match &v {
             Value::Range {
                 lower,
@@ -563,12 +552,7 @@ mod tests {
 
     #[test]
     fn test_display_range_inclusive() {
-        let v = Value::range_with_bounds(
-            Some(Value::Int(1)),
-            true,
-            Some(Value::Int(10)),
-            true,
-        );
+        let v = Value::range_with_bounds(Some(Value::Int(1)), true, Some(Value::Int(10)), true);
         assert_eq!(v.to_string(), "[1, 10]");
     }
 

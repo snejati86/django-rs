@@ -102,10 +102,7 @@ pub fn register_translations(language: &str, entries: Vec<(&str, &str)>) {
 ///     ("apple", "apples", "Apfel", "Äpfel"),
 /// ]);
 /// ```
-pub fn register_plural_translations(
-    language: &str,
-    entries: Vec<(&str, &str, &str, &str)>,
-) {
+pub fn register_plural_translations(language: &str, entries: Vec<(&str, &str, &str, &str)>) {
     with_catalog_mut(language, |catalog| {
         for (singular, _plural, trans_singular, trans_plural) in entries {
             catalog.plurals.insert(
@@ -214,9 +211,10 @@ pub fn translate_plural(
     count: u64,
 ) -> Option<String> {
     with_catalog(language, |catalog| {
-        catalog.plurals.get(singular).map(|(s, p)| {
-            if count == 1 { s.clone() } else { p.clone() }
-        })
+        catalog
+            .plurals
+            .get(singular)
+            .map(|(s, p)| if count == 1 { s.clone() } else { p.clone() })
     })
 }
 
@@ -268,9 +266,7 @@ mod tests {
 
     #[test]
     fn test_plural_translations() {
-        register_plural_translations("test_lang2", vec![
-            ("cat", "cats", "gato", "gatos"),
-        ]);
+        register_plural_translations("test_lang2", vec![("cat", "cats", "gato", "gatos")]);
         assert_eq!(
             translate_plural("test_lang2", "cat", "cats", 1),
             Some("gato".to_string())
@@ -287,10 +283,10 @@ mod tests {
 
     #[test]
     fn test_context_translations() {
-        register_context_translations("test_lang3", vec![
-            ("month", "May", "Mai"),
-            ("modal", "May", "Darf"),
-        ]);
+        register_context_translations(
+            "test_lang3",
+            vec![("month", "May", "Mai"), ("modal", "May", "Darf")],
+        );
         assert_eq!(
             translate_context("test_lang3", "month", "May"),
             Some("Mai".to_string())
@@ -324,10 +320,7 @@ mod tests {
             translate("test_json_lang", "Hello"),
             Some("Bonjour".to_string())
         );
-        assert_eq!(
-            translate("test_json_lang", "Yes"),
-            Some("Oui".to_string())
-        );
+        assert_eq!(translate("test_json_lang", "Yes"), Some("Oui".to_string()));
         assert_eq!(
             translate_plural("test_json_lang", "item", "items", 1),
             Some("élément".to_string())
@@ -354,10 +347,7 @@ mod tests {
         let json = r#"{"messages": {"A": "B"}}"#;
         let result = load_from_json("test_partial_lang", json);
         assert!(result.is_ok());
-        assert_eq!(
-            translate("test_partial_lang", "A"),
-            Some("B".to_string())
-        );
+        assert_eq!(translate("test_partial_lang", "A"), Some("B".to_string()));
     }
 
     #[test]

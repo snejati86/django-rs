@@ -146,14 +146,8 @@ pub trait ListView: View + ContextMixin + Send + Sync {
                         serde_json::Value::Bool(paginator.num_pages() > 1),
                     );
                 } else {
-                    context.insert(
-                        "object_list".to_string(),
-                        serde_json::Value::Array(objects),
-                    );
-                    context.insert(
-                        "is_paginated".to_string(),
-                        serde_json::Value::Bool(false),
-                    );
+                    context.insert("object_list".to_string(), serde_json::Value::Array(objects));
+                    context.insert("is_paginated".to_string(), serde_json::Value::Bool(false));
                 }
 
                 let template = self.template_name();
@@ -205,7 +199,11 @@ pub trait DetailView: View + ContextMixin + Send + Sync {
     ) -> Result<serde_json::Value, DjangoError>;
 
     /// Handles GET requests for the detail view.
-    async fn detail(&self, _request: HttpRequest, kwargs: &HashMap<String, String>) -> HttpResponse {
+    async fn detail(
+        &self,
+        _request: HttpRequest,
+        kwargs: &HashMap<String, String>,
+    ) -> HttpResponse {
         match self.get_object(kwargs).await {
             Ok(object) => {
                 let mut context = self.get_context_data(kwargs);
@@ -266,10 +264,7 @@ pub trait CreateView: View + ContextMixin + Send + Sync {
     }
 
     /// Renders the form with errors after a failed POST.
-    async fn render_form_with_errors(
-        &self,
-        errors: HashMap<String, Vec<String>>,
-    ) -> HttpResponse {
+    async fn render_form_with_errors(&self, errors: HashMap<String, Vec<String>>) -> HttpResponse {
         let mut context = self.get_context_data(&HashMap::new());
         let errors_json: serde_json::Value = serde_json::to_value(&errors).unwrap_or_default();
         context.insert("errors".to_string(), errors_json);
@@ -325,10 +320,7 @@ pub trait UpdateView: View + ContextMixin + Send + Sync {
     async fn form_invalid(&self, errors: HashMap<String, Vec<String>>) -> HttpResponse;
 
     /// Renders the update form for a GET request.
-    async fn render_form(
-        &self,
-        kwargs: &HashMap<String, String>,
-    ) -> HttpResponse {
+    async fn render_form(&self, kwargs: &HashMap<String, String>) -> HttpResponse {
         match self.get_object(kwargs).await {
             Ok(object) => {
                 let mut context = self.get_context_data(kwargs);
@@ -392,16 +384,10 @@ pub trait DeleteView: View + ContextMixin + Send + Sync {
     ) -> Result<serde_json::Value, DjangoError>;
 
     /// Performs the actual deletion.
-    async fn perform_delete(
-        &self,
-        kwargs: &HashMap<String, String>,
-    ) -> Result<(), DjangoError>;
+    async fn perform_delete(&self, kwargs: &HashMap<String, String>) -> Result<(), DjangoError>;
 
     /// Handles POST requests by deleting the object and redirecting.
-    async fn delete_and_redirect(
-        &self,
-        kwargs: &HashMap<String, String>,
-    ) -> HttpResponse {
+    async fn delete_and_redirect(&self, kwargs: &HashMap<String, String>) -> HttpResponse {
         match self.perform_delete(kwargs).await {
             Ok(()) => HttpResponseRedirect::new(self.success_url()),
             Err(e) => HttpResponse::server_error(format!("Error deleting object: {e}")),
@@ -409,10 +395,7 @@ pub trait DeleteView: View + ContextMixin + Send + Sync {
     }
 
     /// Renders the delete confirmation page.
-    async fn render_confirm_delete(
-        &self,
-        kwargs: &HashMap<String, String>,
-    ) -> HttpResponse {
+    async fn render_confirm_delete(&self, kwargs: &HashMap<String, String>) -> HttpResponse {
         match self.get_object(kwargs).await {
             Ok(object) => {
                 let mut context = self.get_context_data(kwargs);
@@ -441,10 +424,7 @@ mod tests {
             _kwargs: &HashMap<String, String>,
         ) -> HashMap<String, serde_json::Value> {
             let mut context = HashMap::new();
-            context.insert(
-                "model".to_string(),
-                serde_json::json!(self.model_name()),
-            );
+            context.insert("model".to_string(), serde_json::json!(self.model_name()));
             context
         }
     }
@@ -491,9 +471,7 @@ mod tests {
                 serde_json::json!({"title": "Second"}),
             ],
         };
-        let request = HttpRequest::builder()
-            .method(http::Method::GET)
-            .build();
+        let request = HttpRequest::builder().method(http::Method::GET).build();
         let response = view.dispatch(request).await;
         assert_eq!(response.status(), http::StatusCode::OK);
         let body = String::from_utf8(response.content_bytes().unwrap()).unwrap();
@@ -510,9 +488,7 @@ mod tests {
                 serde_json::json!({"title": "Third"}),
             ],
         };
-        let request = HttpRequest::builder()
-            .method(http::Method::GET)
-            .build();
+        let request = HttpRequest::builder().method(http::Method::GET).build();
         let response = view.dispatch(request).await;
         let body = String::from_utf8(response.content_bytes().unwrap()).unwrap();
         assert!(body.contains("First"));
@@ -580,9 +556,7 @@ mod tests {
         let view = TestDetailView {
             object: Some(serde_json::json!({"title": "My Article", "pk": 1})),
         };
-        let request = HttpRequest::builder()
-            .method(http::Method::GET)
-            .build();
+        let request = HttpRequest::builder().method(http::Method::GET).build();
         let response = view.dispatch(request).await;
         assert_eq!(response.status(), http::StatusCode::OK);
         let body = String::from_utf8(response.content_bytes().unwrap()).unwrap();
@@ -592,9 +566,7 @@ mod tests {
     #[tokio::test]
     async fn test_detail_view_not_found() {
         let view = TestDetailView { object: None };
-        let request = HttpRequest::builder()
-            .method(http::Method::GET)
-            .build();
+        let request = HttpRequest::builder().method(http::Method::GET).build();
         let response = view.dispatch(request).await;
         assert_eq!(response.status(), http::StatusCode::NOT_FOUND);
     }
@@ -683,9 +655,7 @@ mod tests {
     #[tokio::test]
     async fn test_create_view_get_renders_form() {
         let view = TestCreateView;
-        let request = HttpRequest::builder()
-            .method(http::Method::GET)
-            .build();
+        let request = HttpRequest::builder().method(http::Method::GET).build();
         let response = view.dispatch(request).await;
         assert_eq!(response.status(), http::StatusCode::OK);
     }
@@ -693,9 +663,7 @@ mod tests {
     #[tokio::test]
     async fn test_create_view_post_redirects() {
         let view = TestCreateView;
-        let request = HttpRequest::builder()
-            .method(http::Method::POST)
-            .build();
+        let request = HttpRequest::builder().method(http::Method::POST).build();
         let response = view.dispatch(request).await;
         assert_eq!(response.status(), http::StatusCode::FOUND);
         assert_eq!(
@@ -779,9 +747,7 @@ mod tests {
     #[tokio::test]
     async fn test_delete_view_success() {
         let view = TestDeleteView { should_fail: false };
-        let request = HttpRequest::builder()
-            .method(http::Method::POST)
-            .build();
+        let request = HttpRequest::builder().method(http::Method::POST).build();
         let response = view.dispatch(request).await;
         assert_eq!(response.status(), http::StatusCode::FOUND);
     }
@@ -789,9 +755,7 @@ mod tests {
     #[tokio::test]
     async fn test_delete_view_failure() {
         let view = TestDeleteView { should_fail: true };
-        let request = HttpRequest::builder()
-            .method(http::Method::POST)
-            .build();
+        let request = HttpRequest::builder().method(http::Method::POST).build();
         let response = view.dispatch(request).await;
         assert_eq!(response.status(), http::StatusCode::INTERNAL_SERVER_ERROR);
     }
@@ -875,9 +839,7 @@ mod tests {
     #[tokio::test]
     async fn test_update_view_post_redirects() {
         let view = TestUpdateView;
-        let request = HttpRequest::builder()
-            .method(http::Method::POST)
-            .build();
+        let request = HttpRequest::builder().method(http::Method::POST).build();
         let response = view.dispatch(request).await;
         assert_eq!(response.status(), http::StatusCode::FOUND);
     }
@@ -1028,9 +990,7 @@ mod tests {
                 .map(|i| serde_json::json!({"title": format!("Item {i}")}))
                 .collect(),
         };
-        let request = HttpRequest::builder()
-            .method(http::Method::GET)
-            .build();
+        let request = HttpRequest::builder().method(http::Method::GET).build();
         let response = view.dispatch(request).await;
         let body = String::from_utf8(response.content_bytes().unwrap()).unwrap();
         // All items should be present

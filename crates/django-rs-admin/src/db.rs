@@ -124,11 +124,7 @@ pub trait AdminDbExecutor: Send + Sync {
     ) -> Result<AdminListResult, String>;
 
     /// Fetches a single object by primary key.
-    async fn get_object(
-        &self,
-        admin: &ModelAdmin,
-        pk: &str,
-    ) -> Result<serde_json::Value, String>;
+    async fn get_object(&self, admin: &ModelAdmin, pk: &str) -> Result<serde_json::Value, String>;
 
     /// Creates a new object from the given field values.
     ///
@@ -152,11 +148,7 @@ pub trait AdminDbExecutor: Send + Sync {
     /// Deletes an object by primary key.
     ///
     /// Returns `true` if the object was found and deleted.
-    async fn delete_object(
-        &self,
-        admin: &ModelAdmin,
-        pk: &str,
-    ) -> Result<bool, String>;
+    async fn delete_object(&self, admin: &ModelAdmin, pk: &str) -> Result<bool, String>;
 }
 
 /// Storage entry for a model table in the in-memory database.
@@ -209,9 +201,7 @@ impl InMemoryAdminDb {
     /// Returns the number of objects in a model's table.
     pub fn count(&self, model_key: &str) -> usize {
         let tables = self.tables.read().unwrap();
-        tables
-            .get(model_key)
-            .map_or(0, |t| t.objects.len())
+        tables.get(model_key).map_or(0, |t| t.objects.len())
     }
 
     /// Clears all objects from all tables.
@@ -438,11 +428,7 @@ impl AdminDbExecutor for InMemoryAdminDb {
     }
 
     #[allow(clippy::significant_drop_tightening)]
-    async fn get_object(
-        &self,
-        admin: &ModelAdmin,
-        pk: &str,
-    ) -> Result<serde_json::Value, String> {
+    async fn get_object(&self, admin: &ModelAdmin, pk: &str) -> Result<serde_json::Value, String> {
         let model_key = admin.model_key();
         let pk_field = Self::pk_field(admin);
         let tables = self.tables.read().unwrap();
@@ -453,10 +439,7 @@ impl AdminDbExecutor for InMemoryAdminDb {
         table
             .objects
             .iter()
-            .find(|obj| {
-                obj.get(&pk_field)
-                    .is_some_and(|v| value_matches_pk(v, pk))
-            })
+            .find(|obj| obj.get(&pk_field).is_some_and(|v| value_matches_pk(v, pk)))
             .cloned()
             .ok_or_else(|| format!("Object with pk '{pk}' not found in '{model_key}'"))
     }
@@ -505,10 +488,7 @@ impl AdminDbExecutor for InMemoryAdminDb {
         let obj = table
             .objects
             .iter_mut()
-            .find(|obj| {
-                obj.get(&pk_field)
-                    .is_some_and(|v| value_matches_pk(v, pk))
-            })
+            .find(|obj| obj.get(&pk_field).is_some_and(|v| value_matches_pk(v, pk)))
             .ok_or_else(|| format!("Object with pk '{pk}' not found in '{model_key}'"))?;
 
         // Update fields
@@ -522,11 +502,7 @@ impl AdminDbExecutor for InMemoryAdminDb {
     }
 
     #[allow(clippy::significant_drop_tightening)]
-    async fn delete_object(
-        &self,
-        admin: &ModelAdmin,
-        pk: &str,
-    ) -> Result<bool, String> {
+    async fn delete_object(&self, admin: &ModelAdmin, pk: &str) -> Result<bool, String> {
         let model_key = admin.model_key();
         let pk_field = Self::pk_field(admin);
         let mut tables = self.tables.write().unwrap();
@@ -535,10 +511,9 @@ impl AdminDbExecutor for InMemoryAdminDb {
             .ok_or_else(|| format!("Model '{model_key}' has no table"))?;
 
         let original_len = table.objects.len();
-        table.objects.retain(|obj| {
-            !obj.get(&pk_field)
-                .is_some_and(|v| value_matches_pk(v, pk))
-        });
+        table
+            .objects
+            .retain(|obj| !obj.get(&pk_field).is_some_and(|v| value_matches_pk(v, pk)));
 
         Ok(table.objects.len() < original_len)
     }
@@ -598,10 +573,7 @@ mod tests {
         assert_eq!(params.page_size, 25);
         assert_eq!(params.search, Some("hello".to_string()));
         assert_eq!(params.ordering, Some("-title".to_string()));
-        assert_eq!(
-            params.filters.get("status"),
-            Some(&"published".to_string())
-        );
+        assert_eq!(params.filters.get("status"), Some(&"published".to_string()));
     }
 
     #[test]
@@ -764,7 +736,10 @@ mod tests {
 
         for i in 1..=5 {
             let mut data = HashMap::new();
-            data.insert("title".to_string(), serde_json::json!(format!("Article {i}")));
+            data.insert(
+                "title".to_string(),
+                serde_json::json!(format!("Article {i}")),
+            );
             data.insert("status".to_string(), serde_json::json!("published"));
             db.create_object(&admin, &data).await.unwrap();
         }
@@ -782,7 +757,10 @@ mod tests {
 
         for i in 1..=25 {
             let mut data = HashMap::new();
-            data.insert("title".to_string(), serde_json::json!(format!("Article {i}")));
+            data.insert(
+                "title".to_string(),
+                serde_json::json!(format!("Article {i}")),
+            );
             db.create_object(&admin, &data).await.unwrap();
         }
 
@@ -995,7 +973,10 @@ mod tests {
 
         for i in 1..=3 {
             let mut data = HashMap::new();
-            data.insert("title".to_string(), serde_json::json!(format!("Article {i}")));
+            data.insert(
+                "title".to_string(),
+                serde_json::json!(format!("Article {i}")),
+            );
             db.create_object(&admin, &data).await.unwrap();
         }
 
@@ -1018,14 +999,8 @@ mod tests {
 
     #[test]
     fn test_value_matches_pk_string() {
-        assert!(value_matches_pk(
-            &serde_json::json!("abc"),
-            "abc"
-        ));
-        assert!(!value_matches_pk(
-            &serde_json::json!("abc"),
-            "xyz"
-        ));
+        assert!(value_matches_pk(&serde_json::json!("abc"), "abc"));
+        assert!(!value_matches_pk(&serde_json::json!("abc"), "xyz"));
     }
 
     #[test]
@@ -1153,10 +1128,7 @@ mod tests {
 
     #[test]
     fn test_compare_json_values_none() {
-        assert_eq!(
-            compare_json_values(None, None),
-            std::cmp::Ordering::Equal
-        );
+        assert_eq!(compare_json_values(None, None), std::cmp::Ordering::Equal);
         assert_eq!(
             compare_json_values(None, Some(&serde_json::json!("a"))),
             std::cmp::Ordering::Less

@@ -152,9 +152,7 @@ impl SessionBackend for InMemorySessionBackend {
             .get(session_key)
             .filter(|s| !s.is_expired())
             .cloned()
-            .ok_or_else(|| {
-                DjangoError::NotFound(format!("Session '{session_key}' not found"))
-            })
+            .ok_or_else(|| DjangoError::NotFound(format!("Session '{session_key}' not found")))
     }
 
     async fn save(&self, session: &SessionData) -> Result<String, DjangoError> {
@@ -173,9 +171,7 @@ impl SessionBackend for InMemorySessionBackend {
 
     async fn exists(&self, session_key: &str) -> Result<bool, DjangoError> {
         let sessions = self.sessions.read().await;
-        Ok(sessions
-            .get(session_key)
-            .is_some_and(|s| !s.is_expired()))
+        Ok(sessions.get(session_key).is_some_and(|s| !s.is_expired()))
     }
 
     async fn clear_expired(&self) -> Result<(), DjangoError> {
@@ -258,10 +254,7 @@ impl DatabaseSessionBackend {
             session_data TEXT NOT NULL, \
             expire_date TEXT NOT NULL\
         )";
-        self.db
-            .execute_sql(sql, &[])
-            .await
-            .map(|_| ())
+        self.db.execute_sql(sql, &[]).await.map(|_| ())
     }
 }
 
@@ -308,8 +301,9 @@ impl SessionBackend for DatabaseSessionBackend {
     }
 
     async fn save(&self, session: &SessionData) -> Result<String, DjangoError> {
-        let data_json = serde_json::to_string(&session.data)
-            .map_err(|e| DjangoError::InternalServerError(format!("Failed to serialize session: {e}")))?;
+        let data_json = serde_json::to_string(&session.data).map_err(|e| {
+            DjangoError::InternalServerError(format!("Failed to serialize session: {e}"))
+        })?;
         let expire_str = session.expire_date.to_rfc3339();
 
         // Use INSERT OR REPLACE (SQLite) / ON CONFLICT (Postgres-compatible)
@@ -362,10 +356,7 @@ impl SessionBackend for DatabaseSessionBackend {
         let now_str = Utc::now().to_rfc3339();
         let sql = "DELETE FROM django_session WHERE expire_date < $1";
         self.db
-            .execute_sql(
-                sql,
-                &[django_rs_db::value::Value::String(now_str)],
-            )
+            .execute_sql(sql, &[django_rs_db::value::Value::String(now_str)])
             .await?;
         Ok(())
     }
@@ -428,10 +419,8 @@ impl SignedCookieSessionBackend {
             &base64::engine::general_purpose::URL_SAFE_NO_PAD,
             data.as_bytes(),
         );
-        let sig_b64 = base64::Engine::encode(
-            &base64::engine::general_purpose::URL_SAFE_NO_PAD,
-            signature,
-        );
+        let sig_b64 =
+            base64::Engine::encode(&base64::engine::general_purpose::URL_SAFE_NO_PAD, signature);
 
         format!("{data_b64}.{sig_b64}")
     }
@@ -451,20 +440,20 @@ impl SignedCookieSessionBackend {
         let sig_b64 = parts[0];
         let data_b64 = parts[1];
 
-        let data_bytes = base64::Engine::decode(
-            &base64::engine::general_purpose::URL_SAFE_NO_PAD,
-            data_b64,
-        )
-        .map_err(|e| DjangoError::InternalServerError(format!("Invalid base64 data: {e}")))?;
+        let data_bytes =
+            base64::Engine::decode(&base64::engine::general_purpose::URL_SAFE_NO_PAD, data_b64)
+                .map_err(|e| {
+                    DjangoError::InternalServerError(format!("Invalid base64 data: {e}"))
+                })?;
 
-        let expected_sig = base64::Engine::decode(
-            &base64::engine::general_purpose::URL_SAFE_NO_PAD,
-            sig_b64,
-        )
-        .map_err(|e| DjangoError::InternalServerError(format!("Invalid base64 signature: {e}")))?;
+        let expected_sig =
+            base64::Engine::decode(&base64::engine::general_purpose::URL_SAFE_NO_PAD, sig_b64)
+                .map_err(|e| {
+                    DjangoError::InternalServerError(format!("Invalid base64 signature: {e}"))
+                })?;
 
-        let data_str =
-            String::from_utf8(data_bytes).map_err(|e| DjangoError::InternalServerError(e.to_string()))?;
+        let data_str = String::from_utf8(data_bytes)
+            .map_err(|e| DjangoError::InternalServerError(e.to_string()))?;
 
         // Verify signature
         let key = format!("{}:{}", self.salt, self.secret_key);
@@ -472,8 +461,9 @@ impl SignedCookieSessionBackend {
             Hmac::<Sha256>::new_from_slice(key.as_bytes()).expect("HMAC can take key of any size");
         mac.update(data_str.as_bytes());
 
-        mac.verify_slice(&expected_sig)
-            .map_err(|_| DjangoError::InternalServerError("Invalid cookie signature".to_string()))?;
+        mac.verify_slice(&expected_sig).map_err(|_| {
+            DjangoError::InternalServerError("Invalid cookie signature".to_string())
+        })?;
 
         Ok(data_str)
     }
@@ -529,8 +519,9 @@ impl SessionBackend for SignedCookieSessionBackend {
             "expire_date": session.expire_date.to_rfc3339(),
         });
 
-        let json_str = serde_json::to_string(&envelope)
-            .map_err(|e| DjangoError::InternalServerError(format!("Failed to serialize session: {e}")))?;
+        let json_str = serde_json::to_string(&envelope).map_err(|e| {
+            DjangoError::InternalServerError(format!("Failed to serialize session: {e}"))
+        })?;
 
         let signed = self.sign(&json_str);
 
@@ -617,12 +608,14 @@ struct FileSessionEnvelope {
 impl SessionBackend for FileSessionBackend {
     async fn load(&self, session_key: &str) -> Result<SessionData, DjangoError> {
         let path = self.session_file(session_key);
-        let content = tokio::fs::read_to_string(&path).await.map_err(|_| {
-            DjangoError::NotFound(format!("Session '{session_key}' not found"))
-        })?;
+        let content = tokio::fs::read_to_string(&path)
+            .await
+            .map_err(|_| DjangoError::NotFound(format!("Session '{session_key}' not found")))?;
 
         let envelope: FileSessionEnvelope = serde_json::from_str(&content).map_err(|e| {
-            DjangoError::InternalServerError(format!("Invalid session file for '{session_key}': {e}"))
+            DjangoError::InternalServerError(format!(
+                "Invalid session file for '{session_key}': {e}"
+            ))
         })?;
 
         let expire_date = chrono::DateTime::parse_from_rfc3339(&envelope.expire_date)
@@ -658,8 +651,9 @@ impl SessionBackend for FileSessionBackend {
             expire_date: session.expire_date.to_rfc3339(),
         };
 
-        let content = serde_json::to_string_pretty(&envelope)
-            .map_err(|e| DjangoError::InternalServerError(format!("Failed to serialize session: {e}")))?;
+        let content = serde_json::to_string_pretty(&envelope).map_err(|e| {
+            DjangoError::InternalServerError(format!("Failed to serialize session: {e}"))
+        })?;
 
         let path = self.session_file(&session.session_key);
         tokio::fs::write(&path, content.as_bytes())
@@ -702,10 +696,7 @@ impl SessionBackend for FileSessionBackend {
                 Ok(None) | Err(_) => break,
             };
             let path: std::path::PathBuf = entry.path();
-            let ext_match = path
-                .extension()
-                .and_then(std::ffi::OsStr::to_str)
-                == Some("json");
+            let ext_match = path.extension().and_then(std::ffi::OsStr::to_str) == Some("json");
             if !ext_match {
                 continue;
             }
@@ -844,8 +835,7 @@ impl Middleware for SessionMiddleware {
             // Try to load an existing session from the backend
             if let Ok(session) = self.backend.load(&session_key).await {
                 // Serialize session data as JSON into META
-                let session_data_json =
-                    serde_json::to_string(&session.data).unwrap_or_default();
+                let session_data_json = serde_json::to_string(&session.data).unwrap_or_default();
 
                 // Store session key, data, and modification flag in META
                 let meta = request.meta_mut();
@@ -889,12 +879,8 @@ impl Middleware for SessionMiddleware {
             .get("SESSION_DATA")
             .cloned()
             .unwrap_or_else(|| "{}".to_string());
-        let modified = meta
-            .get("SESSION_MODIFIED")
-            .is_some_and(|v| v == "true");
-        let is_new = meta
-            .get("SESSION_IS_NEW")
-            .is_some_and(|v| v == "true");
+        let modified = meta.get("SESSION_MODIFIED").is_some_and(|v| v == "true");
+        let is_new = meta.get("SESSION_IS_NEW").is_some_and(|v| v == "true");
 
         // Only save and set cookie if session was modified or is new with data
         let data: HashMap<String, serde_json::Value> =
@@ -971,10 +957,7 @@ mod tests {
     fn test_session_data_get_set() {
         let mut session = SessionData::new("test".to_string());
         session.set("username", serde_json::json!("alice"));
-        assert_eq!(
-            session.get("username"),
-            Some(&serde_json::json!("alice"))
-        );
+        assert_eq!(session.get("username"), Some(&serde_json::json!("alice")));
         assert!(session.modified);
     }
 
@@ -1057,10 +1040,7 @@ mod tests {
         backend.save(&session).await.unwrap();
 
         let loaded = backend.load("session-1").await.unwrap();
-        assert_eq!(
-            loaded.get("user"),
-            Some(&serde_json::json!("alice"))
-        );
+        assert_eq!(loaded.get("user"), Some(&serde_json::json!("alice")));
     }
 
     #[tokio::test]
@@ -1275,8 +1255,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_signed_cookie_size_limit() {
-        let backend = SignedCookieSessionBackend::new("secret")
-            .with_max_cookie_size(100);
+        let backend = SignedCookieSessionBackend::new("secret").with_max_cookie_size(100);
         let mut session = SessionData::new("big".to_string());
         // Add a large value
         session.set("data", serde_json::json!("x".repeat(200)));

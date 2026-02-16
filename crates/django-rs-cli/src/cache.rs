@@ -190,10 +190,7 @@ impl CacheBackend for InMemoryCache {
     ) -> Result<(), DjangoError> {
         let mut store = self.store.write().await;
         let expires_at = ttl.map(|d| Instant::now() + d);
-        store.insert(
-            key.to_string(),
-            CacheEntry { value, expires_at },
-        );
+        store.insert(key.to_string(), CacheEntry { value, expires_at });
         Ok(())
     }
 
@@ -246,16 +243,14 @@ impl CacheBackend for InMemoryCache {
 
     async fn has_key(&self, key: &str) -> Result<bool, DjangoError> {
         let store = self.store.read().await;
-        Ok(store
-            .get(key)
-            .is_some_and(|entry| !entry.is_expired()))
+        Ok(store.get(key).is_some_and(|entry| !entry.is_expired()))
     }
 
     async fn incr(&self, key: &str, delta: i64) -> Result<i64, DjangoError> {
         let mut store = self.store.write().await;
-        let entry = store.get_mut(key).ok_or_else(|| {
-            DjangoError::NotFound(format!("Cache key '{key}' does not exist"))
-        })?;
+        let entry = store
+            .get_mut(key)
+            .ok_or_else(|| DjangoError::NotFound(format!("Cache key '{key}' does not exist")))?;
 
         if entry.is_expired() {
             return Err(DjangoError::NotFound(format!(
@@ -448,10 +443,7 @@ impl CacheBackend for FileCache {
             let mut entries = tokio::fs::read_dir(&self.dir).await?;
             while let Some(entry) = entries.next_entry().await? {
                 let path = entry.path();
-                if path
-                    .extension()
-                    .is_some_and(|ext| ext == "cache")
-                {
+                if path.extension().is_some_and(|ext| ext == "cache") {
                     let _ = tokio::fs::remove_file(&path).await;
                 }
             }
@@ -485,9 +477,10 @@ impl CacheBackend for FileCache {
     }
 
     async fn incr(&self, key: &str, delta: i64) -> Result<i64, DjangoError> {
-        let value = self.get(key).await?.ok_or_else(|| {
-            DjangoError::NotFound(format!("Cache key '{key}' does not exist"))
-        })?;
+        let value = self
+            .get(key)
+            .await?
+            .ok_or_else(|| DjangoError::NotFound(format!("Cache key '{key}' does not exist")))?;
 
         match value {
             CacheValue::Integer(current) => {
@@ -532,10 +525,7 @@ impl CacheBackend for DummyCache {
         Ok(())
     }
 
-    async fn get_many(
-        &self,
-        _keys: &[&str],
-    ) -> Result<HashMap<String, CacheValue>, DjangoError> {
+    async fn get_many(&self, _keys: &[&str]) -> Result<HashMap<String, CacheValue>, DjangoError> {
         Ok(HashMap::new())
     }
 
@@ -594,10 +584,7 @@ mod tests {
             CacheValue::String("a".to_string()),
             CacheValue::String("a".to_string())
         );
-        assert_ne!(
-            CacheValue::Integer(1),
-            CacheValue::Integer(2)
-        );
+        assert_ne!(CacheValue::Integer(1), CacheValue::Integer(2));
     }
 
     // ── InMemoryCache tests ───────────────────────────────────────────
@@ -681,14 +668,8 @@ mod tests {
     #[tokio::test]
     async fn test_inmemory_clear() {
         let cache = InMemoryCache::new();
-        cache
-            .set("a", CacheValue::Integer(1), None)
-            .await
-            .unwrap();
-        cache
-            .set("b", CacheValue::Integer(2), None)
-            .await
-            .unwrap();
+        cache.set("a", CacheValue::Integer(1), None).await.unwrap();
+        cache.set("b", CacheValue::Integer(2), None).await.unwrap();
 
         cache.clear().await.unwrap();
 
@@ -699,14 +680,8 @@ mod tests {
     #[tokio::test]
     async fn test_inmemory_get_many() {
         let cache = InMemoryCache::new();
-        cache
-            .set("a", CacheValue::Integer(1), None)
-            .await
-            .unwrap();
-        cache
-            .set("b", CacheValue::Integer(2), None)
-            .await
-            .unwrap();
+        cache.set("a", CacheValue::Integer(1), None).await.unwrap();
+        cache.set("b", CacheValue::Integer(2), None).await.unwrap();
 
         let result = cache.get_many(&["a", "b", "c"]).await.unwrap();
         assert_eq!(result.len(), 2);
@@ -750,7 +725,11 @@ mod tests {
     async fn test_inmemory_has_key_expired() {
         let cache = InMemoryCache::new();
         cache
-            .set("key", CacheValue::Integer(1), Some(Duration::from_millis(1)))
+            .set(
+                "key",
+                CacheValue::Integer(1),
+                Some(Duration::from_millis(1)),
+            )
             .await
             .unwrap();
 
@@ -844,7 +823,11 @@ mod tests {
         let cache = FileCache::new(dir.path().to_path_buf());
 
         cache
-            .set("file-key", CacheValue::String("file-value".to_string()), None)
+            .set(
+                "file-key",
+                CacheValue::String("file-value".to_string()),
+                None,
+            )
             .await
             .unwrap();
 
@@ -902,7 +885,10 @@ mod tests {
 
         assert!(!cache.has_key("key").await.unwrap());
 
-        cache.set("key", CacheValue::Integer(1), None).await.unwrap();
+        cache
+            .set("key", CacheValue::Integer(1), None)
+            .await
+            .unwrap();
         assert!(cache.has_key("key").await.unwrap());
     }
 
@@ -911,7 +897,10 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let cache = FileCache::new(dir.path().to_path_buf());
 
-        cache.set("counter", CacheValue::Integer(10), None).await.unwrap();
+        cache
+            .set("counter", CacheValue::Integer(10), None)
+            .await
+            .unwrap();
         let new_val = cache.incr("counter", 5).await.unwrap();
         assert_eq!(new_val, 15);
     }

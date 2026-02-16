@@ -200,7 +200,10 @@ mod tests {
         let tokens = tokenize("{% if condition %}").unwrap();
         assert_eq!(
             tokens,
-            vec![Token::Block("if".to_string(), vec!["condition".to_string()])]
+            vec![Token::Block(
+                "if".to_string(),
+                vec!["condition".to_string()]
+            )]
         );
     }
 

@@ -20,7 +20,7 @@ use django_rs_forms::form::{BaseForm, Form};
 use django_rs_http::{HttpRequest, HttpResponse, HttpResponseRedirect, QueryDict};
 use django_rs_template::context::{Context, ContextValue};
 use django_rs_template::context_processors::{
-    CsrfContextProcessor, ContextProcessor, RequestContextProcessor, StaticContextProcessor,
+    ContextProcessor, CsrfContextProcessor, RequestContextProcessor, StaticContextProcessor,
 };
 use django_rs_template::engine::Engine;
 use django_rs_views::middleware::{Middleware, MiddlewarePipeline};
@@ -46,9 +46,7 @@ async fn test_template_view_renders_with_engine() {
         .with_engine(engine)
         .with_context("name", serde_json::json!("Django"));
 
-    let request = HttpRequest::builder()
-        .method(http::Method::GET)
-        .build();
+    let request = HttpRequest::builder().method(http::Method::GET).build();
     let response = view.dispatch(request).await;
 
     assert_eq!(response.status(), http::StatusCode::OK);
@@ -59,12 +57,9 @@ async fn test_template_view_renders_with_engine() {
 
 #[tokio::test]
 async fn test_template_view_renders_without_engine_fallback() {
-    let view =
-        TemplateView::new("home.html").with_context("title", serde_json::json!("My Title"));
+    let view = TemplateView::new("home.html").with_context("title", serde_json::json!("My Title"));
 
-    let request = HttpRequest::builder()
-        .method(http::Method::GET)
-        .build();
+    let request = HttpRequest::builder().method(http::Method::GET).build();
     let response = view.dispatch(request).await;
 
     assert_eq!(response.status(), http::StatusCode::OK);
@@ -79,9 +74,7 @@ async fn test_template_view_missing_template_returns_error() {
     // Do not add any template
     let view = TemplateView::new("missing.html").with_engine(engine);
 
-    let request = HttpRequest::builder()
-        .method(http::Method::GET)
-        .build();
+    let request = HttpRequest::builder().method(http::Method::GET).build();
     let response = view.dispatch(request).await;
 
     assert_eq!(response.status(), http::StatusCode::INTERNAL_SERVER_ERROR);
@@ -96,11 +89,12 @@ async fn test_template_view_renders_html_escaping() {
 
     let view = TemplateView::new("safe.html")
         .with_engine(engine)
-        .with_context("content", serde_json::json!("<script>alert('xss')</script>"));
+        .with_context(
+            "content",
+            serde_json::json!("<script>alert('xss')</script>"),
+        );
 
-    let request = HttpRequest::builder()
-        .method(http::Method::GET)
-        .build();
+    let request = HttpRequest::builder().method(http::Method::GET).build();
     let response = view.dispatch(request).await;
 
     let body = String::from_utf8(response.content_bytes().unwrap()).unwrap();
@@ -120,9 +114,7 @@ async fn test_template_view_with_if_tag() {
         .with_engine(engine)
         .with_context("show", serde_json::json!(true));
 
-    let request = HttpRequest::builder()
-        .method(http::Method::GET)
-        .build();
+    let request = HttpRequest::builder().method(http::Method::GET).build();
     let response = view.dispatch(request).await;
 
     let body = String::from_utf8(response.content_bytes().unwrap()).unwrap();
@@ -141,9 +133,7 @@ async fn test_template_view_with_for_loop() {
         .with_engine(engine)
         .with_context("items", serde_json::json!(["a", "b", "c"]));
 
-    let request = HttpRequest::builder()
-        .method(http::Method::GET)
-        .build();
+    let request = HttpRequest::builder().method(http::Method::GET).build();
     let response = view.dispatch(request).await;
 
     let body = String::from_utf8(response.content_bytes().unwrap()).unwrap();
@@ -166,9 +156,7 @@ async fn test_template_view_with_inheritance() {
         .with_engine(engine)
         .with_context("name", serde_json::json!("World"));
 
-    let request = HttpRequest::builder()
-        .method(http::Method::GET)
-        .build();
+    let request = HttpRequest::builder().method(http::Method::GET).build();
     let response = view.dispatch(request).await;
 
     let body = String::from_utf8(response.content_bytes().unwrap()).unwrap();
@@ -231,9 +219,7 @@ async fn test_list_view_renders_with_engine() {
         engine,
     };
 
-    let request = HttpRequest::builder()
-        .method(http::Method::GET)
-        .build();
+    let request = HttpRequest::builder().method(http::Method::GET).build();
     let response = view.dispatch(request).await;
 
     assert_eq!(response.status(), http::StatusCode::OK);
@@ -255,9 +241,7 @@ async fn test_list_view_renders_empty_list() {
         engine,
     };
 
-    let request = HttpRequest::builder()
-        .method(http::Method::GET)
-        .build();
+    let request = HttpRequest::builder().method(http::Method::GET).build();
     let response = view.dispatch(request).await;
 
     let body = String::from_utf8(response.content_bytes().unwrap()).unwrap();
@@ -267,10 +251,7 @@ async fn test_list_view_renders_empty_list() {
 #[tokio::test]
 async fn test_list_view_with_count() {
     let engine = Arc::new(Engine::new());
-    engine.add_string_template(
-        "article_list.html",
-        "Count: {{ object_list|length }}",
-    );
+    engine.add_string_template("article_list.html", "Count: {{ object_list|length }}");
 
     let view = TestEngineListView {
         items: vec![
@@ -281,9 +262,7 @@ async fn test_list_view_with_count() {
         engine,
     };
 
-    let request = HttpRequest::builder()
-        .method(http::Method::GET)
-        .build();
+    let request = HttpRequest::builder().method(http::Method::GET).build();
     let response = view.dispatch(request).await;
 
     let body = String::from_utf8(response.content_bytes().unwrap()).unwrap();
@@ -349,9 +328,7 @@ async fn test_detail_view_renders_with_engine() {
         engine,
     };
 
-    let request = HttpRequest::builder()
-        .method(http::Method::GET)
-        .build();
+    let request = HttpRequest::builder().method(http::Method::GET).build();
     let response = view.dispatch(request).await;
 
     assert_eq!(response.status(), http::StatusCode::OK);
@@ -370,9 +347,7 @@ async fn test_detail_view_not_found_with_engine() {
         engine,
     };
 
-    let request = HttpRequest::builder()
-        .method(http::Method::GET)
-        .build();
+    let request = HttpRequest::builder().method(http::Method::GET).build();
     let response = view.dispatch(request).await;
 
     assert_eq!(response.status(), http::StatusCode::NOT_FOUND);
@@ -462,7 +437,10 @@ async fn test_session_saves_modified_data_on_response() {
     meta.insert("SESSION_MODIFIED".to_string(), "true".to_string());
     let mut data: HashMap<String, serde_json::Value> = HashMap::new();
     data.insert("user_id".to_string(), serde_json::json!(42));
-    meta.insert("SESSION_DATA".to_string(), serde_json::to_string(&data).unwrap());
+    meta.insert(
+        "SESSION_DATA".to_string(),
+        serde_json::to_string(&data).unwrap(),
+    );
 
     let response = HttpResponse::ok("test");
     let resp = mw.process_response(&request, response).await;
@@ -523,10 +501,7 @@ async fn test_session_persists_across_requests() {
     let meta = request2.meta();
     let session_data: HashMap<String, serde_json::Value> =
         serde_json::from_str(meta.get("SESSION_DATA").unwrap()).unwrap();
-    assert_eq!(
-        session_data.get("counter"),
-        Some(&serde_json::json!(1))
-    );
+    assert_eq!(session_data.get("counter"), Some(&serde_json::json!(1)));
 }
 
 #[tokio::test]
@@ -542,7 +517,10 @@ async fn test_session_cookie_secure_flag() {
     meta.insert("SESSION_MODIFIED".to_string(), "true".to_string());
     let mut data: HashMap<String, serde_json::Value> = HashMap::new();
     data.insert("key".to_string(), serde_json::json!("val"));
-    meta.insert("SESSION_DATA".to_string(), serde_json::to_string(&data).unwrap());
+    meta.insert(
+        "SESSION_DATA".to_string(),
+        serde_json::to_string(&data).unwrap(),
+    );
 
     let response = HttpResponse::ok("test");
     let resp = mw.process_response(&request, response).await;
@@ -590,7 +568,10 @@ async fn test_session_samesite_attribute() {
     meta.insert("SESSION_MODIFIED".to_string(), "true".to_string());
     let mut data: HashMap<String, serde_json::Value> = HashMap::new();
     data.insert("k".to_string(), serde_json::json!("v"));
-    meta.insert("SESSION_DATA".to_string(), serde_json::to_string(&data).unwrap());
+    meta.insert(
+        "SESSION_DATA".to_string(),
+        serde_json::to_string(&data).unwrap(),
+    );
 
     let response = HttpResponse::ok("test");
     let resp = mw.process_response(&request, response).await;
@@ -610,16 +591,14 @@ async fn test_session_samesite_attribute() {
 
 #[tokio::test]
 async fn test_form_get_shows_empty_form() {
-    let form = BaseForm::new(vec![
-        FormFieldDef::new(
-            "name",
-            FormFieldType::Char {
-                min_length: None,
-                max_length: None,
-                strip: false,
-            },
-        ),
-    ]);
+    let form = BaseForm::new(vec![FormFieldDef::new(
+        "name",
+        FormFieldType::Char {
+            min_length: None,
+            max_length: None,
+            strip: false,
+        },
+    )]);
 
     assert!(!form.is_bound());
     let ctx = form.as_context();
@@ -765,10 +744,7 @@ impl ContextMixin for TestFormCreateView {
         _kwargs: &HashMap<String, String>,
     ) -> HashMap<String, serde_json::Value> {
         let mut ctx = HashMap::new();
-        ctx.insert(
-            "form_fields".to_string(),
-            serde_json::json!(self.fields()),
-        );
+        ctx.insert("form_fields".to_string(), serde_json::json!(self.fields()));
         ctx
     }
 }
@@ -839,9 +815,7 @@ async fn test_create_view_get_renders_form() {
     );
 
     let view = TestFormCreateView { engine };
-    let request = HttpRequest::builder()
-        .method(http::Method::GET)
-        .build();
+    let request = HttpRequest::builder().method(http::Method::GET).build();
     let response = view.dispatch(request).await;
 
     assert_eq!(response.status(), http::StatusCode::OK);
@@ -877,10 +851,7 @@ async fn test_create_view_post_valid_redirects() {
 #[tokio::test]
 async fn test_create_view_post_invalid_shows_errors() {
     let engine = Arc::new(Engine::new());
-    engine.add_string_template(
-        "article_form.html",
-        "{% if errors %}ERRORS{% endif %}",
-    );
+    engine.add_string_template("article_form.html", "{% if errors %}ERRORS{% endif %}");
 
     let view = TestFormCreateView { engine };
     let request = HttpRequest::builder()
@@ -943,7 +914,10 @@ fn test_request_context_processor_injects_request_info() {
     if let Some(ContextValue::Dict(req)) = ctx.get("request") {
         assert_eq!(req.get("path").unwrap().to_display_string(), "/articles/");
         assert_eq!(req.get("method").unwrap().to_display_string(), "GET");
-        assert!(matches!(req.get("is_secure"), Some(ContextValue::Bool(true))));
+        assert!(matches!(
+            req.get("is_secure"),
+            Some(ContextValue::Bool(true))
+        ));
     } else {
         panic!("Expected request dict");
     }
@@ -985,8 +959,7 @@ fn test_django_app_with_engine() {
     let engine = Engine::new();
     engine.add_string_template("test.html", "Hello!");
 
-    let app = django_rs_views::DjangoApp::new(django_rs_core::Settings::default())
-        .engine(engine);
+    let app = django_rs_views::DjangoApp::new(django_rs_core::Settings::default()).engine(engine);
 
     assert!(app.template_engine().is_some());
 }
@@ -1061,20 +1034,15 @@ async fn test_session_middleware_in_pipeline() {
     let mut pipeline = MiddlewarePipeline::new();
     pipeline.add(SessionMiddleware::new(backend));
 
-    let handler: django_rs_views::middleware::ViewHandler =
-        Box::new(|request: HttpRequest| {
-            Box::pin(async move {
-                let meta = request.meta();
-                let data_str = meta.get("SESSION_DATA").unwrap();
-                let data: HashMap<String, serde_json::Value> =
-                    serde_json::from_str(data_str).unwrap();
-                let role = data
-                    .get("role")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("none");
-                HttpResponse::ok(format!("role={role}"))
-            })
-        });
+    let handler: django_rs_views::middleware::ViewHandler = Box::new(|request: HttpRequest| {
+        Box::pin(async move {
+            let meta = request.meta();
+            let data_str = meta.get("SESSION_DATA").unwrap();
+            let data: HashMap<String, serde_json::Value> = serde_json::from_str(data_str).unwrap();
+            let role = data.get("role").and_then(|v| v.as_str()).unwrap_or("none");
+            HttpResponse::ok(format!("role={role}"))
+        })
+    });
 
     let request = HttpRequest::builder()
         .header("cookie", "sessionid=pipeline-session")
@@ -1087,16 +1055,14 @@ async fn test_session_middleware_in_pipeline() {
 
 #[tokio::test]
 async fn test_form_rebind_clears_errors() {
-    let mut form = BaseForm::new(vec![
-        FormFieldDef::new(
-            "name",
-            FormFieldType::Char {
-                min_length: Some(3),
-                max_length: None,
-                strip: false,
-            },
-        ),
-    ]);
+    let mut form = BaseForm::new(vec![FormFieldDef::new(
+        "name",
+        FormFieldType::Char {
+            min_length: Some(3),
+            max_length: None,
+            strip: false,
+        },
+    )]);
 
     // First attempt: invalid
     let bad_request = HttpRequest::builder()
@@ -1123,16 +1089,15 @@ async fn test_form_rebind_clears_errors() {
 
 #[tokio::test]
 async fn test_form_with_prefix_from_request() {
-    let mut form = BaseForm::new(vec![
-        FormFieldDef::new(
-            "name",
-            FormFieldType::Char {
-                min_length: None,
-                max_length: None,
-                strip: false,
-            },
-        ),
-    ]).with_prefix("myform");
+    let mut form = BaseForm::new(vec![FormFieldDef::new(
+        "name",
+        FormFieldType::Char {
+            min_length: None,
+            max_length: None,
+            strip: false,
+        },
+    )])
+    .with_prefix("myform");
 
     let request = HttpRequest::builder()
         .method(http::Method::POST)
@@ -1156,7 +1121,10 @@ async fn test_session_cookie_path_customization() {
     meta.insert("SESSION_MODIFIED".to_string(), "true".to_string());
     let mut data: HashMap<String, serde_json::Value> = HashMap::new();
     data.insert("k".to_string(), serde_json::json!("v"));
-    meta.insert("SESSION_DATA".to_string(), serde_json::to_string(&data).unwrap());
+    meta.insert(
+        "SESSION_DATA".to_string(),
+        serde_json::to_string(&data).unwrap(),
+    );
 
     let response = HttpResponse::ok("test");
     let resp = mw.process_response(&request, response).await;
@@ -1205,10 +1173,7 @@ async fn test_template_view_boolean_context() {
 #[tokio::test]
 async fn test_template_view_null_context() {
     let engine = Arc::new(Engine::new());
-    engine.add_string_template(
-        "null.html",
-        r#"{{ val|default:"fallback" }}"#,
-    );
+    engine.add_string_template("null.html", r#"{{ val|default:"fallback" }}"#);
 
     let view = TemplateView::new("null.html")
         .with_engine(engine)
@@ -1248,10 +1213,7 @@ async fn test_list_view_with_nested_object_data() {
 #[tokio::test]
 async fn test_detail_view_with_nested_object() {
     let engine = Arc::new(Engine::new());
-    engine.add_string_template(
-        "article_detail.html",
-        "{{ object.metadata.category }}",
-    );
+    engine.add_string_template("article_detail.html", "{{ object.metadata.category }}");
 
     let view = TestEngineDetailView {
         object: Some(serde_json::json!({"metadata": {"category": "tech"}})),
@@ -1271,7 +1233,7 @@ async fn test_detail_view_with_nested_object() {
 
 use django_rs_views::middleware::builtin::{
     AuthenticationMiddleware, CacheMiddleware, LocaleMiddleware, LoginRequiredMiddleware,
-    MessageMiddleware, MessageLevel,
+    MessageLevel, MessageMiddleware,
 };
 
 #[tokio::test]
@@ -1292,7 +1254,11 @@ async fn test_session_auth_pipeline_authenticated_user() {
     let handler: django_rs_views::middleware::ViewHandler = Box::new(|req| {
         Box::pin(async move {
             let user_id = req.meta().get("USER_ID").cloned().unwrap_or_default();
-            let authed = req.meta().get("USER_AUTHENTICATED").cloned().unwrap_or_default();
+            let authed = req
+                .meta()
+                .get("USER_AUTHENTICATED")
+                .cloned()
+                .unwrap_or_default();
             HttpResponse::ok(&format!("user={user_id},auth={authed}"))
         })
     });
@@ -1316,7 +1282,11 @@ async fn test_session_auth_pipeline_anonymous_user() {
 
     let handler: django_rs_views::middleware::ViewHandler = Box::new(|req| {
         Box::pin(async move {
-            let authed = req.meta().get("USER_AUTHENTICATED").cloned().unwrap_or_default();
+            let authed = req
+                .meta()
+                .get("USER_AUTHENTICATED")
+                .cloned()
+                .unwrap_or_default();
             HttpResponse::ok(&format!("auth={authed}"))
         })
     });
@@ -1343,7 +1313,11 @@ async fn test_session_auth_messages_pipeline() {
 
     let handler: django_rs_views::middleware::ViewHandler = Box::new(|req| {
         Box::pin(async move {
-            let authed = req.meta().get("USER_AUTHENTICATED").cloned().unwrap_or_default();
+            let authed = req
+                .meta()
+                .get("USER_AUTHENTICATED")
+                .cloned()
+                .unwrap_or_default();
             let has_store = req.meta().contains_key("_messages_store");
             HttpResponse::ok(&format!("auth={authed},msgs={has_store}"))
         })
@@ -1368,13 +1342,10 @@ async fn test_login_required_blocks_anonymous() {
     pipeline.add(AuthenticationMiddleware);
     pipeline.add(LoginRequiredMiddleware::default());
 
-    let handler: django_rs_views::middleware::ViewHandler = Box::new(|_req| {
-        Box::pin(async move { HttpResponse::ok("protected content") })
-    });
+    let handler: django_rs_views::middleware::ViewHandler =
+        Box::new(|_req| Box::pin(async move { HttpResponse::ok("protected content") }));
 
-    let request = HttpRequest::builder()
-        .path("/dashboard/")
-        .build();
+    let request = HttpRequest::builder().path("/dashboard/").build();
     let response = pipeline.process(request, &handler).await;
     assert_eq!(response.status(), http::StatusCode::FOUND);
     let location = response
@@ -1399,9 +1370,8 @@ async fn test_login_required_allows_authenticated() {
     pipeline.add(AuthenticationMiddleware);
     pipeline.add(LoginRequiredMiddleware::default());
 
-    let handler: django_rs_views::middleware::ViewHandler = Box::new(|_req| {
-        Box::pin(async move { HttpResponse::ok("protected content") })
-    });
+    let handler: django_rs_views::middleware::ViewHandler =
+        Box::new(|_req| Box::pin(async move { HttpResponse::ok("protected content") }));
 
     let request = HttpRequest::builder()
         .path("/dashboard/")
@@ -1437,7 +1407,12 @@ async fn test_locale_middleware_in_pipeline() {
     assert!(body.contains("lang=fr"));
     // Check Content-Language header was set
     assert_eq!(
-        response.headers().get("content-language").unwrap().to_str().unwrap(),
+        response
+            .headers()
+            .get("content-language")
+            .unwrap()
+            .to_str()
+            .unwrap(),
         "fr"
     );
 }

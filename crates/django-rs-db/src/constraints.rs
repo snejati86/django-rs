@@ -356,8 +356,7 @@ mod tests {
     fn test_check_constraint_to_sql_or() {
         let constraint = CheckConstraint::new(
             "has_contact",
-            Q::filter("email", Lookup::IsNull(false))
-                | Q::filter("phone", Lookup::IsNull(false)),
+            Q::filter("email", Lookup::IsNull(false)) | Q::filter("phone", Lookup::IsNull(false)),
         );
         let sql = constraint.to_sql("contacts");
         assert!(sql.contains("CHECK"));
@@ -411,10 +410,7 @@ mod tests {
 
     #[test]
     fn test_check_constraint_condition_sql() {
-        let constraint = CheckConstraint::new(
-            "test",
-            Q::filter("x", Lookup::Gt(Value::from(10))),
-        );
+        let constraint = CheckConstraint::new("test", Q::filter("x", Lookup::Gt(Value::from(10))));
         let (sql, params) = constraint.condition_sql(DatabaseBackendType::PostgreSQL);
         assert_eq!(sql, "\"x\" > $1");
         assert_eq!(params, vec![Value::Int(10)]);
@@ -422,10 +418,7 @@ mod tests {
 
     #[test]
     fn test_check_constraint_condition_sql_sqlite() {
-        let constraint = CheckConstraint::new(
-            "test",
-            Q::filter("x", Lookup::Gt(Value::from(10))),
-        );
+        let constraint = CheckConstraint::new("test", Q::filter("x", Lookup::Gt(Value::from(10))));
         let (sql, params) = constraint.condition_sql(DatabaseBackendType::SQLite);
         assert_eq!(sql, "\"x\" > ?");
         assert_eq!(params, vec![Value::Int(10)]);
@@ -457,20 +450,14 @@ mod tests {
 
     #[test]
     fn test_unique_constraint_creation() {
-        let constraint = UniqueConstraint::new(
-            "unique_email",
-            vec!["email".to_string()],
-        );
+        let constraint = UniqueConstraint::new("unique_email", vec!["email".to_string()]);
         assert_eq!(constraint.name(), "unique_email");
         assert_eq!(constraint.fields(), &["email"]);
     }
 
     #[test]
     fn test_unique_constraint_to_sql_single_column() {
-        let constraint = UniqueConstraint::new(
-            "unique_email",
-            vec!["email".to_string()],
-        );
+        let constraint = UniqueConstraint::new("unique_email", vec!["email".to_string()]);
         let sql = constraint.to_sql("users");
         assert_eq!(sql, "\"unique_email\" UNIQUE (\"email\")");
     }
@@ -490,11 +477,8 @@ mod tests {
 
     #[test]
     fn test_unique_constraint_with_condition() {
-        let constraint = UniqueConstraint::new(
-            "unique_active_email",
-            vec!["email".to_string()],
-        )
-        .condition(Q::filter("is_active", Lookup::Exact(Value::from(true))));
+        let constraint = UniqueConstraint::new("unique_active_email", vec!["email".to_string()])
+            .condition(Q::filter("is_active", Lookup::Exact(Value::from(true))));
         let sql = constraint.to_sql("users");
         assert!(sql.contains("UNIQUE (\"email\")"));
         assert!(sql.contains("WHERE"));
@@ -503,21 +487,15 @@ mod tests {
 
     #[test]
     fn test_unique_constraint_nulls_not_distinct() {
-        let constraint = UniqueConstraint::new(
-            "unique_code",
-            vec!["code".to_string()],
-        )
-        .nulls_distinct(false);
+        let constraint =
+            UniqueConstraint::new("unique_code", vec!["code".to_string()]).nulls_distinct(false);
         let sql = constraint.to_sql("items");
         assert!(sql.contains("NULLS NOT DISTINCT"));
     }
 
     #[test]
     fn test_unique_constraint_nulls_distinct_default() {
-        let constraint = UniqueConstraint::new(
-            "unique_code",
-            vec!["code".to_string()],
-        );
+        let constraint = UniqueConstraint::new("unique_code", vec!["code".to_string()]);
         let sql = constraint.to_sql("items");
         // Default behavior: no NULLS clause
         assert!(!sql.contains("NULLS"));
@@ -525,11 +503,8 @@ mod tests {
 
     #[test]
     fn test_unique_constraint_nulls_distinct_true() {
-        let constraint = UniqueConstraint::new(
-            "unique_code",
-            vec!["code".to_string()],
-        )
-        .nulls_distinct(true);
+        let constraint =
+            UniqueConstraint::new("unique_code", vec!["code".to_string()]).nulls_distinct(true);
         let sql = constraint.to_sql("items");
         // When explicitly true, it's the SQL default -- no extra clause needed
         assert!(!sql.contains("NULLS NOT DISTINCT"));
@@ -537,10 +512,7 @@ mod tests {
 
     #[test]
     fn test_unique_constraint_create_sql() {
-        let constraint = UniqueConstraint::new(
-            "unique_email",
-            vec!["email".to_string()],
-        );
+        let constraint = UniqueConstraint::new("unique_email", vec!["email".to_string()]);
         let sql = constraint.create_sql("users");
         assert!(sql.starts_with("ALTER TABLE \"users\" ADD CONSTRAINT"));
         assert!(sql.contains("UNIQUE"));
@@ -548,10 +520,7 @@ mod tests {
 
     #[test]
     fn test_unique_constraint_drop_sql() {
-        let constraint = UniqueConstraint::new(
-            "unique_email",
-            vec!["email".to_string()],
-        );
+        let constraint = UniqueConstraint::new("unique_email", vec!["email".to_string()]);
         let sql = constraint.drop_sql("users");
         assert_eq!(
             sql,
@@ -561,11 +530,8 @@ mod tests {
 
     #[test]
     fn test_unique_constraint_condition_sql() {
-        let constraint = UniqueConstraint::new(
-            "test",
-            vec!["col".to_string()],
-        )
-        .condition(Q::filter("active", Lookup::Exact(Value::from(true))));
+        let constraint = UniqueConstraint::new("test", vec!["col".to_string()])
+            .condition(Q::filter("active", Lookup::Exact(Value::from(true))));
         let result = constraint.condition_sql(DatabaseBackendType::PostgreSQL);
         assert!(result.is_some());
         let (sql, params) = result.unwrap();
@@ -575,23 +541,20 @@ mod tests {
 
     #[test]
     fn test_unique_constraint_no_condition_sql() {
-        let constraint = UniqueConstraint::new(
-            "test",
-            vec!["col".to_string()],
-        );
-        assert!(constraint.condition_sql(DatabaseBackendType::PostgreSQL).is_none());
+        let constraint = UniqueConstraint::new("test", vec!["col".to_string()]);
+        assert!(constraint
+            .condition_sql(DatabaseBackendType::PostgreSQL)
+            .is_none());
     }
 
     #[test]
     fn test_unique_constraint_with_complex_condition() {
-        let constraint = UniqueConstraint::new(
-            "unique_active_verified",
-            vec!["username".to_string()],
-        )
-        .condition(
-            Q::filter("is_active", Lookup::Exact(Value::from(true)))
-                & Q::filter("is_verified", Lookup::Exact(Value::from(true))),
-        );
+        let constraint =
+            UniqueConstraint::new("unique_active_verified", vec!["username".to_string()])
+                .condition(
+                    Q::filter("is_active", Lookup::Exact(Value::from(true)))
+                        & Q::filter("is_verified", Lookup::Exact(Value::from(true))),
+                );
         let sql = constraint.to_sql("users");
         assert!(sql.contains("WHERE"));
         assert!(sql.contains("AND"));
@@ -619,10 +582,7 @@ mod tests {
 
     #[test]
     fn test_inline_params_multiple() {
-        let sql = inline_params(
-            "\"x\" BETWEEN $1 AND $2",
-            &[Value::Int(1), Value::Int(10)],
-        );
+        let sql = inline_params("\"x\" BETWEEN $1 AND $2", &[Value::Int(1), Value::Int(10)]);
         assert_eq!(sql, "\"x\" BETWEEN 1 AND 10");
     }
 
@@ -706,8 +666,7 @@ mod tests {
     #[test]
     fn test_unique_constraint_get_condition_some() {
         let q = Q::filter("active", Lookup::Exact(Value::from(true)));
-        let constraint = UniqueConstraint::new("test", vec!["col".to_string()])
-            .condition(q);
+        let constraint = UniqueConstraint::new("test", vec!["col".to_string()]).condition(q);
         assert!(constraint.get_condition().is_some());
     }
 }

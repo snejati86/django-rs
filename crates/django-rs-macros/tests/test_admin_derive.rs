@@ -97,10 +97,7 @@ fn test_user_admin_readonly_fields() {
 
 #[test]
 fn test_user_admin_date_hierarchy() {
-    assert_eq!(
-        UserAdmin::date_hierarchy(),
-        Some("date_joined".to_string())
-    );
+    assert_eq!(UserAdmin::date_hierarchy(), Some("date_joined".to_string()));
 }
 
 #[test]
@@ -118,7 +115,7 @@ pub struct TaskAdmin;
 fn test_task_admin_multi_ordering() {
     let ordering = TaskAdmin::ordering();
     assert_eq!(ordering.len(), 3);
-    assert_eq!(ordering[0], ("priority", true));   // descending
-    assert_eq!(ordering[1], ("name", false));       // ascending
-    assert_eq!(ordering[2], ("created_at", true));  // descending
+    assert_eq!(ordering[0], ("priority", true)); // descending
+    assert_eq!(ordering[1], ("name", false)); // ascending
+    assert_eq!(ordering[2], ("created_at", true)); // descending
 }

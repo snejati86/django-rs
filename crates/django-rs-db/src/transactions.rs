@@ -28,8 +28,8 @@
 //! ```
 
 use crate::executor::DbExecutor;
-use crate::value::Value;
 use crate::query::compiler::{DatabaseBackendType, Row};
+use crate::value::Value;
 use django_rs_core::{DjangoError, DjangoResult};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -330,7 +330,10 @@ impl<'a> TransactionManager<'a> {
             callback();
         } else {
             // Register for later execution
-            self.on_commit_callbacks.lock().await.push(Box::new(callback));
+            self.on_commit_callbacks
+                .lock()
+                .await
+                .push(Box::new(callback));
         }
     }
 
@@ -477,11 +480,7 @@ mod tests {
             Ok(Row::new(vec!["id".to_string()], vec![Value::Int(1)]))
         }
 
-        async fn insert_returning_id(
-            &self,
-            sql: &str,
-            _params: &[Value],
-        ) -> DjangoResult<Value> {
+        async fn insert_returning_id(&self, sql: &str, _params: &[Value]) -> DjangoResult<Value> {
             self.statements.lock().await.push(sql.to_string());
             Ok(Value::Int(1))
         }
@@ -651,10 +650,7 @@ mod tests {
 
         let stmts = db.statements().await;
         assert_eq!(stmts[0], "BEGIN");
-        assert_eq!(
-            stmts[1],
-            "SET TRANSACTION ISOLATION LEVEL SERIALIZABLE"
-        );
+        assert_eq!(stmts[1], "SET TRANSACTION ISOLATION LEVEL SERIALIZABLE");
         assert_eq!(stmts[2], "SELECT 1");
         assert_eq!(stmts[3], "COMMIT");
     }
@@ -705,7 +701,9 @@ mod tests {
         txn.begin().await.unwrap();
 
         txn.create_savepoint("my_sp").await.unwrap();
-        txn.execute_sql("INSERT INTO t VALUES (1)", &[]).await.unwrap();
+        txn.execute_sql("INSERT INTO t VALUES (1)", &[])
+            .await
+            .unwrap();
         txn.rollback_to_savepoint("my_sp").await.unwrap();
         txn.commit().await.unwrap();
 
@@ -788,9 +786,18 @@ mod tests {
         let r3 = Arc::clone(&results);
 
         let outcome = atomic(&db, |txn| async move {
-            txn.on_commit(move || { r1.lock().unwrap().push(1); }).await;
-            txn.on_commit(move || { r2.lock().unwrap().push(2); }).await;
-            txn.on_commit(move || { r3.lock().unwrap().push(3); }).await;
+            txn.on_commit(move || {
+                r1.lock().unwrap().push(1);
+            })
+            .await;
+            txn.on_commit(move || {
+                r2.lock().unwrap().push(2);
+            })
+            .await;
+            txn.on_commit(move || {
+                r3.lock().unwrap().push(3);
+            })
+            .await;
             Ok(())
         })
         .await;

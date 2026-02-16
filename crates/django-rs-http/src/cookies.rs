@@ -8,8 +8,8 @@ use std::collections::HashMap;
 use std::fmt;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use base64::Engine as Base64Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+use base64::Engine as Base64Engine;
 use hmac::{Hmac, Mac};
 use sha2::Sha256;
 
@@ -222,8 +222,8 @@ pub fn sign_cookie_value(value: &str, secret_key: &str, salt: &str) -> String {
     let payload = format!("{value}:{timestamp}");
     let signing_key = format!("{salt}{secret_key}");
 
-    let mut mac = HmacSha256::new_from_slice(signing_key.as_bytes())
-        .expect("HMAC can take key of any size");
+    let mut mac =
+        HmacSha256::new_from_slice(signing_key.as_bytes()).expect("HMAC can take key of any size");
     mac.update(payload.as_bytes());
     let signature = URL_SAFE_NO_PAD.encode(mac.finalize().into_bytes());
 
@@ -270,8 +270,8 @@ pub fn verify_signed_cookie(
     let payload = format!("{value}:{timestamp_str}");
     let signing_key = format!("{salt}{secret_key}");
 
-    let mut mac = HmacSha256::new_from_slice(signing_key.as_bytes())
-        .expect("HMAC can take key of any size");
+    let mut mac =
+        HmacSha256::new_from_slice(signing_key.as_bytes()).expect("HMAC can take key of any size");
     mac.update(payload.as_bytes());
 
     let expected_signature = URL_SAFE_NO_PAD.encode(mac.finalize().into_bytes());
@@ -379,8 +379,7 @@ mod tests {
 
     #[test]
     fn test_cookie_with_expires() {
-        let cookie = Cookie::new("session", "abc")
-            .expires("Thu, 01 Dec 2025 16:00:00 GMT");
+        let cookie = Cookie::new("session", "abc").expires("Thu, 01 Dec 2025 16:00:00 GMT");
         let header = cookie.to_set_cookie_header();
         assert!(header.contains("Expires=Thu, 01 Dec 2025 16:00:00 GMT"));
     }

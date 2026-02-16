@@ -68,7 +68,11 @@ pub fn compile_bulk_insert(
 
     // Get column names from the first row
     let columns: Vec<&str> = rows[0].iter().map(|(name, _)| *name).collect();
-    let col_list: String = columns.iter().map(|c| format!("\"{c}\"")).collect::<Vec<_>>().join(", ");
+    let col_list: String = columns
+        .iter()
+        .map(|c| format!("\"{c}\""))
+        .collect::<Vec<_>>()
+        .join(", ");
 
     let mut sql = format!("INSERT INTO \"{table}\" ({col_list}) VALUES ");
 
@@ -199,17 +203,9 @@ pub async fn bulk_create<M: Model>(
     let mut total_inserted = 0u64;
 
     for chunk in objects.chunks_mut(batch_size) {
-        let rows: Vec<Vec<(&str, Value)>> = chunk
-            .iter()
-            .map(Model::non_pk_field_values)
-            .collect();
+        let rows: Vec<Vec<(&str, Value)>> = chunk.iter().map(Model::non_pk_field_values).collect();
 
-        let (sql, params) = compile_bulk_insert(
-            M::table_name(),
-            &rows,
-            options,
-            db.backend_type(),
-        );
+        let (sql, params) = compile_bulk_insert(M::table_name(), &rows, options, db.backend_type());
 
         if sql.is_empty() {
             continue;
@@ -429,8 +425,7 @@ pub async fn update_or_create<M: Model>(
             create_fields.push((name, val.clone()));
         }
 
-        let (insert_sql, insert_params) =
-            compiler.compile_insert(M::table_name(), &create_fields);
+        let (insert_sql, insert_params) = compiler.compile_insert(M::table_name(), &create_fields);
         let pk = db.insert_returning_id(&insert_sql, &insert_params).await?;
 
         // Fetch the created object
@@ -595,11 +590,7 @@ mod tests {
             Ok(Row::new(vec!["id".to_string()], vec![Value::Int(1)]))
         }
 
-        async fn insert_returning_id(
-            &self,
-            sql: &str,
-            params: &[Value],
-        ) -> DjangoResult<Value> {
+        async fn insert_returning_id(&self, sql: &str, params: &[Value]) -> DjangoResult<Value> {
             self.statements
                 .lock()
                 .await
@@ -620,8 +611,12 @@ mod tests {
             vec![("name", Value::from("Bob")), ("price", Value::from(20))],
         ];
         let options = BulkCreateOptions::default();
-        let (sql, params) =
-            compile_bulk_insert("test_item", &rows, &options, DatabaseBackendType::PostgreSQL);
+        let (sql, params) = compile_bulk_insert(
+            "test_item",
+            &rows,
+            &options,
+            DatabaseBackendType::PostgreSQL,
+        );
 
         assert_eq!(
             sql,
@@ -632,9 +627,10 @@ mod tests {
 
     #[test]
     fn test_bulk_insert_sqlite_basic() {
-        let rows = vec![
-            vec![("name", Value::from("Alice")), ("price", Value::from(10))],
-        ];
+        let rows = vec![vec![
+            ("name", Value::from("Alice")),
+            ("price", Value::from(10)),
+        ]];
         let options = BulkCreateOptions::default();
         let (sql, params) =
             compile_bulk_insert("test_item", &rows, &options, DatabaseBackendType::SQLite);
@@ -650,8 +646,12 @@ mod tests {
     fn test_bulk_insert_empty() {
         let rows: Vec<Vec<(&str, Value)>> = vec![];
         let options = BulkCreateOptions::default();
-        let (sql, params) =
-            compile_bulk_insert("test_item", &rows, &options, DatabaseBackendType::PostgreSQL);
+        let (sql, params) = compile_bulk_insert(
+            "test_item",
+            &rows,
+            &options,
+            DatabaseBackendType::PostgreSQL,
+        );
 
         assert!(sql.is_empty());
         assert!(params.is_empty());
@@ -659,25 +659,25 @@ mod tests {
 
     #[test]
     fn test_bulk_insert_ignore_conflicts_pg() {
-        let rows = vec![
-            vec![("name", Value::from("Alice"))],
-        ];
+        let rows = vec![vec![("name", Value::from("Alice"))]];
         let options = BulkCreateOptions {
             ignore_conflicts: true,
             unique_fields: vec!["name"],
             ..Default::default()
         };
-        let (sql, _) =
-            compile_bulk_insert("test_item", &rows, &options, DatabaseBackendType::PostgreSQL);
+        let (sql, _) = compile_bulk_insert(
+            "test_item",
+            &rows,
+            &options,
+            DatabaseBackendType::PostgreSQL,
+        );
 
         assert!(sql.contains("ON CONFLICT (\"name\") DO NOTHING"));
     }
 
     #[test]
     fn test_bulk_insert_ignore_conflicts_mysql() {
-        let rows = vec![
-            vec![("name", Value::from("Alice"))],
-        ];
+        let rows = vec![vec![("name", Value::from("Alice"))]];
         let options = BulkCreateOptions {
             ignore_conflicts: true,
             unique_fields: vec!["name"],
@@ -691,26 +691,32 @@ mod tests {
 
     #[test]
     fn test_bulk_insert_upsert_pg() {
-        let rows = vec![
-            vec![("name", Value::from("Alice")), ("price", Value::from(10))],
-        ];
+        let rows = vec![vec![
+            ("name", Value::from("Alice")),
+            ("price", Value::from(10)),
+        ]];
         let options = BulkCreateOptions {
             update_conflicts: true,
             update_fields: vec!["price"],
             unique_fields: vec!["name"],
             ..Default::default()
         };
-        let (sql, _) =
-            compile_bulk_insert("test_item", &rows, &options, DatabaseBackendType::PostgreSQL);
+        let (sql, _) = compile_bulk_insert(
+            "test_item",
+            &rows,
+            &options,
+            DatabaseBackendType::PostgreSQL,
+        );
 
         assert!(sql.contains("ON CONFLICT (\"name\") DO UPDATE SET \"price\" = EXCLUDED.\"price\""));
     }
 
     #[test]
     fn test_bulk_insert_upsert_mysql() {
-        let rows = vec![
-            vec![("name", Value::from("Alice")), ("price", Value::from(10))],
-        ];
+        let rows = vec![vec![
+            ("name", Value::from("Alice")),
+            ("price", Value::from(10)),
+        ]];
         let options = BulkCreateOptions {
             update_conflicts: true,
             update_fields: vec!["price"],
@@ -725,9 +731,10 @@ mod tests {
 
     #[test]
     fn test_bulk_insert_upsert_sqlite() {
-        let rows = vec![
-            vec![("name", Value::from("Alice")), ("price", Value::from(10))],
-        ];
+        let rows = vec![vec![
+            ("name", Value::from("Alice")),
+            ("price", Value::from(10)),
+        ]];
         let options = BulkCreateOptions {
             update_conflicts: true,
             update_fields: vec!["price"],
@@ -773,8 +780,12 @@ mod tests {
         );
 
         assert_eq!(stmts.len(), 2);
-        assert!(stmts[0].0.contains("UPDATE \"test_item\" SET \"name\" = $1 WHERE \"id\" = $2"));
-        assert!(stmts[1].0.contains("UPDATE \"test_item\" SET \"name\" = $1 WHERE \"id\" = $2"));
+        assert!(stmts[0]
+            .0
+            .contains("UPDATE \"test_item\" SET \"name\" = $1 WHERE \"id\" = $2"));
+        assert!(stmts[1]
+            .0
+            .contains("UPDATE \"test_item\" SET \"name\" = $1 WHERE \"id\" = $2"));
     }
 
     #[test]
@@ -833,8 +844,16 @@ mod tests {
         let db = MockDb::new(DatabaseBackendType::PostgreSQL);
 
         let mut items = vec![
-            Item { id: 0, name: "Alice".to_string(), price: 10 },
-            Item { id: 0, name: "Bob".to_string(), price: 20 },
+            Item {
+                id: 0,
+                name: "Alice".to_string(),
+                price: 10,
+            },
+            Item {
+                id: 0,
+                name: "Bob".to_string(),
+                price: 20,
+            },
         ];
 
         let options = BulkCreateOptions::default();
@@ -852,9 +871,21 @@ mod tests {
         let db = MockDb::new(DatabaseBackendType::PostgreSQL);
 
         let mut items = vec![
-            Item { id: 0, name: "A".to_string(), price: 10 },
-            Item { id: 0, name: "B".to_string(), price: 20 },
-            Item { id: 0, name: "C".to_string(), price: 30 },
+            Item {
+                id: 0,
+                name: "A".to_string(),
+                price: 10,
+            },
+            Item {
+                id: 0,
+                name: "B".to_string(),
+                price: 20,
+            },
+            Item {
+                id: 0,
+                name: "C".to_string(),
+                price: 30,
+            },
         ];
 
         let options = BulkCreateOptions {
@@ -885,13 +916,14 @@ mod tests {
     async fn test_get_or_create_existing() {
         let existing_row = Row::new(
             vec!["id".to_string(), "name".to_string(), "price".to_string()],
-            vec![Value::Int(1), Value::String("Alice".to_string()), Value::Int(10)],
+            vec![
+                Value::Int(1),
+                Value::String("Alice".to_string()),
+                Value::Int(10),
+            ],
         );
 
-        let db = MockDb::with_responses(
-            DatabaseBackendType::PostgreSQL,
-            vec![vec![existing_row]],
-        );
+        let db = MockDb::with_responses(DatabaseBackendType::PostgreSQL, vec![vec![existing_row]]);
 
         let (item, created): (Item, bool) = get_or_create(
             &[("name", Value::from("Alice"))],
@@ -910,13 +942,17 @@ mod tests {
     async fn test_get_or_create_new() {
         let created_row = Row::new(
             vec!["id".to_string(), "name".to_string(), "price".to_string()],
-            vec![Value::Int(1), Value::String("Bob".to_string()), Value::Int(20)],
+            vec![
+                Value::Int(1),
+                Value::String("Bob".to_string()),
+                Value::Int(20),
+            ],
         );
 
         let db = MockDb::with_responses(
             DatabaseBackendType::PostgreSQL,
             vec![
-                vec![],          // SELECT returns empty (doesn't exist)
+                vec![],            // SELECT returns empty (doesn't exist)
                 vec![created_row], // fetch after INSERT
             ],
         );
@@ -943,11 +979,19 @@ mod tests {
     async fn test_update_or_create_existing() {
         let existing_row = Row::new(
             vec!["id".to_string(), "name".to_string(), "price".to_string()],
-            vec![Value::Int(1), Value::String("Alice".to_string()), Value::Int(10)],
+            vec![
+                Value::Int(1),
+                Value::String("Alice".to_string()),
+                Value::Int(10),
+            ],
         );
         let updated_row = Row::new(
             vec!["id".to_string(), "name".to_string(), "price".to_string()],
-            vec![Value::Int(1), Value::String("Alice".to_string()), Value::Int(99)],
+            vec![
+                Value::Int(1),
+                Value::String("Alice".to_string()),
+                Value::Int(99),
+            ],
         );
 
         let db = MockDb::with_responses(
@@ -979,7 +1023,11 @@ mod tests {
     async fn test_update_or_create_new() {
         let created_row = Row::new(
             vec!["id".to_string(), "name".to_string(), "price".to_string()],
-            vec![Value::Int(1), Value::String("Charlie".to_string()), Value::Int(30)],
+            vec![
+                Value::Int(1),
+                Value::String("Charlie".to_string()),
+                Value::Int(30),
+            ],
         );
 
         let db = MockDb::with_responses(
@@ -1028,8 +1076,12 @@ mod tests {
             vec![("name", Value::from("C")), ("price", Value::from(3))],
         ];
         let options = BulkCreateOptions::default();
-        let (sql, params) =
-            compile_bulk_insert("test_item", &rows, &options, DatabaseBackendType::PostgreSQL);
+        let (sql, params) = compile_bulk_insert(
+            "test_item",
+            &rows,
+            &options,
+            DatabaseBackendType::PostgreSQL,
+        );
 
         assert!(sql.contains("($1, $2), ($3, $4), ($5, $6)"));
         assert_eq!(params.len(), 6);

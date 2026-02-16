@@ -10,7 +10,7 @@ use django_rs_http::urls::resolver::{root, URLEntry, URLResolver};
 use django_rs_http::{HttpRequest, HttpResponse};
 use django_rs_template::engine::Engine;
 
-use crate::views::{BlogStore, post_detail_view, post_list_view};
+use crate::views::{post_detail_view, post_list_view, BlogStore};
 
 /// Creates the blog URL configuration.
 ///
@@ -18,10 +18,7 @@ use crate::views::{BlogStore, post_detail_view, post_list_view};
 /// - `posts/` -> Post list view
 /// - `posts/<int:id>/` -> Post detail view
 /// - `posts/create/` -> Post create view
-pub fn blog_urls(
-    store: Arc<BlogStore>,
-    engine: Arc<Engine>,
-) -> URLResolver {
+pub fn blog_urls(store: Arc<BlogStore>, engine: Arc<Engine>) -> URLResolver {
     let list_store = Arc::clone(&store);
     let list_engine = Arc::clone(&engine);
     let list_handler: Arc<dyn Fn(HttpRequest) -> django_rs_http::BoxFuture + Send + Sync> =
@@ -134,7 +131,8 @@ mod tests {
         let resolver = blog_urls(store, engine);
 
         let empty_kwargs = std::collections::HashMap::new();
-        let url = django_rs_http::urls::reverse::reverse("post_list", &[], &empty_kwargs, &resolver);
+        let url =
+            django_rs_http::urls::reverse::reverse("post_list", &[], &empty_kwargs, &resolver);
         assert!(url.is_ok());
         assert_eq!(url.unwrap(), "/posts/");
     }

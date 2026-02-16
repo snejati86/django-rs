@@ -30,13 +30,11 @@ pub struct JsonSerializer;
 
 impl Serializer for JsonSerializer {
     fn serialize(&self, objects: &[serde_json::Value]) -> Result<String, DjangoError> {
-        serde_json::to_string(objects)
-            .map_err(|e| DjangoError::SerializationError(e.to_string()))
+        serde_json::to_string(objects).map_err(|e| DjangoError::SerializationError(e.to_string()))
     }
 
     fn deserialize(&self, data: &str) -> Result<Vec<serde_json::Value>, DjangoError> {
-        serde_json::from_str(data)
-            .map_err(|e| DjangoError::SerializationError(e.to_string()))
+        serde_json::from_str(data).map_err(|e| DjangoError::SerializationError(e.to_string()))
     }
 }
 
@@ -53,8 +51,7 @@ impl Serializer for PrettyJsonSerializer {
     }
 
     fn deserialize(&self, data: &str) -> Result<Vec<serde_json::Value>, DjangoError> {
-        serde_json::from_str(data)
-            .map_err(|e| DjangoError::SerializationError(e.to_string()))
+        serde_json::from_str(data).map_err(|e| DjangoError::SerializationError(e.to_string()))
     }
 }
 

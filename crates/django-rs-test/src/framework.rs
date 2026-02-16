@@ -38,10 +38,7 @@ impl TestCase {
     }
 
     /// Creates a new test case with settings overrides.
-    pub fn with_settings(
-        app: Router,
-        overrides: HashMap<String, serde_json::Value>,
-    ) -> Self {
+    pub fn with_settings(app: Router, overrides: HashMap<String, serde_json::Value>) -> Self {
         Self {
             client: TestClient::new(app),
             settings_overrides: overrides,
@@ -119,14 +116,12 @@ pub fn assert_redirects(response: &TestResponse, expected_url: &str) {
 ///
 /// Panics if the template name does not match.
 pub fn assert_template_used(response: &TestResponse, template_name: &str) {
-    let actual = response
-        .header("x-template-name")
-        .unwrap_or_else(|| {
-            panic!(
-                "Response does not have X-Template-Name header. \
+    let actual = response.header("x-template-name").unwrap_or_else(|| {
+        panic!(
+            "Response does not have X-Template-Name header. \
                  Template assertions require debug mode."
-            )
-        });
+        )
+    });
 
     assert!(
         actual.contains(template_name),
@@ -269,11 +264,7 @@ mod tests {
 
     #[test]
     fn test_assert_redirects_passes() {
-        let response = make_response(
-            StatusCode::FOUND,
-            "",
-            vec![("location", "/new-location/")],
-        );
+        let response = make_response(StatusCode::FOUND, "", vec![("location", "/new-location/")]);
         assert_redirects(&response, "/new-location/");
     }
 
@@ -294,11 +285,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "Expected redirect to")]
     fn test_assert_redirects_fails_wrong_url() {
-        let response = make_response(
-            StatusCode::FOUND,
-            "",
-            vec![("location", "/wrong-url/")],
-        );
+        let response = make_response(StatusCode::FOUND, "", vec![("location", "/wrong-url/")]);
         assert_redirects(&response, "/right-url/");
     }
 
@@ -324,11 +311,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "Expected template")]
     fn test_assert_template_used_fails_wrong_template() {
-        let response = make_response(
-            StatusCode::OK,
-            "",
-            vec![("x-template-name", "other.html")],
-        );
+        let response = make_response(StatusCode::OK, "", vec![("x-template-name", "other.html")]);
         assert_template_used(&response, "home.html");
     }
 
@@ -367,11 +350,7 @@ mod tests {
 
     #[test]
     fn test_assert_has_header_passes() {
-        let response = make_response(
-            StatusCode::OK,
-            "",
-            vec![("x-custom", "value")],
-        );
+        let response = make_response(StatusCode::OK, "", vec![("x-custom", "value")]);
         assert_has_header(&response, "x-custom");
     }
 
@@ -393,11 +372,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "Expected response NOT to have header")]
     fn test_assert_not_has_header_fails() {
-        let response = make_response(
-            StatusCode::OK,
-            "",
-            vec![("x-custom", "value")],
-        );
+        let response = make_response(StatusCode::OK, "", vec![("x-custom", "value")]);
         assert_not_has_header(&response, "x-custom");
     }
 
@@ -405,8 +380,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_testcase_integration() {
-        let app = Router::new()
-            .route("/", get(|| async { "home" }));
+        let app = Router::new().route("/", get(|| async { "home" }));
 
         let mut tc = TestCase::new(app);
         let response = tc.client.get("/").await;
@@ -419,13 +393,7 @@ mod tests {
         let app = Router::new()
             .route(
                 "/old",
-                get(|| async {
-                    (
-                        StatusCode::FOUND,
-                        [(http::header::LOCATION, "/new")],
-                        "",
-                    )
-                }),
+                get(|| async { (StatusCode::FOUND, [(http::header::LOCATION, "/new")], "") }),
             )
             .route("/new", get(|| async { "new page" }));
 

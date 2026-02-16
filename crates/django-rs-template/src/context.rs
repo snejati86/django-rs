@@ -581,10 +581,7 @@ mod tests {
         let mut inner = HashMap::new();
         inner.insert("name".to_string(), ContextValue::from("Alice"));
         let v = ContextValue::Dict(inner);
-        assert_eq!(
-            v.resolve_path("name").unwrap().to_display_string(),
-            "Alice"
-        );
+        assert_eq!(v.resolve_path("name").unwrap().to_display_string(), "Alice");
     }
 
     #[test]

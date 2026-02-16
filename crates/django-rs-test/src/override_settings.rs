@@ -102,9 +102,7 @@ impl SettingsOverride {
     /// Sets a custom extra setting.
     #[must_use]
     pub fn set_extra(mut self, key: &str, value: serde_json::Value) -> Self {
-        self.settings
-            .extra
-            .insert(key.to_string(), value);
+        self.settings.extra.insert(key.to_string(), value);
         self
     }
 
@@ -160,13 +158,7 @@ where
 /// This reads from the thread-local stack. If no override has been pushed,
 /// it returns a fresh `Settings::default()`.
 pub fn get_settings() -> Settings {
-    SETTINGS_STACK.with(|stack| {
-        stack
-            .borrow()
-            .last()
-            .cloned()
-            .unwrap_or_default()
-    })
+    SETTINGS_STACK.with(|stack| stack.borrow().last().cloned().unwrap_or_default())
 }
 
 #[cfg(test)]
@@ -205,24 +197,18 @@ mod tests {
 
     #[test]
     fn test_override_language_code() {
-        override_settings(
-            SettingsOverride::new().set_language_code("fr"),
-            || {
-                let s = get_settings();
-                assert_eq!(s.language_code, "fr");
-            },
-        );
+        override_settings(SettingsOverride::new().set_language_code("fr"), || {
+            let s = get_settings();
+            assert_eq!(s.language_code, "fr");
+        });
     }
 
     #[test]
     fn test_override_time_zone() {
-        override_settings(
-            SettingsOverride::new().set_time_zone("US/Eastern"),
-            || {
-                let s = get_settings();
-                assert_eq!(s.time_zone, "US/Eastern");
-            },
-        );
+        override_settings(SettingsOverride::new().set_time_zone("US/Eastern"), || {
+            let s = get_settings();
+            assert_eq!(s.time_zone, "US/Eastern");
+        });
     }
 
     #[test]
@@ -264,7 +250,11 @@ mod tests {
     #[test]
     fn test_override_returns_value() {
         let result = override_settings(SettingsOverride::new().set_debug(false), || {
-            if get_settings().debug { 0 } else { 42 }
+            if get_settings().debug {
+                0
+            } else {
+                42
+            }
         });
         assert_eq!(result, 42);
     }

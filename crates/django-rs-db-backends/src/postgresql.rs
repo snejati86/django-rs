@@ -213,11 +213,10 @@ impl DatabaseBackend for PostgresBackend {
             .map_err(|e| DjangoError::OperationalError(format!("Pool error: {e}")))?;
 
         let sql_params = Self::value_to_sql_params(params);
-        let param_refs: Vec<&(dyn tokio_postgres::types::ToSql + Sync)> =
-            sql_params
-                .iter()
-                .map(|p| p.as_ref() as &(dyn tokio_postgres::types::ToSql + Sync))
-                .collect();
+        let param_refs: Vec<&(dyn tokio_postgres::types::ToSql + Sync)> = sql_params
+            .iter()
+            .map(|p| p.as_ref() as &(dyn tokio_postgres::types::ToSql + Sync))
+            .collect();
 
         client
             .execute(sql, &param_refs)
@@ -233,11 +232,10 @@ impl DatabaseBackend for PostgresBackend {
             .map_err(|e| DjangoError::OperationalError(format!("Pool error: {e}")))?;
 
         let sql_params = Self::value_to_sql_params(params);
-        let param_refs: Vec<&(dyn tokio_postgres::types::ToSql + Sync)> =
-            sql_params
-                .iter()
-                .map(|p| p.as_ref() as &(dyn tokio_postgres::types::ToSql + Sync))
-                .collect();
+        let param_refs: Vec<&(dyn tokio_postgres::types::ToSql + Sync)> = sql_params
+            .iter()
+            .map(|p| p.as_ref() as &(dyn tokio_postgres::types::ToSql + Sync))
+            .collect();
 
         let rows = client
             .query(sql, &param_refs)
@@ -297,11 +295,7 @@ impl django_rs_db::DbExecutor for PostgresBackend {
         DatabaseBackend::query_one(self, sql, params).await
     }
 
-    async fn insert_returning_id(
-        &self,
-        sql: &str,
-        params: &[Value],
-    ) -> Result<Value, DjangoError> {
+    async fn insert_returning_id(&self, sql: &str, params: &[Value]) -> Result<Value, DjangoError> {
         // PostgreSQL supports RETURNING; append it to the SQL
         let sql_returning = format!("{sql} RETURNING id");
         let rows = DatabaseBackend::query(self, &sql_returning, params).await?;
@@ -364,11 +358,7 @@ mod tests {
         let date = chrono::NaiveDate::from_ymd_opt(2024, 1, 1).unwrap();
         let time = chrono::NaiveTime::from_hms_opt(12, 0, 0).unwrap();
         let dt = date.and_time(time);
-        let params = vec![
-            Value::Date(date),
-            Value::Time(time),
-            Value::DateTime(dt),
-        ];
+        let params = vec![Value::Date(date), Value::Time(time), Value::DateTime(dt)];
         let sql_params = PostgresBackend::value_to_sql_params(&params);
         assert_eq!(sql_params.len(), 3);
     }

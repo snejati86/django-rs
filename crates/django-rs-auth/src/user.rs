@@ -362,10 +362,7 @@ mod tests {
     #[test]
     fn test_abstract_user_direct_permissions() {
         let mut user = AbstractUser::new("editor");
-        user.user_permissions = vec![
-            "blog.add_post".to_string(),
-            "blog.change_post".to_string(),
-        ];
+        user.user_permissions = vec!["blog.add_post".to_string(), "blog.change_post".to_string()];
         assert!(user.has_perm("blog.add_post"));
         assert!(user.has_perm("blog.change_post"));
         assert!(!user.has_perm("blog.delete_post"));

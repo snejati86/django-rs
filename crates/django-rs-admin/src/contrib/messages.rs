@@ -67,11 +67,7 @@ impl Message {
     }
 
     /// Creates a new message with custom tags.
-    pub fn with_tags(
-        level: MessageLevel,
-        text: impl Into<String>,
-        extra_tags: &str,
-    ) -> Self {
+    pub fn with_tags(level: MessageLevel, text: impl Into<String>, extra_tags: &str) -> Self {
         let base_tag = level.tag();
         let tags = if extra_tags.is_empty() {
             base_tag.to_string()

@@ -103,7 +103,6 @@ impl std::error::Error for ValidationError {}
 #[derive(Error, Debug)]
 pub enum DjangoError {
     // ── HTTP errors ──────────────────────────────────────────────────
-
     /// HTTP 400 Bad Request.
     #[error("Bad request: {0}")]
     BadRequest(String),
@@ -137,7 +136,6 @@ pub enum DjangoError {
     InternalServerError(String),
 
     // ── ORM errors ───────────────────────────────────────────────────
-
     /// Raised when a query expected exactly one result but found none.
     #[error("Object does not exist: {0}")]
     DoesNotExist(String),
@@ -159,13 +157,11 @@ pub enum DjangoError {
     OperationalError(String),
 
     // ── Validation ───────────────────────────────────────────────────
-
     /// One or more fields failed validation.
     #[error("Validation error: {0}")]
     ValidationError(ValidationError),
 
     // ── Configuration ────────────────────────────────────────────────
-
     /// A configuration value is missing or invalid.
     #[error("Configuration error: {0}")]
     ConfigurationError(String),
@@ -175,7 +171,6 @@ pub enum DjangoError {
     ImproperlyConfigured(String),
 
     // ── Templates ────────────────────────────────────────────────────
-
     /// A template contains invalid syntax.
     #[error("Template syntax error: {0}")]
     TemplateSyntaxError(String),
@@ -185,19 +180,16 @@ pub enum DjangoError {
     TemplateDoesNotExist(String),
 
     // ── Serialization ────────────────────────────────────────────────
-
     /// An error occurred during serialization or deserialization.
     #[error("Serialization error: {0}")]
     SerializationError(String),
 
     // ── IO ───────────────────────────────────────────────────────────
-
     /// An I/O error occurred.
     #[error("IO error: {0}")]
     IoError(#[from] std::io::Error),
 
     // ── Security ─────────────────────────────────────────────────────
-
     /// A potentially malicious operation was detected.
     #[error("Suspicious operation: {0}")]
     SuspiciousOperation(String),
@@ -266,8 +258,7 @@ mod tests {
 
     #[test]
     fn test_validation_error_with_param() {
-        let err = ValidationError::new("Too short.", "min_length")
-            .with_param("min", "8");
+        let err = ValidationError::new("Too short.", "min_length").with_param("min", "8");
         assert_eq!(err.params.get("min").unwrap(), "8");
     }
 
@@ -280,7 +271,10 @@ mod tests {
         assert_eq!(DjangoError::MethodNotAllowed("x".into()).status_code(), 405);
         assert_eq!(DjangoError::Conflict("x".into()).status_code(), 409);
         assert_eq!(DjangoError::Gone.status_code(), 410);
-        assert_eq!(DjangoError::InternalServerError("x".into()).status_code(), 500);
+        assert_eq!(
+            DjangoError::InternalServerError("x".into()).status_code(),
+            500
+        );
         assert_eq!(DjangoError::DoesNotExist("x".into()).status_code(), 404);
         assert_eq!(DjangoError::DatabaseError("x".into()).status_code(), 500);
         assert_eq!(DjangoError::IntegrityError("x".into()).status_code(), 500);
@@ -288,9 +282,18 @@ mod tests {
             DjangoError::ValidationError(ValidationError::new("x", "y")).status_code(),
             400
         );
-        assert_eq!(DjangoError::SuspiciousOperation("x".into()).status_code(), 403);
-        assert_eq!(DjangoError::TemplateSyntaxError("x".into()).status_code(), 500);
-        assert_eq!(DjangoError::TemplateDoesNotExist("x".into()).status_code(), 500);
+        assert_eq!(
+            DjangoError::SuspiciousOperation("x".into()).status_code(),
+            403
+        );
+        assert_eq!(
+            DjangoError::TemplateSyntaxError("x".into()).status_code(),
+            500
+        );
+        assert_eq!(
+            DjangoError::TemplateDoesNotExist("x".into()).status_code(),
+            500
+        );
     }
 
     #[test]

@@ -84,9 +84,10 @@ impl PathConverter for IntConverter {
     }
 
     fn to_rust(&self, value: &str) -> DjangoResult<PathValue> {
-        value.parse::<i64>().map(PathValue::Int).map_err(|_| {
-            DjangoError::BadRequest(format!("Invalid integer value: {value}"))
-        })
+        value
+            .parse::<i64>()
+            .map(PathValue::Int)
+            .map_err(|_| DjangoError::BadRequest(format!("Invalid integer value: {value}")))
     }
 
     fn to_url(&self, value: &PathValue) -> DjangoResult<String> {

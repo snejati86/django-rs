@@ -298,7 +298,8 @@ mod tests {
 
     #[test]
     fn test_aggregate_distinct() {
-        let expr = Expression::aggregate_distinct(AggregateFunc::Count, Expression::col("category"));
+        let expr =
+            Expression::aggregate_distinct(AggregateFunc::Count, Expression::col("category"));
         if let Expression::Aggregate { distinct, .. } = &expr {
             assert!(distinct);
         } else {
@@ -370,8 +371,7 @@ mod tests {
     #[test]
     fn test_chained_arithmetic() {
         // (price * quantity) - discount
-        let expr =
-            (Expression::f("price") * Expression::f("quantity")) - Expression::f("discount");
+        let expr = (Expression::f("price") * Expression::f("quantity")) - Expression::f("discount");
         assert!(matches!(expr, Expression::Sub(_, _)));
     }
 }

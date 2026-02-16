@@ -56,11 +56,7 @@ fn session_auth_hash(password_hash: &str) -> String {
 ///
 /// This mirrors Django's `django.contrib.auth.login()`.
 pub fn login_to_session(request: &mut HttpRequest, user: &AbstractUser) {
-    login_to_session_with_backend(
-        request,
-        user,
-        "django_rs.auth.backends.ModelBackend",
-    );
+    login_to_session_with_backend(request, user, "django_rs.auth.backends.ModelBackend");
 }
 
 /// Stores user authentication state with a specific backend name.
@@ -353,11 +349,7 @@ mod tests {
         let user = create_test_user("alice", "pass123").await;
         let mut request = make_request();
 
-        login_to_session_with_backend(
-            &mut request,
-            &user,
-            "myapp.backends.LDAPBackend",
-        );
+        login_to_session_with_backend(&mut request, &user, "myapp.backends.LDAPBackend");
 
         let backend = get_backend_from_meta(&request);
         assert_eq!(backend.as_deref(), Some("myapp.backends.LDAPBackend"));

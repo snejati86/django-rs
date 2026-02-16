@@ -148,8 +148,14 @@ impl ManagementCommand for CheckCommand {
             return Ok(());
         }
 
-        let errors = messages.iter().filter(|m| m.level >= CheckLevel::Error).count();
-        let warnings = messages.iter().filter(|m| m.level == CheckLevel::Warning).count();
+        let errors = messages
+            .iter()
+            .filter(|m| m.level >= CheckLevel::Error)
+            .count();
+        let warnings = messages
+            .iter()
+            .filter(|m| m.level == CheckLevel::Warning)
+            .count();
 
         for msg in &messages {
             let hint_text = msg

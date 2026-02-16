@@ -68,18 +68,16 @@ pub use executor::{
     save_model, save_model_with_hooks, DbExecutor, ModelLifecycleHooks,
 };
 pub use fields::{FieldDef, FieldType, OnDelete};
+pub use model::{BloomIndex, BrinIndex, GinIndex, GistIndex, Index, IndexType, SpGistIndex};
 pub use model::{Model, ModelMeta};
-pub use query::{
-    AggregateFunc, CompoundQuery, CompoundType, DatabaseBackendType, Exists, Expression,
-    InheritanceType, Lookup, Manager, OrderBy, OuterRef, PrefetchRelatedField, PrefetchResult, Q,
-    Query, QuerySet, Row, SelectColumn, SelectRelatedField, SqlCompiler, SubqueryExpression, When,
-    WhereNode, WindowExpression, WindowFrame, WindowFrameBound, WindowFrameType, WindowFunction,
-};
-pub use model::{
-    BloomIndex, BrinIndex, GinIndex, GistIndex, Index, IndexType, SpGistIndex,
-};
 pub use query::expressions::search::{
     SearchQuery, SearchQueryType, SearchRank, SearchVector, TrigramSimilarity,
+};
+pub use query::{
+    AggregateFunc, CompoundQuery, CompoundType, DatabaseBackendType, Exists, Expression,
+    InheritanceType, Lookup, Manager, OrderBy, OuterRef, PrefetchRelatedField, PrefetchResult,
+    Query, QuerySet, Row, SelectColumn, SelectRelatedField, SqlCompiler, SubqueryExpression, When,
+    WhereNode, WindowExpression, WindowFrame, WindowFrameBound, WindowFrameType, WindowFunction, Q,
 };
 pub use router::{DatabaseEntry, DatabaseRouter, DatabasesConfig, RouterChain};
 pub use validators::Validator;
@@ -87,8 +85,7 @@ pub use value::Value;
 
 // Re-export new modules at the crate root for convenience.
 pub use query::bulk::{
-    bulk_create, bulk_update, get_or_create, update_or_create, BulkCreateOptions,
-    BulkUpdateOptions,
+    bulk_create, bulk_update, get_or_create, update_or_create, BulkCreateOptions, BulkUpdateOptions,
 };
 pub use query::custom_lookups::{CustomLookup, LookupRegistry, Transform, TransformOutput};
 pub use query::raw::{RawQuerySet, RawSql};

@@ -119,8 +119,7 @@ impl AdminSite {
     ///
     /// The `model_key` should be in `"app_label.model_name"` format.
     pub fn register(&mut self, model_key: &str, admin: ModelAdmin) {
-        self.registered_models
-            .insert(model_key.to_string(), admin);
+        self.registered_models.insert(model_key.to_string(), admin);
         self.action_registries
             .insert(model_key.to_string(), ActionRegistry::new());
     }
@@ -142,10 +141,7 @@ impl AdminSite {
     }
 
     /// Returns the mutable action registry for a registered model.
-    pub fn get_action_registry_mut(
-        &mut self,
-        model_key: &str,
-    ) -> Option<&mut ActionRegistry> {
+    pub fn get_action_registry_mut(&mut self, model_key: &str) -> Option<&mut ActionRegistry> {
         self.action_registries.get_mut(model_key)
     }
 
@@ -182,9 +178,8 @@ impl AdminSite {
     /// - `DELETE /:app/:model/:pk/` - Delete an object
     /// - `POST /:app/:model/action/` - Execute bulk action
     pub fn into_axum_router(self) -> Router {
-        let db: Arc<dyn AdminDbExecutor> = self
-            .db
-            .unwrap_or_else(|| Arc::new(InMemoryAdminDb::new()));
+        let db: Arc<dyn AdminDbExecutor> =
+            self.db.unwrap_or_else(|| Arc::new(InMemoryAdminDb::new()));
         let log_store: Arc<dyn LogEntryStore> = self
             .log_store
             .unwrap_or_else(|| Arc::new(InMemoryLogEntryStore::new()));
@@ -205,15 +200,10 @@ impl AdminSite {
             .route("/log/", get(handle_log_recent))
             .route("/log/{ct}/{id}/", get(handle_log_object))
             .route("/{app}/{model}/schema", get(handle_schema))
-            .route(
-                "/{app}/{model}/",
-                get(handle_list).post(handle_create),
-            )
+            .route("/{app}/{model}/", get(handle_list).post(handle_create))
             .route(
                 "/{app}/{model}/{pk}/",
-                get(handle_detail)
-                    .put(handle_update)
-                    .delete(handle_delete),
+                get(handle_detail).put(handle_update).delete(handle_delete),
             )
             .with_state(shared)
     }
@@ -242,9 +232,7 @@ struct AdminSiteState {
 // ── Authentication Handlers ────────────────────────────────────────
 
 /// Handler for `POST /login/` - authenticate with username/password.
-async fn handle_login(
-    axum::Json(payload): axum::Json<LoginRequest>,
-) -> impl IntoResponse {
+async fn handle_login(axum::Json(payload): axum::Json<LoginRequest>) -> impl IntoResponse {
     // Hardcoded admin/admin for development
     if payload.username == "admin" && payload.password == "admin" {
         let response = LoginResponse {
@@ -376,10 +364,8 @@ async fn handle_list(
                 filters: HashMap::new(),
             };
             match state.db.list_objects(admin, &params).await {
-                Ok(result) => axum::Json(
-                    serde_json::to_value(result.response).unwrap_or_default(),
-                )
-                .into_response(),
+                Ok(result) => axum::Json(serde_json::to_value(result.response).unwrap_or_default())
+                    .into_response(),
                 Err(e) => (
                     StatusCode::INTERNAL_SERVER_ERROR,
                     axum::Json(serde_json::json!({"error": e})),
@@ -432,17 +418,16 @@ async fn handle_create(
     match state.registered_models.get(&key) {
         Some(admin) => match state.db.create_object(admin, &body).await {
             Ok(obj) => {
-                let pk = obj
-                    .get("id")
-                    .map(|v| v.to_string())
-                    .unwrap_or_default();
+                let pk = obj.get("id").map(|v| v.to_string()).unwrap_or_default();
                 let repr = obj
                     .get("title")
                     .or_else(|| obj.get("name"))
                     .and_then(|v| v.as_str())
                     .unwrap_or("object")
                     .to_string();
-                state.log_store.log_addition(1, &key, &pk, &repr, "Created via admin");
+                state
+                    .log_store
+                    .log_addition(1, &key, &pk, &repr, "Created via admin");
                 (StatusCode::CREATED, axum::Json(obj)).into_response()
             }
             Err(e) => (
@@ -570,19 +555,13 @@ mod tests {
     #[test]
     fn test_admin_site_static_dir() {
         let site = AdminSite::new("admin").static_dir(PathBuf::from("/static"));
-        assert_eq!(
-            site.static_dir_path(),
-            Some(&PathBuf::from("/static"))
-        );
+        assert_eq!(site.static_dir_path(), Some(&PathBuf::from("/static")));
     }
 
     #[test]
     fn test_admin_site_register() {
         let mut site = AdminSite::new("admin");
-        site.register(
-            "blog.article",
-            ModelAdmin::new("blog", "article"),
-        );
+        site.register("blog.article", ModelAdmin::new("blog", "article"));
         assert!(site.is_registered("blog.article"));
         assert!(!site.is_registered("blog.comment"));
         assert_eq!(site.model_count(), 1);
@@ -591,10 +570,7 @@ mod tests {
     #[test]
     fn test_admin_site_unregister() {
         let mut site = AdminSite::new("admin");
-        site.register(
-            "blog.article",
-            ModelAdmin::new("blog", "article"),
-        );
+        site.register("blog.article", ModelAdmin::new("blog", "article"));
         assert!(site.is_registered("blog.article"));
         site.unregister("blog.article");
         assert!(!site.is_registered("blog.article"));
@@ -606,8 +582,7 @@ mod tests {
         let mut site = AdminSite::new("admin");
         site.register(
             "blog.article",
-            ModelAdmin::new("blog", "article")
-                .list_per_page(25),
+            ModelAdmin::new("blog", "article").list_per_page(25),
         );
         let admin = site.get_model_admin("blog.article").unwrap();
         assert_eq!(admin.list_per_page, 25);
@@ -665,11 +640,10 @@ mod tests {
         let mut site = AdminSite::new("admin");
         site.register(
             "blog.article",
-            ModelAdmin::new("blog", "article")
-                .fields_schema(vec![
-                    FieldSchema::new("id", "BigAutoField").primary_key(),
-                    FieldSchema::new("title", "CharField").max_length(200),
-                ]),
+            ModelAdmin::new("blog", "article").fields_schema(vec![
+                FieldSchema::new("id", "BigAutoField").primary_key(),
+                FieldSchema::new("title", "CharField").max_length(200),
+            ]),
         );
         // Should not panic
         let _router = site.into_axum_router();
@@ -704,9 +678,7 @@ mod tests {
     fn test_admin_site_with_db_and_log_store() {
         let db = Arc::new(InMemoryAdminDb::new());
         let log_store = Arc::new(InMemoryLogEntryStore::new());
-        let mut site = AdminSite::new("admin")
-            .db(db)
-            .log_store(log_store);
+        let mut site = AdminSite::new("admin").db(db).log_store(log_store);
         site.register("blog.article", ModelAdmin::new("blog", "article"));
         let _router = site.into_axum_router();
     }

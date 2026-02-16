@@ -250,10 +250,7 @@ impl SearchRank {
                 query_params,
             )
         } else {
-            Expression::RawSQL(
-                format!("{func}({vector_sql}, {query_sql})"),
-                query_params,
-            )
+            Expression::RawSQL(format!("{func}({vector_sql}, {query_sql})"), query_params)
         }
     }
 }
@@ -364,8 +361,7 @@ mod tests {
 
     #[test]
     fn test_search_query_websearch() {
-        let sq = SearchQuery::new("rust OR python")
-            .search_type(SearchQueryType::Websearch);
+        let sq = SearchQuery::new("rust OR python").search_type(SearchQueryType::Websearch);
         let expr = sq.to_expression();
         match &expr {
             Expression::RawSQL(sql, _) => {
@@ -389,8 +385,7 @@ mod tests {
 
     #[test]
     fn test_search_query_raw() {
-        let sq = SearchQuery::new("rust & web")
-            .search_type(SearchQueryType::Raw);
+        let sq = SearchQuery::new("rust & web").search_type(SearchQueryType::Raw);
         let expr = sq.to_expression();
         match &expr {
             Expression::RawSQL(sql, _) => {
@@ -402,8 +397,7 @@ mod tests {
 
     #[test]
     fn test_search_query_phrase() {
-        let sq = SearchQuery::new("rust web")
-            .search_type(SearchQueryType::Phrase);
+        let sq = SearchQuery::new("rust web").search_type(SearchQueryType::Phrase);
         let expr = sq.to_expression();
         match &expr {
             Expression::RawSQL(sql, _) => {

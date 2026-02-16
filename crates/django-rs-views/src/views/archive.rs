@@ -95,10 +95,7 @@ fn filter_by_year(
 ) -> Vec<serde_json::Value> {
     objects
         .iter()
-        .filter(|obj| {
-            extract_date(obj, date_field)
-                .is_some_and(|d| d.year() == year)
-        })
+        .filter(|obj| extract_date(obj, date_field).is_some_and(|d| d.year() == year))
         .cloned()
         .collect()
 }
@@ -113,9 +110,7 @@ fn filter_by_month(
     objects
         .iter()
         .filter(|obj| {
-            extract_date(obj, date_field).is_some_and(|d| {
-                d.year() == year && d.month() == month
-            })
+            extract_date(obj, date_field).is_some_and(|d| d.year() == year && d.month() == month)
         })
         .cloned()
         .collect()
@@ -129,18 +124,13 @@ fn filter_by_day(
 ) -> Vec<serde_json::Value> {
     objects
         .iter()
-        .filter(|obj| {
-            extract_date(obj, date_field).is_some_and(|d| d == date)
-        })
+        .filter(|obj| extract_date(obj, date_field).is_some_and(|d| d == date))
         .cloned()
         .collect()
 }
 
 /// Sorts objects by date field, newest first.
-fn sort_by_date_desc(
-    objects: &mut [serde_json::Value],
-    date_field: &str,
-) {
+fn sort_by_date_desc(objects: &mut [serde_json::Value], date_field: &str) {
     objects.sort_by(|a, b| {
         let da = extract_date(a, date_field);
         let db = extract_date(b, date_field);
@@ -149,10 +139,7 @@ fn sort_by_date_desc(
 }
 
 /// Collects unique dates from objects, sorted newest first.
-fn collect_date_list(
-    objects: &[serde_json::Value],
-    date_field: &str,
-) -> Vec<String> {
+fn collect_date_list(objects: &[serde_json::Value], date_field: &str) -> Vec<String> {
     let mut dates: Vec<NaiveDate> = objects
         .iter()
         .filter_map(|obj| extract_date(obj, date_field))
@@ -160,7 +147,10 @@ fn collect_date_list(
     dates.sort_unstable();
     dates.dedup();
     dates.reverse(); // Newest first
-    dates.iter().map(|d| d.format("%Y-%m-%d").to_string()).collect()
+    dates
+        .iter()
+        .map(|d| d.format("%Y-%m-%d").to_string())
+        .collect()
 }
 
 // ── Trait: DateMixin (shared config) ──────────────────────────────────
@@ -223,10 +213,8 @@ pub trait ArchiveIndexView: View + ContextMixin + DateMixin + Send + Sync {
                 // Filter out future dates unless allowed
                 if !self.allow_future() {
                     let today = chrono::Utc::now().date_naive();
-                    objects.retain(|obj| {
-                        extract_date(obj, date_field)
-                            .map_or(true, |d| d <= today)
-                    });
+                    objects
+                        .retain(|obj| extract_date(obj, date_field).map_or(true, |d| d <= today));
                 }
 
                 // Sort newest first
@@ -237,10 +225,7 @@ pub trait ArchiveIndexView: View + ContextMixin + DateMixin + Send + Sync {
                 let latest = objects.first().cloned();
 
                 let mut context = self.get_context_data(&HashMap::new());
-                context.insert(
-                    "date_list".to_string(),
-                    serde_json::json!(date_list),
-                );
+                context.insert("date_list".to_string(), serde_json::json!(date_list));
                 if let Some(latest_obj) = latest {
                     context.insert("latest".to_string(), latest_obj);
                 }
@@ -272,14 +257,8 @@ pub trait ArchiveIndexView: View + ContextMixin + DateMixin + Send + Sync {
                         serde_json::Value::Bool(paginator.num_pages() > 1),
                     );
                 } else {
-                    context.insert(
-                        "object_list".to_string(),
-                        serde_json::Value::Array(objects),
-                    );
-                    context.insert(
-                        "is_paginated".to_string(),
-                        serde_json::Value::Bool(false),
-                    );
+                    context.insert("object_list".to_string(), serde_json::Value::Array(objects));
+                    context.insert("is_paginated".to_string(), serde_json::Value::Bool(false));
                 }
 
                 let template = self.template_name();
@@ -320,11 +299,7 @@ pub trait YearArchiveView: View + ContextMixin + DateMixin + Send + Sync {
     async fn get_queryset(&self) -> Result<Vec<serde_json::Value>, DjangoError>;
 
     /// Handles GET requests for a year archive.
-    async fn year_archive(
-        &self,
-        _request: HttpRequest,
-        year: i32,
-    ) -> HttpResponse {
+    async fn year_archive(&self, _request: HttpRequest, year: i32) -> HttpResponse {
         match self.get_queryset().await {
             Ok(objects) => {
                 let date_field = self.date_field();
@@ -332,10 +307,8 @@ pub trait YearArchiveView: View + ContextMixin + DateMixin + Send + Sync {
 
                 if !self.allow_future() {
                     let today = chrono::Utc::now().date_naive();
-                    filtered.retain(|obj| {
-                        extract_date(obj, date_field)
-                            .map_or(true, |d| d <= today)
-                    });
+                    filtered
+                        .retain(|obj| extract_date(obj, date_field).map_or(true, |d| d <= today));
                 }
 
                 sort_by_date_desc(&mut filtered, date_field);
@@ -388,12 +361,7 @@ pub trait MonthArchiveView: View + ContextMixin + DateMixin + Send + Sync {
     async fn get_queryset(&self) -> Result<Vec<serde_json::Value>, DjangoError>;
 
     /// Handles GET requests for a month archive.
-    async fn month_archive(
-        &self,
-        _request: HttpRequest,
-        year: i32,
-        month: u32,
-    ) -> HttpResponse {
+    async fn month_archive(&self, _request: HttpRequest, year: i32, month: u32) -> HttpResponse {
         match self.get_queryset().await {
             Ok(objects) => {
                 let date_field = self.date_field();
@@ -401,10 +369,8 @@ pub trait MonthArchiveView: View + ContextMixin + DateMixin + Send + Sync {
 
                 if !self.allow_future() {
                     let today = chrono::Utc::now().date_naive();
-                    filtered.retain(|obj| {
-                        extract_date(obj, date_field)
-                            .map_or(true, |d| d <= today)
-                    });
+                    filtered
+                        .retain(|obj| extract_date(obj, date_field).map_or(true, |d| d <= today));
                 }
 
                 sort_by_date_desc(&mut filtered, date_field);
@@ -467,17 +433,13 @@ pub trait DayArchiveView: View + ContextMixin + DateMixin + Send + Sync {
         day: u32,
     ) -> HttpResponse {
         let Some(date) = NaiveDate::from_ymd_opt(year, month, day) else {
-            return HttpResponse::not_found(format!(
-                "Invalid date: {year}-{month:02}-{day:02}"
-            ));
+            return HttpResponse::not_found(format!("Invalid date: {year}-{month:02}-{day:02}"));
         };
 
         if !self.allow_future() {
             let today = chrono::Utc::now().date_naive();
             if date > today {
-                return HttpResponse::not_found(format!(
-                    "Future date not allowed: {date}"
-                ));
+                return HttpResponse::not_found(format!("Future date not allowed: {date}"));
             }
         }
 
@@ -603,9 +565,7 @@ pub trait DateDetailView: View + ContextMixin + DateMixin + Send + Sync {
         kwargs: &HashMap<String, String>,
     ) -> HttpResponse {
         let Some(expected_date) = NaiveDate::from_ymd_opt(year, month, day) else {
-            return HttpResponse::not_found(format!(
-                "Invalid date: {year}-{month:02}-{day:02}"
-            ));
+            return HttpResponse::not_found(format!("Invalid date: {year}-{month:02}-{day:02}"));
         };
 
         match self.get_object(kwargs).await {
@@ -701,9 +661,7 @@ mod tests {
 
     #[test]
     fn test_filter_by_year_no_match() {
-        let objects = vec![
-            serde_json::json!({"pub_date": "2025-01-01"}),
-        ];
+        let objects = vec![serde_json::json!({"pub_date": "2025-01-01"})];
         let result = filter_by_year(&objects, "pub_date", 2026);
         assert!(result.is_empty());
     }
@@ -832,9 +790,7 @@ mod tests {
             ],
             paginate: None,
         };
-        let request = HttpRequest::builder()
-            .method(http::Method::GET)
-            .build();
+        let request = HttpRequest::builder().method(http::Method::GET).build();
         let response = view.dispatch(request).await;
         assert_eq!(response.status(), http::StatusCode::OK);
         let body = String::from_utf8(response.content_bytes().unwrap()).unwrap();
@@ -853,9 +809,7 @@ mod tests {
             ],
             paginate: None,
         };
-        let request = HttpRequest::builder()
-            .method(http::Method::GET)
-            .build();
+        let request = HttpRequest::builder().method(http::Method::GET).build();
         let response = view.dispatch(request).await;
         let body = String::from_utf8(response.content_bytes().unwrap()).unwrap();
         // Verify "C" (newest) appears before "A" (oldest)
@@ -877,9 +831,7 @@ mod tests {
                 .collect(),
             paginate: Some(2),
         };
-        let request = HttpRequest::builder()
-            .method(http::Method::GET)
-            .build();
+        let request = HttpRequest::builder().method(http::Method::GET).build();
         let response = view.dispatch(request).await;
         let body = String::from_utf8(response.content_bytes().unwrap()).unwrap();
         assert!(body.contains("is_paginated"));
@@ -892,9 +844,7 @@ mod tests {
             items: vec![],
             paginate: None,
         };
-        let request = HttpRequest::builder()
-            .method(http::Method::GET)
-            .build();
+        let request = HttpRequest::builder().method(http::Method::GET).build();
         let response = view.dispatch(request).await;
         assert_eq!(response.status(), http::StatusCode::OK);
         let body = String::from_utf8(response.content_bytes().unwrap()).unwrap();
@@ -955,9 +905,7 @@ mod tests {
                 serde_json::json!({"title": "C", "pub_date": "2025-12-01"}),
             ],
         };
-        let request = HttpRequest::builder()
-            .method(http::Method::GET)
-            .build();
+        let request = HttpRequest::builder().method(http::Method::GET).build();
         let response = view.year_archive(request, 2025).await;
         assert_eq!(response.status(), http::StatusCode::OK);
         let body = String::from_utf8(response.content_bytes().unwrap()).unwrap();
@@ -1018,9 +966,7 @@ mod tests {
                 serde_json::json!({"title": "D", "pub_date": "2025-01-31"}),
             ],
         };
-        let request = HttpRequest::builder()
-            .method(http::Method::GET)
-            .build();
+        let request = HttpRequest::builder().method(http::Method::GET).build();
         let response = view.month_archive(request, 2025, 2).await;
         assert_eq!(response.status(), http::StatusCode::OK);
         let body = String::from_utf8(response.content_bytes().unwrap()).unwrap();
@@ -1086,9 +1032,7 @@ mod tests {
                 serde_json::json!({"title": "C", "pub_date": "2025-02-16"}),
             ],
         };
-        let request = HttpRequest::builder()
-            .method(http::Method::GET)
-            .build();
+        let request = HttpRequest::builder().method(http::Method::GET).build();
         let response = view.day_archive(request, 2025, 2, 15).await;
         assert_eq!(response.status(), http::StatusCode::OK);
         let body = String::from_utf8(response.content_bytes().unwrap()).unwrap();
@@ -1101,9 +1045,7 @@ mod tests {
     #[tokio::test]
     async fn test_day_archive_invalid_date() {
         let view = TestDayArchiveView { items: vec![] };
-        let request = HttpRequest::builder()
-            .method(http::Method::GET)
-            .build();
+        let request = HttpRequest::builder().method(http::Method::GET).build();
         let response = view.day_archive(request, 2025, 2, 31).await;
         assert_eq!(response.status(), http::StatusCode::NOT_FOUND);
     }
@@ -1111,9 +1053,7 @@ mod tests {
     #[tokio::test]
     async fn test_day_archive_future_date_rejected() {
         let view = TestDayArchiveView { items: vec![] };
-        let request = HttpRequest::builder()
-            .method(http::Method::GET)
-            .build();
+        let request = HttpRequest::builder().method(http::Method::GET).build();
         // Use a date far in the future
         let response = view.day_archive(request, 2099, 1, 1).await;
         assert_eq!(response.status(), http::StatusCode::NOT_FOUND);
@@ -1161,13 +1101,9 @@ mod tests {
     #[tokio::test]
     async fn test_day_archive_future_allowed() {
         let view = FutureDayArchiveView {
-            items: vec![
-                serde_json::json!({"title": "Future", "pub_date": "2099-01-01"}),
-            ],
+            items: vec![serde_json::json!({"title": "Future", "pub_date": "2099-01-01"})],
         };
-        let request = HttpRequest::builder()
-            .method(http::Method::GET)
-            .build();
+        let request = HttpRequest::builder().method(http::Method::GET).build();
         let response = view.day_archive(request, 2099, 1, 1).await;
         assert_eq!(response.status(), http::StatusCode::OK);
         let body = String::from_utf8(response.content_bytes().unwrap()).unwrap();
@@ -1231,9 +1167,7 @@ mod tests {
                 serde_json::json!({"title": "Yesterday", "pub_date": "2020-01-01"}),
             ],
         };
-        let request = HttpRequest::builder()
-            .method(http::Method::GET)
-            .build();
+        let request = HttpRequest::builder().method(http::Method::GET).build();
         let response = view.dispatch(request).await;
         assert_eq!(response.status(), http::StatusCode::OK);
         let body = String::from_utf8(response.content_bytes().unwrap()).unwrap();
@@ -1245,9 +1179,7 @@ mod tests {
     #[tokio::test]
     async fn test_today_archive_empty() {
         let view = TestTodayArchiveView { items: vec![] };
-        let request = HttpRequest::builder()
-            .method(http::Method::GET)
-            .build();
+        let request = HttpRequest::builder().method(http::Method::GET).build();
         let response = view.dispatch(request).await;
         assert_eq!(response.status(), http::StatusCode::OK);
     }
@@ -1306,13 +1238,9 @@ mod tests {
                 "pub_date": "2025-02-15"
             })),
         };
-        let request = HttpRequest::builder()
-            .method(http::Method::GET)
-            .build();
+        let request = HttpRequest::builder().method(http::Method::GET).build();
         let kwargs = HashMap::new();
-        let response = view
-            .date_detail(request, 2025, 2, 15, &kwargs)
-            .await;
+        let response = view.date_detail(request, 2025, 2, 15, &kwargs).await;
         assert_eq!(response.status(), http::StatusCode::OK);
         let body = String::from_utf8(response.content_bytes().unwrap()).unwrap();
         assert!(body.contains("Test Article"));
@@ -1327,13 +1255,9 @@ mod tests {
                 "pub_date": "2025-02-15"
             })),
         };
-        let request = HttpRequest::builder()
-            .method(http::Method::GET)
-            .build();
+        let request = HttpRequest::builder().method(http::Method::GET).build();
         let kwargs = HashMap::new();
-        let response = view
-            .date_detail(request, 2025, 3, 15, &kwargs)
-            .await;
+        let response = view.date_detail(request, 2025, 3, 15, &kwargs).await;
         assert_eq!(response.status(), http::StatusCode::NOT_FOUND);
     }
 
@@ -1342,26 +1266,18 @@ mod tests {
         let view = TestDateDetailView {
             object: Some(serde_json::json!({"pub_date": "2025-02-15"})),
         };
-        let request = HttpRequest::builder()
-            .method(http::Method::GET)
-            .build();
+        let request = HttpRequest::builder().method(http::Method::GET).build();
         let kwargs = HashMap::new();
-        let response = view
-            .date_detail(request, 2025, 13, 1, &kwargs)
-            .await;
+        let response = view.date_detail(request, 2025, 13, 1, &kwargs).await;
         assert_eq!(response.status(), http::StatusCode::NOT_FOUND);
     }
 
     #[tokio::test]
     async fn test_date_detail_object_not_found() {
         let view = TestDateDetailView { object: None };
-        let request = HttpRequest::builder()
-            .method(http::Method::GET)
-            .build();
+        let request = HttpRequest::builder().method(http::Method::GET).build();
         let kwargs = HashMap::new();
-        let response = view
-            .date_detail(request, 2025, 2, 15, &kwargs)
-            .await;
+        let response = view.date_detail(request, 2025, 2, 15, &kwargs).await;
         assert_eq!(response.status(), http::StatusCode::NOT_FOUND);
     }
 
@@ -1373,13 +1289,9 @@ mod tests {
                 "pub_date": "2099-01-01"
             })),
         };
-        let request = HttpRequest::builder()
-            .method(http::Method::GET)
-            .build();
+        let request = HttpRequest::builder().method(http::Method::GET).build();
         let kwargs = HashMap::new();
-        let response = view
-            .date_detail(request, 2099, 1, 1, &kwargs)
-            .await;
+        let response = view.date_detail(request, 2099, 1, 1, &kwargs).await;
         assert_eq!(response.status(), http::StatusCode::NOT_FOUND);
     }
 

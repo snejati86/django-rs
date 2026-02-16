@@ -174,7 +174,11 @@ pub fn generate_rss(feed: &dyn Feed) -> String {
     xml.push_str("  <channel>\n");
     let _ = writeln!(xml, "    <title>{}</title>", xml_escape(&feed.title()));
     let _ = writeln!(xml, "    <link>{}</link>", xml_escape(&feed.link()));
-    let _ = writeln!(xml, "    <description>{}</description>", xml_escape(&feed.description()));
+    let _ = writeln!(
+        xml,
+        "    <description>{}</description>",
+        xml_escape(&feed.description())
+    );
 
     if let Some(lang) = feed.language() {
         let _ = writeln!(xml, "    <language>{}</language>", xml_escape(&lang));
@@ -196,7 +200,11 @@ pub fn generate_rss(feed: &dyn Feed) -> String {
         xml.push_str("    <item>\n");
         let _ = writeln!(xml, "      <title>{}</title>", xml_escape(&item.title));
         let _ = writeln!(xml, "      <link>{}</link>", xml_escape(&item.link));
-        let _ = writeln!(xml, "      <description>{}</description>", xml_escape(&item.description));
+        let _ = writeln!(
+            xml,
+            "      <description>{}</description>",
+            xml_escape(&item.description)
+        );
 
         if let Some(ref pub_date) = item.pub_date {
             let _ = writeln!(xml, "      <pubDate>{}</pubDate>", xml_escape(pub_date));
@@ -248,17 +256,29 @@ pub fn generate_atom(feed: &dyn Feed) -> String {
     xml.push_str("<feed xmlns=\"http://www.w3.org/2005/Atom\">\n");
     let _ = writeln!(xml, "  <title>{}</title>", xml_escape(&feed.title()));
     let _ = writeln!(xml, "  <link href=\"{}\"/>", xml_escape(&feed.link()));
-    let _ = writeln!(xml, "  <subtitle>{}</subtitle>", xml_escape(&feed.description()));
+    let _ = writeln!(
+        xml,
+        "  <subtitle>{}</subtitle>",
+        xml_escape(&feed.description())
+    );
 
     if let Some(feed_url) = feed.feed_url() {
-        let _ = writeln!(xml, "  <link href=\"{}\" rel=\"self\"/>", xml_escape(&feed_url));
+        let _ = writeln!(
+            xml,
+            "  <link href=\"{}\" rel=\"self\"/>",
+            xml_escape(&feed_url)
+        );
     }
 
     // Generate a feed ID from the link
     let _ = writeln!(xml, "  <id>{}</id>", xml_escape(&feed.link()));
 
     // Updated timestamp (use current time if not available)
-    let _ = writeln!(xml, "  <updated>{}</updated>", chrono::Utc::now().to_rfc3339());
+    let _ = writeln!(
+        xml,
+        "  <updated>{}</updated>",
+        chrono::Utc::now().to_rfc3339()
+    );
 
     if let Some(author) = feed.author_name() {
         xml.push_str("  <author>\n");
@@ -277,7 +297,11 @@ pub fn generate_atom(feed: &dyn Feed) -> String {
 
         let id = item.guid.as_deref().unwrap_or(&item.link);
         let _ = writeln!(xml, "    <id>{}</id>", xml_escape(id));
-        let _ = writeln!(xml, "    <summary>{}</summary>", xml_escape(&item.description));
+        let _ = writeln!(
+            xml,
+            "    <summary>{}</summary>",
+            xml_escape(&item.description)
+        );
 
         if let Some(ref pub_date) = item.pub_date {
             let _ = writeln!(xml, "    <updated>{}</updated>", xml_escape(pub_date));
@@ -605,8 +629,7 @@ mod tests {
 
     #[test]
     fn test_feed_item_clone() {
-        let item = FeedItem::new("Title", "https://example.com/", "Desc")
-            .with_author("author");
+        let item = FeedItem::new("Title", "https://example.com/", "Desc").with_author("author");
         let cloned = item.clone();
         assert_eq!(item.title, cloned.title);
         assert_eq!(item.author, cloned.author);

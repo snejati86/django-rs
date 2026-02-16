@@ -50,9 +50,10 @@ impl FilterRegistry {
         value: &ContextValue,
         args: &[ContextValue],
     ) -> Result<ContextValue, DjangoError> {
-        let filter = self.filters.get(name).ok_or_else(|| {
-            DjangoError::TemplateSyntaxError(format!("Unknown filter: '{name}'"))
-        })?;
+        let filter = self
+            .filters
+            .get(name)
+            .ok_or_else(|| DjangoError::TemplateSyntaxError(format!("Unknown filter: '{name}'")))?;
         filter.apply(value, args)
     }
 }
@@ -145,26 +146,49 @@ fn register_all(r: &mut FilterRegistry) {
 
 struct LowerFilter;
 impl Filter for LowerFilter {
-    fn name(&self) -> &'static str { "lower" }
-    fn apply(&self, value: &ContextValue, _args: &[ContextValue]) -> Result<ContextValue, DjangoError> {
-        Ok(ContextValue::String(value.to_display_string().to_lowercase()))
+    fn name(&self) -> &'static str {
+        "lower"
+    }
+    fn apply(
+        &self,
+        value: &ContextValue,
+        _args: &[ContextValue],
+    ) -> Result<ContextValue, DjangoError> {
+        Ok(ContextValue::String(
+            value.to_display_string().to_lowercase(),
+        ))
     }
 }
 
 struct UpperFilter;
 impl Filter for UpperFilter {
-    fn name(&self) -> &'static str { "upper" }
-    fn apply(&self, value: &ContextValue, _args: &[ContextValue]) -> Result<ContextValue, DjangoError> {
-        Ok(ContextValue::String(value.to_display_string().to_uppercase()))
+    fn name(&self) -> &'static str {
+        "upper"
+    }
+    fn apply(
+        &self,
+        value: &ContextValue,
+        _args: &[ContextValue],
+    ) -> Result<ContextValue, DjangoError> {
+        Ok(ContextValue::String(
+            value.to_display_string().to_uppercase(),
+        ))
     }
 }
 
 struct TitleFilter;
 impl Filter for TitleFilter {
-    fn name(&self) -> &'static str { "title" }
-    fn apply(&self, value: &ContextValue, _args: &[ContextValue]) -> Result<ContextValue, DjangoError> {
+    fn name(&self) -> &'static str {
+        "title"
+    }
+    fn apply(
+        &self,
+        value: &ContextValue,
+        _args: &[ContextValue],
+    ) -> Result<ContextValue, DjangoError> {
         let s = value.to_display_string();
-        let titled = s.split_whitespace()
+        let titled = s
+            .split_whitespace()
             .map(|word| {
                 let mut chars = word.chars();
                 match chars.next() {
@@ -180,8 +204,14 @@ impl Filter for TitleFilter {
 
 struct CapfirstFilter;
 impl Filter for CapfirstFilter {
-    fn name(&self) -> &'static str { "capfirst" }
-    fn apply(&self, value: &ContextValue, _args: &[ContextValue]) -> Result<ContextValue, DjangoError> {
+    fn name(&self) -> &'static str {
+        "capfirst"
+    }
+    fn apply(
+        &self,
+        value: &ContextValue,
+        _args: &[ContextValue],
+    ) -> Result<ContextValue, DjangoError> {
         let s = value.to_display_string();
         let mut chars = s.chars();
         let result = match chars.next() {
@@ -194,18 +224,33 @@ impl Filter for CapfirstFilter {
 
 struct CutFilter;
 impl Filter for CutFilter {
-    fn name(&self) -> &'static str { "cut" }
-    fn apply(&self, value: &ContextValue, args: &[ContextValue]) -> Result<ContextValue, DjangoError> {
+    fn name(&self) -> &'static str {
+        "cut"
+    }
+    fn apply(
+        &self,
+        value: &ContextValue,
+        args: &[ContextValue],
+    ) -> Result<ContextValue, DjangoError> {
         let s = value.to_display_string();
-        let to_remove = args.first().map(|a| a.to_display_string()).unwrap_or_default();
+        let to_remove = args
+            .first()
+            .map(|a| a.to_display_string())
+            .unwrap_or_default();
         Ok(ContextValue::String(s.replace(&to_remove, "")))
     }
 }
 
 struct TruncatecharsFilter;
 impl Filter for TruncatecharsFilter {
-    fn name(&self) -> &'static str { "truncatechars" }
-    fn apply(&self, value: &ContextValue, args: &[ContextValue]) -> Result<ContextValue, DjangoError> {
+    fn name(&self) -> &'static str {
+        "truncatechars"
+    }
+    fn apply(
+        &self,
+        value: &ContextValue,
+        args: &[ContextValue],
+    ) -> Result<ContextValue, DjangoError> {
         let s = value.to_display_string();
         let max_len = args.first().and_then(|a| a.as_integer()).unwrap_or(0) as usize;
         if max_len == 0 || s.len() <= max_len {
@@ -221,8 +266,14 @@ impl Filter for TruncatecharsFilter {
 
 struct TruncatewordsFilter;
 impl Filter for TruncatewordsFilter {
-    fn name(&self) -> &'static str { "truncatewords" }
-    fn apply(&self, value: &ContextValue, args: &[ContextValue]) -> Result<ContextValue, DjangoError> {
+    fn name(&self) -> &'static str {
+        "truncatewords"
+    }
+    fn apply(
+        &self,
+        value: &ContextValue,
+        args: &[ContextValue],
+    ) -> Result<ContextValue, DjangoError> {
         let s = value.to_display_string();
         let max_words = args.first().and_then(|a| a.as_integer()).unwrap_or(0) as usize;
         let words: Vec<&str> = s.split_whitespace().collect();
@@ -236,8 +287,14 @@ impl Filter for TruncatewordsFilter {
 
 struct StriptagsFilter;
 impl Filter for StriptagsFilter {
-    fn name(&self) -> &'static str { "striptags" }
-    fn apply(&self, value: &ContextValue, _args: &[ContextValue]) -> Result<ContextValue, DjangoError> {
+    fn name(&self) -> &'static str {
+        "striptags"
+    }
+    fn apply(
+        &self,
+        value: &ContextValue,
+        _args: &[ContextValue],
+    ) -> Result<ContextValue, DjangoError> {
         let s = value.to_display_string();
         let re = regex::Regex::new(r"<[^>]*>").unwrap();
         Ok(ContextValue::String(re.replace_all(&s, "").to_string()))
@@ -246,8 +303,14 @@ impl Filter for StriptagsFilter {
 
 struct EscapeFilter;
 impl Filter for EscapeFilter {
-    fn name(&self) -> &'static str { "escape" }
-    fn apply(&self, value: &ContextValue, _args: &[ContextValue]) -> Result<ContextValue, DjangoError> {
+    fn name(&self) -> &'static str {
+        "escape"
+    }
+    fn apply(
+        &self,
+        value: &ContextValue,
+        _args: &[ContextValue],
+    ) -> Result<ContextValue, DjangoError> {
         let s = value.to_display_string();
         Ok(ContextValue::String(escape_html(&s)))
     }
@@ -255,8 +318,14 @@ impl Filter for EscapeFilter {
 
 struct EscapejsFilter;
 impl Filter for EscapejsFilter {
-    fn name(&self) -> &'static str { "escapejs" }
-    fn apply(&self, value: &ContextValue, _args: &[ContextValue]) -> Result<ContextValue, DjangoError> {
+    fn name(&self) -> &'static str {
+        "escapejs"
+    }
+    fn apply(
+        &self,
+        value: &ContextValue,
+        _args: &[ContextValue],
+    ) -> Result<ContextValue, DjangoError> {
         let s = value.to_display_string();
         let result = s
             .replace('\\', "\\\\")
@@ -273,16 +342,28 @@ impl Filter for EscapejsFilter {
 
 struct SafeFilter;
 impl Filter for SafeFilter {
-    fn name(&self) -> &'static str { "safe" }
-    fn apply(&self, value: &ContextValue, _args: &[ContextValue]) -> Result<ContextValue, DjangoError> {
+    fn name(&self) -> &'static str {
+        "safe"
+    }
+    fn apply(
+        &self,
+        value: &ContextValue,
+        _args: &[ContextValue],
+    ) -> Result<ContextValue, DjangoError> {
         Ok(ContextValue::SafeString(value.to_display_string()))
     }
 }
 
 struct LinebreaksFilter;
 impl Filter for LinebreaksFilter {
-    fn name(&self) -> &'static str { "linebreaks" }
-    fn apply(&self, value: &ContextValue, _args: &[ContextValue]) -> Result<ContextValue, DjangoError> {
+    fn name(&self) -> &'static str {
+        "linebreaks"
+    }
+    fn apply(
+        &self,
+        value: &ContextValue,
+        _args: &[ContextValue],
+    ) -> Result<ContextValue, DjangoError> {
         let s = value.to_display_string();
         let paragraphs: Vec<&str> = s.split("\n\n").collect();
         let result = paragraphs
@@ -299,8 +380,14 @@ impl Filter for LinebreaksFilter {
 
 struct LinebreaksbrFilter;
 impl Filter for LinebreaksbrFilter {
-    fn name(&self) -> &'static str { "linebreaksbr" }
-    fn apply(&self, value: &ContextValue, _args: &[ContextValue]) -> Result<ContextValue, DjangoError> {
+    fn name(&self) -> &'static str {
+        "linebreaksbr"
+    }
+    fn apply(
+        &self,
+        value: &ContextValue,
+        _args: &[ContextValue],
+    ) -> Result<ContextValue, DjangoError> {
         let s = value.to_display_string();
         Ok(ContextValue::SafeString(s.replace('\n', "<br>")))
     }
@@ -308,8 +395,14 @@ impl Filter for LinebreaksbrFilter {
 
 struct UrlizeFilter;
 impl Filter for UrlizeFilter {
-    fn name(&self) -> &'static str { "urlize" }
-    fn apply(&self, value: &ContextValue, _args: &[ContextValue]) -> Result<ContextValue, DjangoError> {
+    fn name(&self) -> &'static str {
+        "urlize"
+    }
+    fn apply(
+        &self,
+        value: &ContextValue,
+        _args: &[ContextValue],
+    ) -> Result<ContextValue, DjangoError> {
         let s = value.to_display_string();
         let re = regex::Regex::new(r"(https?://[^\s<]+)").unwrap();
         let result = re.replace_all(&s, r#"<a href="$1">$1</a>"#).to_string();
@@ -319,8 +412,14 @@ impl Filter for UrlizeFilter {
 
 struct SlugifyFilter;
 impl Filter for SlugifyFilter {
-    fn name(&self) -> &'static str { "slugify" }
-    fn apply(&self, value: &ContextValue, _args: &[ContextValue]) -> Result<ContextValue, DjangoError> {
+    fn name(&self) -> &'static str {
+        "slugify"
+    }
+    fn apply(
+        &self,
+        value: &ContextValue,
+        _args: &[ContextValue],
+    ) -> Result<ContextValue, DjangoError> {
         let s = value.to_display_string().to_lowercase();
         let re = regex::Regex::new(r"[^a-z0-9\s-]").unwrap();
         let cleaned = re.replace_all(&s, "");
@@ -332,8 +431,14 @@ impl Filter for SlugifyFilter {
 
 struct CenterFilter;
 impl Filter for CenterFilter {
-    fn name(&self) -> &'static str { "center" }
-    fn apply(&self, value: &ContextValue, args: &[ContextValue]) -> Result<ContextValue, DjangoError> {
+    fn name(&self) -> &'static str {
+        "center"
+    }
+    fn apply(
+        &self,
+        value: &ContextValue,
+        args: &[ContextValue],
+    ) -> Result<ContextValue, DjangoError> {
         let s = value.to_display_string();
         let width = args.first().and_then(|a| a.as_integer()).unwrap_or(0) as usize;
         if s.len() >= width {
@@ -353,8 +458,14 @@ impl Filter for CenterFilter {
 
 struct LjustFilter;
 impl Filter for LjustFilter {
-    fn name(&self) -> &'static str { "ljust" }
-    fn apply(&self, value: &ContextValue, args: &[ContextValue]) -> Result<ContextValue, DjangoError> {
+    fn name(&self) -> &'static str {
+        "ljust"
+    }
+    fn apply(
+        &self,
+        value: &ContextValue,
+        args: &[ContextValue],
+    ) -> Result<ContextValue, DjangoError> {
         let s = value.to_display_string();
         let width = args.first().and_then(|a| a.as_integer()).unwrap_or(0) as usize;
         Ok(ContextValue::String(format!("{s:<width$}")))
@@ -363,8 +474,14 @@ impl Filter for LjustFilter {
 
 struct RjustFilter;
 impl Filter for RjustFilter {
-    fn name(&self) -> &'static str { "rjust" }
-    fn apply(&self, value: &ContextValue, args: &[ContextValue]) -> Result<ContextValue, DjangoError> {
+    fn name(&self) -> &'static str {
+        "rjust"
+    }
+    fn apply(
+        &self,
+        value: &ContextValue,
+        args: &[ContextValue],
+    ) -> Result<ContextValue, DjangoError> {
         let s = value.to_display_string();
         let width = args.first().and_then(|a| a.as_integer()).unwrap_or(0) as usize;
         Ok(ContextValue::String(format!("{s:>width$}")))
@@ -373,8 +490,14 @@ impl Filter for RjustFilter {
 
 struct WordwrapFilter;
 impl Filter for WordwrapFilter {
-    fn name(&self) -> &'static str { "wordwrap" }
-    fn apply(&self, value: &ContextValue, args: &[ContextValue]) -> Result<ContextValue, DjangoError> {
+    fn name(&self) -> &'static str {
+        "wordwrap"
+    }
+    fn apply(
+        &self,
+        value: &ContextValue,
+        args: &[ContextValue],
+    ) -> Result<ContextValue, DjangoError> {
         let s = value.to_display_string();
         let width = args.first().and_then(|a| a.as_integer()).unwrap_or(79) as usize;
         let mut result = String::new();
@@ -399,10 +522,19 @@ impl Filter for WordwrapFilter {
 
 struct AddslashesFilter;
 impl Filter for AddslashesFilter {
-    fn name(&self) -> &'static str { "addslashes" }
-    fn apply(&self, value: &ContextValue, _args: &[ContextValue]) -> Result<ContextValue, DjangoError> {
+    fn name(&self) -> &'static str {
+        "addslashes"
+    }
+    fn apply(
+        &self,
+        value: &ContextValue,
+        _args: &[ContextValue],
+    ) -> Result<ContextValue, DjangoError> {
         let s = value.to_display_string();
-        let result = s.replace('\\', "\\\\").replace('\'', "\\'").replace('"', "\\\"");
+        let result = s
+            .replace('\\', "\\\\")
+            .replace('\'', "\\'")
+            .replace('"', "\\\"");
         Ok(ContextValue::String(result))
     }
 }
@@ -413,8 +545,14 @@ impl Filter for AddslashesFilter {
 
 struct LengthFilter;
 impl Filter for LengthFilter {
-    fn name(&self) -> &'static str { "length" }
-    fn apply(&self, value: &ContextValue, _args: &[ContextValue]) -> Result<ContextValue, DjangoError> {
+    fn name(&self) -> &'static str {
+        "length"
+    }
+    fn apply(
+        &self,
+        value: &ContextValue,
+        _args: &[ContextValue],
+    ) -> Result<ContextValue, DjangoError> {
         let len = value.len().unwrap_or(0);
         Ok(ContextValue::Integer(len as i64))
     }
@@ -422,8 +560,14 @@ impl Filter for LengthFilter {
 
 struct LengthIsFilter;
 impl Filter for LengthIsFilter {
-    fn name(&self) -> &'static str { "length_is" }
-    fn apply(&self, value: &ContextValue, args: &[ContextValue]) -> Result<ContextValue, DjangoError> {
+    fn name(&self) -> &'static str {
+        "length_is"
+    }
+    fn apply(
+        &self,
+        value: &ContextValue,
+        args: &[ContextValue],
+    ) -> Result<ContextValue, DjangoError> {
         let len = value.len().unwrap_or(0) as i64;
         let expected = args.first().and_then(|a| a.as_integer()).unwrap_or(0);
         Ok(ContextValue::Bool(len == expected))
@@ -432,15 +576,20 @@ impl Filter for LengthIsFilter {
 
 struct FirstFilter;
 impl Filter for FirstFilter {
-    fn name(&self) -> &'static str { "first" }
-    fn apply(&self, value: &ContextValue, _args: &[ContextValue]) -> Result<ContextValue, DjangoError> {
+    fn name(&self) -> &'static str {
+        "first"
+    }
+    fn apply(
+        &self,
+        value: &ContextValue,
+        _args: &[ContextValue],
+    ) -> Result<ContextValue, DjangoError> {
         match value {
             ContextValue::List(list) => Ok(list.first().cloned().unwrap_or(ContextValue::None)),
-            ContextValue::String(s) | ContextValue::SafeString(s) => {
-                Ok(s.chars().next().map_or(ContextValue::None, |c| {
-                    ContextValue::String(c.to_string())
-                }))
-            }
+            ContextValue::String(s) | ContextValue::SafeString(s) => Ok(s
+                .chars()
+                .next()
+                .map_or(ContextValue::None, |c| ContextValue::String(c.to_string()))),
             _ => Ok(ContextValue::None),
         }
     }
@@ -448,15 +597,20 @@ impl Filter for FirstFilter {
 
 struct LastFilter;
 impl Filter for LastFilter {
-    fn name(&self) -> &'static str { "last" }
-    fn apply(&self, value: &ContextValue, _args: &[ContextValue]) -> Result<ContextValue, DjangoError> {
+    fn name(&self) -> &'static str {
+        "last"
+    }
+    fn apply(
+        &self,
+        value: &ContextValue,
+        _args: &[ContextValue],
+    ) -> Result<ContextValue, DjangoError> {
         match value {
             ContextValue::List(list) => Ok(list.last().cloned().unwrap_or(ContextValue::None)),
-            ContextValue::String(s) | ContextValue::SafeString(s) => {
-                Ok(s.chars().last().map_or(ContextValue::None, |c| {
-                    ContextValue::String(c.to_string())
-                }))
-            }
+            ContextValue::String(s) | ContextValue::SafeString(s) => Ok(s
+                .chars()
+                .last()
+                .map_or(ContextValue::None, |c| ContextValue::String(c.to_string()))),
             _ => Ok(ContextValue::None),
         }
     }
@@ -464,9 +618,18 @@ impl Filter for LastFilter {
 
 struct JoinFilter;
 impl Filter for JoinFilter {
-    fn name(&self) -> &'static str { "join" }
-    fn apply(&self, value: &ContextValue, args: &[ContextValue]) -> Result<ContextValue, DjangoError> {
-        let separator = args.first().map(|a| a.to_display_string()).unwrap_or_default();
+    fn name(&self) -> &'static str {
+        "join"
+    }
+    fn apply(
+        &self,
+        value: &ContextValue,
+        args: &[ContextValue],
+    ) -> Result<ContextValue, DjangoError> {
+        let separator = args
+            .first()
+            .map(|a| a.to_display_string())
+            .unwrap_or_default();
         match value {
             ContextValue::List(list) => {
                 let joined = list
@@ -483,16 +646,31 @@ impl Filter for JoinFilter {
 
 struct SliceFilter;
 impl Filter for SliceFilter {
-    fn name(&self) -> &'static str { "slice" }
-    fn apply(&self, value: &ContextValue, args: &[ContextValue]) -> Result<ContextValue, DjangoError> {
-        let slice_str = args.first().map(|a| a.to_display_string()).unwrap_or_default();
+    fn name(&self) -> &'static str {
+        "slice"
+    }
+    fn apply(
+        &self,
+        value: &ContextValue,
+        args: &[ContextValue],
+    ) -> Result<ContextValue, DjangoError> {
+        let slice_str = args
+            .first()
+            .map(|a| a.to_display_string())
+            .unwrap_or_default();
         let parts: Vec<&str> = slice_str.split(':').collect();
 
         match value {
             ContextValue::List(list) => {
                 let len = list.len() as i64;
-                let start = parts.first().and_then(|s| s.parse::<i64>().ok()).unwrap_or(0);
-                let end = parts.get(1).and_then(|s| s.parse::<i64>().ok()).unwrap_or(len);
+                let start = parts
+                    .first()
+                    .and_then(|s| s.parse::<i64>().ok())
+                    .unwrap_or(0);
+                let end = parts
+                    .get(1)
+                    .and_then(|s| s.parse::<i64>().ok())
+                    .unwrap_or(len);
 
                 let start = normalize_index(start, len);
                 let end = normalize_index(end, len);
@@ -505,8 +683,14 @@ impl Filter for SliceFilter {
             }
             ContextValue::String(s) | ContextValue::SafeString(s) => {
                 let len = s.len() as i64;
-                let start = parts.first().and_then(|p| p.parse::<i64>().ok()).unwrap_or(0);
-                let end = parts.get(1).and_then(|p| p.parse::<i64>().ok()).unwrap_or(len);
+                let start = parts
+                    .first()
+                    .and_then(|p| p.parse::<i64>().ok())
+                    .unwrap_or(0);
+                let end = parts
+                    .get(1)
+                    .and_then(|p| p.parse::<i64>().ok())
+                    .unwrap_or(len);
 
                 let start = normalize_index(start, len);
                 let end = normalize_index(end, len);
@@ -533,15 +717,30 @@ fn normalize_index(idx: i64, len: i64) -> usize {
 
 struct DictsortFilter;
 impl Filter for DictsortFilter {
-    fn name(&self) -> &'static str { "dictsort" }
-    fn apply(&self, value: &ContextValue, args: &[ContextValue]) -> Result<ContextValue, DjangoError> {
-        let key = args.first().map(|a| a.to_display_string()).unwrap_or_default();
+    fn name(&self) -> &'static str {
+        "dictsort"
+    }
+    fn apply(
+        &self,
+        value: &ContextValue,
+        args: &[ContextValue],
+    ) -> Result<ContextValue, DjangoError> {
+        let key = args
+            .first()
+            .map(|a| a.to_display_string())
+            .unwrap_or_default();
         match value {
             ContextValue::List(list) => {
                 let mut sorted = list.clone();
                 sorted.sort_by(|a, b| {
-                    let a_val = a.resolve_path(&key).map(|v| v.to_display_string()).unwrap_or_default();
-                    let b_val = b.resolve_path(&key).map(|v| v.to_display_string()).unwrap_or_default();
+                    let a_val = a
+                        .resolve_path(&key)
+                        .map(|v| v.to_display_string())
+                        .unwrap_or_default();
+                    let b_val = b
+                        .resolve_path(&key)
+                        .map(|v| v.to_display_string())
+                        .unwrap_or_default();
                     a_val.cmp(&b_val)
                 });
                 Ok(ContextValue::List(sorted))
@@ -553,15 +752,30 @@ impl Filter for DictsortFilter {
 
 struct DictsortreversedFilter;
 impl Filter for DictsortreversedFilter {
-    fn name(&self) -> &'static str { "dictsortreversed" }
-    fn apply(&self, value: &ContextValue, args: &[ContextValue]) -> Result<ContextValue, DjangoError> {
-        let key = args.first().map(|a| a.to_display_string()).unwrap_or_default();
+    fn name(&self) -> &'static str {
+        "dictsortreversed"
+    }
+    fn apply(
+        &self,
+        value: &ContextValue,
+        args: &[ContextValue],
+    ) -> Result<ContextValue, DjangoError> {
+        let key = args
+            .first()
+            .map(|a| a.to_display_string())
+            .unwrap_or_default();
         match value {
             ContextValue::List(list) => {
                 let mut sorted = list.clone();
                 sorted.sort_by(|a, b| {
-                    let a_val = a.resolve_path(&key).map(|v| v.to_display_string()).unwrap_or_default();
-                    let b_val = b.resolve_path(&key).map(|v| v.to_display_string()).unwrap_or_default();
+                    let a_val = a
+                        .resolve_path(&key)
+                        .map(|v| v.to_display_string())
+                        .unwrap_or_default();
+                    let b_val = b
+                        .resolve_path(&key)
+                        .map(|v| v.to_display_string())
+                        .unwrap_or_default();
                     b_val.cmp(&a_val)
                 });
                 Ok(ContextValue::List(sorted))
@@ -573,8 +787,14 @@ impl Filter for DictsortreversedFilter {
 
 struct RandomFilter;
 impl Filter for RandomFilter {
-    fn name(&self) -> &'static str { "random" }
-    fn apply(&self, value: &ContextValue, _args: &[ContextValue]) -> Result<ContextValue, DjangoError> {
+    fn name(&self) -> &'static str {
+        "random"
+    }
+    fn apply(
+        &self,
+        value: &ContextValue,
+        _args: &[ContextValue],
+    ) -> Result<ContextValue, DjangoError> {
         use rand::Rng;
         match value {
             ContextValue::List(list) if !list.is_empty() => {
@@ -588,8 +808,14 @@ impl Filter for RandomFilter {
 
 struct UnorderedListFilter;
 impl Filter for UnorderedListFilter {
-    fn name(&self) -> &'static str { "unordered_list" }
-    fn apply(&self, value: &ContextValue, _args: &[ContextValue]) -> Result<ContextValue, DjangoError> {
+    fn name(&self) -> &'static str {
+        "unordered_list"
+    }
+    fn apply(
+        &self,
+        value: &ContextValue,
+        _args: &[ContextValue],
+    ) -> Result<ContextValue, DjangoError> {
         match value {
             ContextValue::List(list) => {
                 let items: Vec<String> = list
@@ -609,8 +835,14 @@ impl Filter for UnorderedListFilter {
 
 struct AddFilter;
 impl Filter for AddFilter {
-    fn name(&self) -> &'static str { "add" }
-    fn apply(&self, value: &ContextValue, args: &[ContextValue]) -> Result<ContextValue, DjangoError> {
+    fn name(&self) -> &'static str {
+        "add"
+    }
+    fn apply(
+        &self,
+        value: &ContextValue,
+        args: &[ContextValue],
+    ) -> Result<ContextValue, DjangoError> {
         let arg = args.first().unwrap_or(&ContextValue::Integer(0));
 
         // Try numeric addition first
@@ -630,8 +862,14 @@ impl Filter for AddFilter {
 
 struct FloatformatFilter;
 impl Filter for FloatformatFilter {
-    fn name(&self) -> &'static str { "floatformat" }
-    fn apply(&self, value: &ContextValue, args: &[ContextValue]) -> Result<ContextValue, DjangoError> {
+    fn name(&self) -> &'static str {
+        "floatformat"
+    }
+    fn apply(
+        &self,
+        value: &ContextValue,
+        args: &[ContextValue],
+    ) -> Result<ContextValue, DjangoError> {
         let f = value.as_float().unwrap_or(0.0);
         let precision = args.first().and_then(|a| a.as_integer()).unwrap_or(-1);
 
@@ -662,8 +900,14 @@ impl Filter for FloatformatFilter {
 
 struct FilesizeformatFilter;
 impl Filter for FilesizeformatFilter {
-    fn name(&self) -> &'static str { "filesizeformat" }
-    fn apply(&self, value: &ContextValue, _args: &[ContextValue]) -> Result<ContextValue, DjangoError> {
+    fn name(&self) -> &'static str {
+        "filesizeformat"
+    }
+    fn apply(
+        &self,
+        value: &ContextValue,
+        _args: &[ContextValue],
+    ) -> Result<ContextValue, DjangoError> {
         let bytes = value.as_float().unwrap_or(0.0);
         let result = if bytes < 1024.0 {
             format!("{} bytes", bytes as i64)
@@ -682,8 +926,14 @@ impl Filter for FilesizeformatFilter {
 
 struct DivisiblebyFilter;
 impl Filter for DivisiblebyFilter {
-    fn name(&self) -> &'static str { "divisibleby" }
-    fn apply(&self, value: &ContextValue, args: &[ContextValue]) -> Result<ContextValue, DjangoError> {
+    fn name(&self) -> &'static str {
+        "divisibleby"
+    }
+    fn apply(
+        &self,
+        value: &ContextValue,
+        args: &[ContextValue],
+    ) -> Result<ContextValue, DjangoError> {
         let n = value.as_integer().unwrap_or(0);
         let divisor = args.first().and_then(|a| a.as_integer()).unwrap_or(1);
         if divisor == 0 {
@@ -699,18 +949,27 @@ impl Filter for DivisiblebyFilter {
 
 struct DateFilter;
 impl Filter for DateFilter {
-    fn name(&self) -> &'static str { "date" }
-    fn apply(&self, value: &ContextValue, args: &[ContextValue]) -> Result<ContextValue, DjangoError> {
-        let format = args.first().map(|a| a.to_display_string()).unwrap_or_else(|| "N j, Y".to_string());
+    fn name(&self) -> &'static str {
+        "date"
+    }
+    fn apply(
+        &self,
+        value: &ContextValue,
+        args: &[ContextValue],
+    ) -> Result<ContextValue, DjangoError> {
+        let format = args
+            .first()
+            .map(|a| a.to_display_string())
+            .unwrap_or_else(|| "N j, Y".to_string());
         let s = value.to_display_string();
         // Try to parse the date string
         if let Ok(dt) = chrono::NaiveDate::parse_from_str(&s, "%Y-%m-%d") {
             let dt = dt.and_hms_opt(0, 0, 0).unwrap();
-            let dt: chrono::DateTime<chrono::Local> = chrono::DateTime::from_naive_utc_and_offset(
-                dt,
-                *chrono::Local::now().offset(),
-            );
-            Ok(ContextValue::String(crate::parser::format_django_date_pub(&dt, &format)))
+            let dt: chrono::DateTime<chrono::Local> =
+                chrono::DateTime::from_naive_utc_and_offset(dt, *chrono::Local::now().offset());
+            Ok(ContextValue::String(crate::parser::format_django_date_pub(
+                &dt, &format,
+            )))
         } else {
             Ok(value.clone())
         }
@@ -719,17 +978,28 @@ impl Filter for DateFilter {
 
 struct TimeFilter;
 impl Filter for TimeFilter {
-    fn name(&self) -> &'static str { "time" }
-    fn apply(&self, value: &ContextValue, args: &[ContextValue]) -> Result<ContextValue, DjangoError> {
-        let format = args.first().map(|a| a.to_display_string()).unwrap_or_else(|| "H:i".to_string());
+    fn name(&self) -> &'static str {
+        "time"
+    }
+    fn apply(
+        &self,
+        value: &ContextValue,
+        args: &[ContextValue],
+    ) -> Result<ContextValue, DjangoError> {
+        let format = args
+            .first()
+            .map(|a| a.to_display_string())
+            .unwrap_or_else(|| "H:i".to_string());
         let s = value.to_display_string();
         if let Ok(t) = chrono::NaiveTime::parse_from_str(&s, "%H:%M:%S") {
-            let dt = chrono::NaiveDate::from_ymd_opt(2000, 1, 1).unwrap().and_time(t);
-            let dt: chrono::DateTime<chrono::Local> = chrono::DateTime::from_naive_utc_and_offset(
-                dt,
-                *chrono::Local::now().offset(),
-            );
-            Ok(ContextValue::String(crate::parser::format_django_date_pub(&dt, &format)))
+            let dt = chrono::NaiveDate::from_ymd_opt(2000, 1, 1)
+                .unwrap()
+                .and_time(t);
+            let dt: chrono::DateTime<chrono::Local> =
+                chrono::DateTime::from_naive_utc_and_offset(dt, *chrono::Local::now().offset());
+            Ok(ContextValue::String(crate::parser::format_django_date_pub(
+                &dt, &format,
+            )))
         } else {
             Ok(value.clone())
         }
@@ -738,8 +1008,14 @@ impl Filter for TimeFilter {
 
 struct TimesinceFilter;
 impl Filter for TimesinceFilter {
-    fn name(&self) -> &'static str { "timesince" }
-    fn apply(&self, value: &ContextValue, _args: &[ContextValue]) -> Result<ContextValue, DjangoError> {
+    fn name(&self) -> &'static str {
+        "timesince"
+    }
+    fn apply(
+        &self,
+        value: &ContextValue,
+        _args: &[ContextValue],
+    ) -> Result<ContextValue, DjangoError> {
         let s = value.to_display_string();
         if let Ok(dt) = chrono::NaiveDate::parse_from_str(&s, "%Y-%m-%d") {
             let now = chrono::Local::now().date_naive();
@@ -753,8 +1029,14 @@ impl Filter for TimesinceFilter {
 
 struct TimeuntilFilter;
 impl Filter for TimeuntilFilter {
-    fn name(&self) -> &'static str { "timeuntil" }
-    fn apply(&self, value: &ContextValue, _args: &[ContextValue]) -> Result<ContextValue, DjangoError> {
+    fn name(&self) -> &'static str {
+        "timeuntil"
+    }
+    fn apply(
+        &self,
+        value: &ContextValue,
+        _args: &[ContextValue],
+    ) -> Result<ContextValue, DjangoError> {
         let s = value.to_display_string();
         if let Ok(dt) = chrono::NaiveDate::parse_from_str(&s, "%Y-%m-%d") {
             let now = chrono::Local::now().date_naive();
@@ -777,7 +1059,11 @@ fn format_duration(duration: chrono::Duration) -> String {
         let remaining_days = days % 365;
         let months = remaining_days / 30;
         if months > 0 {
-            format!("{years} year{}, {months} month{}", plural(years), plural(months))
+            format!(
+                "{years} year{}, {months} month{}",
+                plural(years),
+                plural(months)
+            )
         } else {
             format!("{years} year{}", plural(years))
         }
@@ -785,7 +1071,11 @@ fn format_duration(duration: chrono::Duration) -> String {
         let months = days / 30;
         let remaining_days = days % 30;
         if remaining_days > 0 {
-            format!("{months} month{}, {remaining_days} day{}", plural(months), plural(remaining_days))
+            format!(
+                "{months} month{}, {remaining_days} day{}",
+                plural(months),
+                plural(remaining_days)
+            )
         } else {
             format!("{months} month{}", plural(months))
         }
@@ -797,7 +1087,11 @@ fn format_duration(duration: chrono::Duration) -> String {
         }
     } else if hours > 0 {
         if minutes > 0 {
-            format!("{hours} hour{}, {minutes} minute{}", plural(hours), plural(minutes))
+            format!(
+                "{hours} hour{}, {minutes} minute{}",
+                plural(hours),
+                plural(minutes)
+            )
         } else {
             format!("{hours} hour{}", plural(hours))
         }
@@ -807,7 +1101,11 @@ fn format_duration(duration: chrono::Duration) -> String {
 }
 
 fn plural(n: u64) -> &'static str {
-    if n == 1 { "" } else { "s" }
+    if n == 1 {
+        ""
+    } else {
+        "s"
+    }
 }
 
 // ============================================================
@@ -816,8 +1114,14 @@ fn plural(n: u64) -> &'static str {
 
 struct DefaultFilter;
 impl Filter for DefaultFilter {
-    fn name(&self) -> &'static str { "default" }
-    fn apply(&self, value: &ContextValue, args: &[ContextValue]) -> Result<ContextValue, DjangoError> {
+    fn name(&self) -> &'static str {
+        "default"
+    }
+    fn apply(
+        &self,
+        value: &ContextValue,
+        args: &[ContextValue],
+    ) -> Result<ContextValue, DjangoError> {
         if value.is_truthy() {
             Ok(value.clone())
         } else {
@@ -828,8 +1132,14 @@ impl Filter for DefaultFilter {
 
 struct DefaultIfNoneFilter;
 impl Filter for DefaultIfNoneFilter {
-    fn name(&self) -> &'static str { "default_if_none" }
-    fn apply(&self, value: &ContextValue, args: &[ContextValue]) -> Result<ContextValue, DjangoError> {
+    fn name(&self) -> &'static str {
+        "default_if_none"
+    }
+    fn apply(
+        &self,
+        value: &ContextValue,
+        args: &[ContextValue],
+    ) -> Result<ContextValue, DjangoError> {
         if matches!(value, ContextValue::None) {
             Ok(args.first().cloned().unwrap_or(ContextValue::None))
         } else {
@@ -840,9 +1150,18 @@ impl Filter for DefaultIfNoneFilter {
 
 struct YesnoFilter;
 impl Filter for YesnoFilter {
-    fn name(&self) -> &'static str { "yesno" }
-    fn apply(&self, value: &ContextValue, args: &[ContextValue]) -> Result<ContextValue, DjangoError> {
-        let mapping = args.first().map(|a| a.to_display_string()).unwrap_or_else(|| "yes,no,maybe".to_string());
+    fn name(&self) -> &'static str {
+        "yesno"
+    }
+    fn apply(
+        &self,
+        value: &ContextValue,
+        args: &[ContextValue],
+    ) -> Result<ContextValue, DjangoError> {
+        let mapping = args
+            .first()
+            .map(|a| a.to_display_string())
+            .unwrap_or_else(|| "yes,no,maybe".to_string());
         let parts: Vec<&str> = mapping.split(',').collect();
         let yes = parts.first().unwrap_or(&"yes");
         let no = parts.get(1).unwrap_or(&"no");
@@ -860,9 +1179,18 @@ impl Filter for YesnoFilter {
 
 struct PluralizeFilter;
 impl Filter for PluralizeFilter {
-    fn name(&self) -> &'static str { "pluralize" }
-    fn apply(&self, value: &ContextValue, args: &[ContextValue]) -> Result<ContextValue, DjangoError> {
-        let suffix = args.first().map(|a| a.to_display_string()).unwrap_or_else(|| "s".to_string());
+    fn name(&self) -> &'static str {
+        "pluralize"
+    }
+    fn apply(
+        &self,
+        value: &ContextValue,
+        args: &[ContextValue],
+    ) -> Result<ContextValue, DjangoError> {
+        let suffix = args
+            .first()
+            .map(|a| a.to_display_string())
+            .unwrap_or_else(|| "s".to_string());
         let parts: Vec<&str> = suffix.split(',').collect();
 
         let (singular, plural_suffix) = if parts.len() >= 2 {
@@ -886,22 +1214,35 @@ impl Filter for PluralizeFilter {
 
 struct IriencodeFilter;
 impl Filter for IriencodeFilter {
-    fn name(&self) -> &'static str { "iriencode" }
-    fn apply(&self, value: &ContextValue, _args: &[ContextValue]) -> Result<ContextValue, DjangoError> {
+    fn name(&self) -> &'static str {
+        "iriencode"
+    }
+    fn apply(
+        &self,
+        value: &ContextValue,
+        _args: &[ContextValue],
+    ) -> Result<ContextValue, DjangoError> {
         let s = value.to_display_string();
-        let encoded = percent_encoding::utf8_percent_encode(
-            &s,
-            percent_encoding::NON_ALPHANUMERIC,
-        ).to_string();
+        let encoded = percent_encoding::utf8_percent_encode(&s, percent_encoding::NON_ALPHANUMERIC)
+            .to_string();
         Ok(ContextValue::SafeString(encoded))
     }
 }
 
 struct JsonScriptFilter;
 impl Filter for JsonScriptFilter {
-    fn name(&self) -> &'static str { "json_script" }
-    fn apply(&self, value: &ContextValue, args: &[ContextValue]) -> Result<ContextValue, DjangoError> {
-        let element_id = args.first().map(|a| a.to_display_string()).unwrap_or_default();
+    fn name(&self) -> &'static str {
+        "json_script"
+    }
+    fn apply(
+        &self,
+        value: &ContextValue,
+        args: &[ContextValue],
+    ) -> Result<ContextValue, DjangoError> {
+        let element_id = args
+            .first()
+            .map(|a| a.to_display_string())
+            .unwrap_or_default();
 
         // Convert ContextValue to a JSON representation
         let json_str = context_value_to_json_string(value);
@@ -929,8 +1270,14 @@ impl Filter for JsonScriptFilter {
 
 struct LinenumbersFilter;
 impl Filter for LinenumbersFilter {
-    fn name(&self) -> &'static str { "linenumbers" }
-    fn apply(&self, value: &ContextValue, _args: &[ContextValue]) -> Result<ContextValue, DjangoError> {
+    fn name(&self) -> &'static str {
+        "linenumbers"
+    }
+    fn apply(
+        &self,
+        value: &ContextValue,
+        _args: &[ContextValue],
+    ) -> Result<ContextValue, DjangoError> {
         let s = value.to_display_string();
         let lines: Vec<&str> = s.split('\n').collect();
         let width = lines.len().to_string().len();
@@ -945,11 +1292,18 @@ impl Filter for LinenumbersFilter {
 
 struct Phone2numericFilter;
 impl Filter for Phone2numericFilter {
-    fn name(&self) -> &'static str { "phone2numeric" }
-    fn apply(&self, value: &ContextValue, _args: &[ContextValue]) -> Result<ContextValue, DjangoError> {
+    fn name(&self) -> &'static str {
+        "phone2numeric"
+    }
+    fn apply(
+        &self,
+        value: &ContextValue,
+        _args: &[ContextValue],
+    ) -> Result<ContextValue, DjangoError> {
         let s = value.to_display_string();
-        let result: String = s.chars().map(|c| {
-            match c.to_ascii_uppercase() {
+        let result: String = s
+            .chars()
+            .map(|c| match c.to_ascii_uppercase() {
                 'A' | 'B' | 'C' => '2',
                 'D' | 'E' | 'F' => '3',
                 'G' | 'H' | 'I' => '4',
@@ -959,17 +1313,26 @@ impl Filter for Phone2numericFilter {
                 'T' | 'U' | 'V' => '8',
                 'W' | 'X' | 'Y' | 'Z' => '9',
                 other => other,
-            }
-        }).collect();
+            })
+            .collect();
         Ok(ContextValue::String(result))
     }
 }
 
 struct StringformatFilter;
 impl Filter for StringformatFilter {
-    fn name(&self) -> &'static str { "stringformat" }
-    fn apply(&self, value: &ContextValue, args: &[ContextValue]) -> Result<ContextValue, DjangoError> {
-        let fmt_str = args.first().map(|a| a.to_display_string()).unwrap_or_default();
+    fn name(&self) -> &'static str {
+        "stringformat"
+    }
+    fn apply(
+        &self,
+        value: &ContextValue,
+        args: &[ContextValue],
+    ) -> Result<ContextValue, DjangoError> {
+        let fmt_str = args
+            .first()
+            .map(|a| a.to_display_string())
+            .unwrap_or_default();
 
         // Django's stringformat uses Python's % formatting, e.g. stringformat:"02d" means "%02d".
         // We support a subset of common format specifiers.
@@ -1104,8 +1467,14 @@ fn python_format_string(fmt: &str, val: &str) -> String {
 
 struct TruncatecharsHtmlFilter;
 impl Filter for TruncatecharsHtmlFilter {
-    fn name(&self) -> &'static str { "truncatechars_html" }
-    fn apply(&self, value: &ContextValue, args: &[ContextValue]) -> Result<ContextValue, DjangoError> {
+    fn name(&self) -> &'static str {
+        "truncatechars_html"
+    }
+    fn apply(
+        &self,
+        value: &ContextValue,
+        args: &[ContextValue],
+    ) -> Result<ContextValue, DjangoError> {
         let s = value.to_display_string();
         let max_len = args.first().and_then(|a| a.as_integer()).unwrap_or(0) as usize;
 
@@ -1120,8 +1489,14 @@ impl Filter for TruncatecharsHtmlFilter {
 
 struct TruncatewordsHtmlFilter;
 impl Filter for TruncatewordsHtmlFilter {
-    fn name(&self) -> &'static str { "truncatewords_html" }
-    fn apply(&self, value: &ContextValue, args: &[ContextValue]) -> Result<ContextValue, DjangoError> {
+    fn name(&self) -> &'static str {
+        "truncatewords_html"
+    }
+    fn apply(
+        &self,
+        value: &ContextValue,
+        args: &[ContextValue],
+    ) -> Result<ContextValue, DjangoError> {
         let s = value.to_display_string();
         let max_words = args.first().and_then(|a| a.as_integer()).unwrap_or(0) as usize;
 
@@ -1149,7 +1524,11 @@ fn context_value_to_json_string(value: &ContextValue) -> String {
             }
         }
         ContextValue::Bool(b) => {
-            if *b { "true".to_string() } else { "false".to_string() }
+            if *b {
+                "true".to_string()
+            } else {
+                "false".to_string()
+            }
         }
         ContextValue::None => "null".to_string(),
         ContextValue::List(items) => {
@@ -1159,7 +1538,13 @@ fn context_value_to_json_string(value: &ContextValue) -> String {
         ContextValue::Dict(map) => {
             let inner: Vec<String> = map
                 .iter()
-                .map(|(k, v)| format!("{}: {}", serde_json::to_string(k).unwrap_or_default(), context_value_to_json_string(v)))
+                .map(|(k, v)| {
+                    format!(
+                        "{}: {}",
+                        serde_json::to_string(k).unwrap_or_default(),
+                        context_value_to_json_string(v)
+                    )
+                })
                 .collect();
             format!("{{{}}}", inner.join(", "))
         }
@@ -1194,17 +1579,27 @@ fn truncate_html_chars(html: &str, max_chars: usize) -> String {
             let tag_inner = tag.trim_start_matches('<').trim_end_matches('>').trim();
             if tag_inner.starts_with('/') {
                 // Closing tag
-                let tag_name = tag_inner.trim_start_matches('/').split_whitespace().next().unwrap_or("");
+                let tag_name = tag_inner
+                    .trim_start_matches('/')
+                    .split_whitespace()
+                    .next()
+                    .unwrap_or("");
                 if let Some(pos) = open_tags.iter().rposition(|t| t == tag_name) {
                     open_tags.remove(pos);
                 }
                 result.push_str(&tag);
-            } else if tag_inner.ends_with('/') || is_void_element(tag_inner.split_whitespace().next().unwrap_or("")) {
+            } else if tag_inner.ends_with('/')
+                || is_void_element(tag_inner.split_whitespace().next().unwrap_or(""))
+            {
                 // Self-closing or void element
                 result.push_str(&tag);
             } else {
                 // Opening tag
-                let tag_name = tag_inner.split_whitespace().next().unwrap_or("").to_string();
+                let tag_name = tag_inner
+                    .split_whitespace()
+                    .next()
+                    .unwrap_or("")
+                    .to_string();
                 if !tag_name.is_empty() {
                     open_tags.push(tag_name);
                 }
@@ -1252,15 +1647,25 @@ fn truncate_html_words(html: &str, max_words: usize) -> String {
 
             let tag_inner = tag.trim_start_matches('<').trim_end_matches('>').trim();
             if tag_inner.starts_with('/') {
-                let tag_name = tag_inner.trim_start_matches('/').split_whitespace().next().unwrap_or("");
+                let tag_name = tag_inner
+                    .trim_start_matches('/')
+                    .split_whitespace()
+                    .next()
+                    .unwrap_or("");
                 if let Some(pos) = open_tags.iter().rposition(|t| t == tag_name) {
                     open_tags.remove(pos);
                 }
                 result.push_str(&tag);
-            } else if tag_inner.ends_with('/') || is_void_element(tag_inner.split_whitespace().next().unwrap_or("")) {
+            } else if tag_inner.ends_with('/')
+                || is_void_element(tag_inner.split_whitespace().next().unwrap_or(""))
+            {
                 result.push_str(&tag);
             } else {
-                let tag_name = tag_inner.split_whitespace().next().unwrap_or("").to_string();
+                let tag_name = tag_inner
+                    .split_whitespace()
+                    .next()
+                    .unwrap_or("")
+                    .to_string();
                 if !tag_name.is_empty() {
                     open_tags.push(tag_name);
                 }
@@ -1316,8 +1721,20 @@ fn truncate_html_words(html: &str, max_words: usize) -> String {
 fn is_void_element(tag: &str) -> bool {
     matches!(
         tag.to_lowercase().as_str(),
-        "area" | "base" | "br" | "col" | "embed" | "hr" | "img" | "input"
-            | "link" | "meta" | "param" | "source" | "track" | "wbr"
+        "area"
+            | "base"
+            | "br"
+            | "col"
+            | "embed"
+            | "hr"
+            | "img"
+            | "input"
+            | "link"
+            | "meta"
+            | "param"
+            | "source"
+            | "track"
+            | "wbr"
     )
 }
 
@@ -1355,7 +1772,11 @@ mod tests {
 
     #[test]
     fn test_cut() {
-        let result = apply_filter("cut", ContextValue::from("hello world"), vec![ContextValue::from(" ")]);
+        let result = apply_filter(
+            "cut",
+            ContextValue::from("hello world"),
+            vec![ContextValue::from(" ")],
+        );
         assert_eq!(result.to_display_string(), "helloworld");
     }
 
@@ -1403,7 +1824,11 @@ mod tests {
 
     #[test]
     fn test_escapejs() {
-        let result = apply_filter("escapejs", ContextValue::from("it's \"good\"\nnewline"), vec![]);
+        let result = apply_filter(
+            "escapejs",
+            ContextValue::from("it's \"good\"\nnewline"),
+            vec![],
+        );
         assert!(result.to_display_string().contains("\\'"));
         assert!(result.to_display_string().contains("\\n"));
     }
@@ -1428,7 +1853,11 @@ mod tests {
 
     #[test]
     fn test_urlize() {
-        let result = apply_filter("urlize", ContextValue::from("Visit https://example.com"), vec![]);
+        let result = apply_filter(
+            "urlize",
+            ContextValue::from("Visit https://example.com"),
+            vec![],
+        );
         assert!(result.to_display_string().contains("<a href="));
     }
 
@@ -1440,20 +1869,32 @@ mod tests {
 
     #[test]
     fn test_center() {
-        let result = apply_filter("center", ContextValue::from("hi"), vec![ContextValue::Integer(10)]);
+        let result = apply_filter(
+            "center",
+            ContextValue::from("hi"),
+            vec![ContextValue::Integer(10)],
+        );
         assert_eq!(result.to_display_string().len(), 10);
         assert!(result.to_display_string().contains("hi"));
     }
 
     #[test]
     fn test_ljust() {
-        let result = apply_filter("ljust", ContextValue::from("hi"), vec![ContextValue::Integer(10)]);
+        let result = apply_filter(
+            "ljust",
+            ContextValue::from("hi"),
+            vec![ContextValue::Integer(10)],
+        );
         assert_eq!(result.to_display_string(), "hi        ");
     }
 
     #[test]
     fn test_rjust() {
-        let result = apply_filter("rjust", ContextValue::from("hi"), vec![ContextValue::Integer(10)]);
+        let result = apply_filter(
+            "rjust",
+            ContextValue::from("hi"),
+            vec![ContextValue::Integer(10)],
+        );
         assert_eq!(result.to_display_string(), "        hi");
     }
 
@@ -1513,7 +1954,11 @@ mod tests {
     fn test_join() {
         let result = apply_filter(
             "join",
-            ContextValue::List(vec![ContextValue::from("a"), ContextValue::from("b"), ContextValue::from("c")]),
+            ContextValue::List(vec![
+                ContextValue::from("a"),
+                ContextValue::from("b"),
+                ContextValue::from("c"),
+            ]),
             vec![ContextValue::from(", ")],
         );
         assert_eq!(result.to_display_string(), "a, b, c");
@@ -1540,19 +1985,31 @@ mod tests {
 
     #[test]
     fn test_add_integers() {
-        let result = apply_filter("add", ContextValue::Integer(5), vec![ContextValue::Integer(3)]);
+        let result = apply_filter(
+            "add",
+            ContextValue::Integer(5),
+            vec![ContextValue::Integer(3)],
+        );
         assert_eq!(result.to_display_string(), "8");
     }
 
     #[test]
     fn test_add_strings() {
-        let result = apply_filter("add", ContextValue::from("hello"), vec![ContextValue::from(" world")]);
+        let result = apply_filter(
+            "add",
+            ContextValue::from("hello"),
+            vec![ContextValue::from(" world")],
+        );
         assert_eq!(result.to_display_string(), "hello world");
     }
 
     #[test]
     fn test_floatformat() {
-        let result = apply_filter("floatformat", ContextValue::Float(3.14159), vec![ContextValue::Integer(2)]);
+        let result = apply_filter(
+            "floatformat",
+            ContextValue::Float(3.14159),
+            vec![ContextValue::Integer(2)],
+        );
         assert_eq!(result.to_display_string(), "3.14");
     }
 
@@ -1576,31 +2033,51 @@ mod tests {
 
     #[test]
     fn test_divisibleby() {
-        let result = apply_filter("divisibleby", ContextValue::Integer(10), vec![ContextValue::Integer(5)]);
+        let result = apply_filter(
+            "divisibleby",
+            ContextValue::Integer(10),
+            vec![ContextValue::Integer(5)],
+        );
         assert_eq!(result, ContextValue::Bool(true));
     }
 
     #[test]
     fn test_divisibleby_false() {
-        let result = apply_filter("divisibleby", ContextValue::Integer(10), vec![ContextValue::Integer(3)]);
+        let result = apply_filter(
+            "divisibleby",
+            ContextValue::Integer(10),
+            vec![ContextValue::Integer(3)],
+        );
         assert_eq!(result, ContextValue::Bool(false));
     }
 
     #[test]
     fn test_default() {
-        let result = apply_filter("default", ContextValue::None, vec![ContextValue::from("N/A")]);
+        let result = apply_filter(
+            "default",
+            ContextValue::None,
+            vec![ContextValue::from("N/A")],
+        );
         assert_eq!(result.to_display_string(), "N/A");
     }
 
     #[test]
     fn test_default_with_value() {
-        let result = apply_filter("default", ContextValue::from("hello"), vec![ContextValue::from("N/A")]);
+        let result = apply_filter(
+            "default",
+            ContextValue::from("hello"),
+            vec![ContextValue::from("N/A")],
+        );
         assert_eq!(result.to_display_string(), "hello");
     }
 
     #[test]
     fn test_default_if_none() {
-        let result = apply_filter("default_if_none", ContextValue::None, vec![ContextValue::from("fallback")]);
+        let result = apply_filter(
+            "default_if_none",
+            ContextValue::None,
+            vec![ContextValue::from("fallback")],
+        );
         assert_eq!(result.to_display_string(), "fallback");
     }
 
@@ -1617,33 +2094,64 @@ mod tests {
     #[test]
     fn test_yesno() {
         assert_eq!(
-            apply_filter("yesno", ContextValue::Bool(true), vec![ContextValue::from("yeah,nah")]).to_display_string(),
+            apply_filter(
+                "yesno",
+                ContextValue::Bool(true),
+                vec![ContextValue::from("yeah,nah")]
+            )
+            .to_display_string(),
             "yeah"
         );
         assert_eq!(
-            apply_filter("yesno", ContextValue::Bool(false), vec![ContextValue::from("yeah,nah")]).to_display_string(),
+            apply_filter(
+                "yesno",
+                ContextValue::Bool(false),
+                vec![ContextValue::from("yeah,nah")]
+            )
+            .to_display_string(),
             "nah"
         );
         assert_eq!(
-            apply_filter("yesno", ContextValue::None, vec![ContextValue::from("yeah,nah,dunno")]).to_display_string(),
+            apply_filter(
+                "yesno",
+                ContextValue::None,
+                vec![ContextValue::from("yeah,nah,dunno")]
+            )
+            .to_display_string(),
             "dunno"
         );
     }
 
     #[test]
     fn test_pluralize() {
-        assert_eq!(apply_filter("pluralize", ContextValue::Integer(1), vec![]).to_display_string(), "");
-        assert_eq!(apply_filter("pluralize", ContextValue::Integer(2), vec![]).to_display_string(), "s");
+        assert_eq!(
+            apply_filter("pluralize", ContextValue::Integer(1), vec![]).to_display_string(),
+            ""
+        );
+        assert_eq!(
+            apply_filter("pluralize", ContextValue::Integer(2), vec![]).to_display_string(),
+            "s"
+        );
     }
 
     #[test]
     fn test_pluralize_custom() {
         assert_eq!(
-            apply_filter("pluralize", ContextValue::Integer(1), vec![ContextValue::from("es")]).to_display_string(),
+            apply_filter(
+                "pluralize",
+                ContextValue::Integer(1),
+                vec![ContextValue::from("es")]
+            )
+            .to_display_string(),
             ""
         );
         assert_eq!(
-            apply_filter("pluralize", ContextValue::Integer(2), vec![ContextValue::from("es")]).to_display_string(),
+            apply_filter(
+                "pluralize",
+                ContextValue::Integer(2),
+                vec![ContextValue::from("es")]
+            )
+            .to_display_string(),
             "es"
         );
     }
@@ -1651,11 +2159,21 @@ mod tests {
     #[test]
     fn test_pluralize_singular_plural() {
         assert_eq!(
-            apply_filter("pluralize", ContextValue::Integer(1), vec![ContextValue::from("y,ies")]).to_display_string(),
+            apply_filter(
+                "pluralize",
+                ContextValue::Integer(1),
+                vec![ContextValue::from("y,ies")]
+            )
+            .to_display_string(),
             "y"
         );
         assert_eq!(
-            apply_filter("pluralize", ContextValue::Integer(2), vec![ContextValue::from("y,ies")]).to_display_string(),
+            apply_filter(
+                "pluralize",
+                ContextValue::Integer(2),
+                vec![ContextValue::from("y,ies")]
+            )
+            .to_display_string(),
             "ies"
         );
     }
@@ -1773,7 +2291,11 @@ mod tests {
     fn test_json_script_dict() {
         let mut map = std::collections::HashMap::new();
         map.insert("key".to_string(), ContextValue::from("value"));
-        let result = apply_filter("json_script", ContextValue::Dict(map), vec![ContextValue::from("data")]);
+        let result = apply_filter(
+            "json_script",
+            ContextValue::Dict(map),
+            vec![ContextValue::from("data")],
+        );
         let s = result.to_display_string();
         assert!(s.contains(r#""key""#));
         assert!(s.contains(r#""value""#));
@@ -1810,7 +2332,10 @@ mod tests {
     #[test]
     fn test_linenumbers_padding() {
         // 10+ lines should pad to 2 digits
-        let input = (1..=12).map(|i| format!("line{i}")).collect::<Vec<_>>().join("\n");
+        let input = (1..=12)
+            .map(|i| format!("line{i}"))
+            .collect::<Vec<_>>()
+            .join("\n");
         let result = apply_filter("linenumbers", ContextValue::from(input.as_str()), vec![]);
         let s = result.to_display_string();
         assert!(s.contains(" 1. line1"));
@@ -1837,31 +2362,51 @@ mod tests {
 
     #[test]
     fn test_stringformat_int() {
-        let result = apply_filter("stringformat", ContextValue::Integer(42), vec![ContextValue::from("03d")]);
+        let result = apply_filter(
+            "stringformat",
+            ContextValue::Integer(42),
+            vec![ContextValue::from("03d")],
+        );
         assert_eq!(result.to_display_string(), "042");
     }
 
     #[test]
     fn test_stringformat_float() {
-        let result = apply_filter("stringformat", ContextValue::Float(3.14159), vec![ContextValue::from(".2f")]);
+        let result = apply_filter(
+            "stringformat",
+            ContextValue::Float(3.14159),
+            vec![ContextValue::from(".2f")],
+        );
         assert_eq!(result.to_display_string(), "3.14");
     }
 
     #[test]
     fn test_stringformat_string() {
-        let result = apply_filter("stringformat", ContextValue::from("hi"), vec![ContextValue::from("10s")]);
+        let result = apply_filter(
+            "stringformat",
+            ContextValue::from("hi"),
+            vec![ContextValue::from("10s")],
+        );
         assert_eq!(result.to_display_string(), "        hi");
     }
 
     #[test]
     fn test_stringformat_hex() {
-        let result = apply_filter("stringformat", ContextValue::Integer(255), vec![ContextValue::from("x")]);
+        let result = apply_filter(
+            "stringformat",
+            ContextValue::Integer(255),
+            vec![ContextValue::from("x")],
+        );
         assert_eq!(result.to_display_string(), "ff");
     }
 
     #[test]
     fn test_stringformat_octal() {
-        let result = apply_filter("stringformat", ContextValue::Integer(8), vec![ContextValue::from("o")]);
+        let result = apply_filter(
+            "stringformat",
+            ContextValue::Integer(8),
+            vec![ContextValue::from("o")],
+        );
         assert_eq!(result.to_display_string(), "10");
     }
 
@@ -1946,13 +2491,21 @@ mod tests {
 
     #[test]
     fn test_json_script_bool() {
-        let result = apply_filter("json_script", ContextValue::Bool(true), vec![ContextValue::from("d")]);
+        let result = apply_filter(
+            "json_script",
+            ContextValue::Bool(true),
+            vec![ContextValue::from("d")],
+        );
         assert!(result.to_display_string().contains("true"));
     }
 
     #[test]
     fn test_json_script_null() {
-        let result = apply_filter("json_script", ContextValue::None, vec![ContextValue::from("d")]);
+        let result = apply_filter(
+            "json_script",
+            ContextValue::None,
+            vec![ContextValue::from("d")],
+        );
         assert!(result.to_display_string().contains("null"));
     }
 
@@ -1969,9 +2522,18 @@ mod tests {
 
     #[test]
     fn test_context_value_to_json_string() {
-        assert_eq!(context_value_to_json_string(&ContextValue::Integer(42)), "42");
-        assert_eq!(context_value_to_json_string(&ContextValue::Bool(true)), "true");
+        assert_eq!(
+            context_value_to_json_string(&ContextValue::Integer(42)),
+            "42"
+        );
+        assert_eq!(
+            context_value_to_json_string(&ContextValue::Bool(true)),
+            "true"
+        );
         assert_eq!(context_value_to_json_string(&ContextValue::None), "null");
-        assert_eq!(context_value_to_json_string(&ContextValue::from("hello")), "\"hello\"");
+        assert_eq!(
+            context_value_to_json_string(&ContextValue::from("hello")),
+            "\"hello\""
+        );
     }
 }

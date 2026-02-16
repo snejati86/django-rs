@@ -54,9 +54,7 @@ impl LiveServerTestCase {
         let listener = TcpListener::bind("127.0.0.1:0")
             .await
             .expect("Failed to bind to random port");
-        let addr = listener
-            .local_addr()
-            .expect("Failed to get local address");
+        let addr = listener.local_addr().expect("Failed to get local address");
 
         let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
 
@@ -136,9 +134,10 @@ mod tests {
     async fn test_server_responds_to_requests() {
         let app = Router::new()
             .route("/hello", get(|| async { "Hello from live server" }))
-            .route("/json", get(|| async {
-                axum::Json(serde_json::json!({"status": "ok"}))
-            }));
+            .route(
+                "/json",
+                get(|| async { axum::Json(serde_json::json!({"status": "ok"})) }),
+            );
 
         let server = LiveServerTestCase::start(app).await;
         let url = server.url();
@@ -147,7 +146,10 @@ mod tests {
         // We test the connection by attempting to connect to the port.
         let addr = server.addr();
         let stream = tokio::net::TcpStream::connect(addr).await;
-        assert!(stream.is_ok(), "Should be able to connect to the live server");
+        assert!(
+            stream.is_ok(),
+            "Should be able to connect to the live server"
+        );
 
         server.stop().await;
 

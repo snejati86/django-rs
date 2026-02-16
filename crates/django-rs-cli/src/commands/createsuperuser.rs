@@ -67,9 +67,7 @@ impl ManagementCommand for CreatesuperuserCommand {
 
         if noinput {
             let username = matches.get_one::<String>("username").ok_or_else(|| {
-                DjangoError::ConfigurationError(
-                    "--username is required with --noinput".to_string(),
-                )
+                DjangoError::ConfigurationError("--username is required with --noinput".to_string())
             })?;
             let email = matches
                 .get_one::<String>("email")

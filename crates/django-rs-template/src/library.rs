@@ -152,11 +152,7 @@ impl Library {
     /// # Errors
     ///
     /// Returns an error if the tag is not found.
-    pub fn execute_simple_tag(
-        &self,
-        name: &str,
-        args: &[String],
-    ) -> Result<String, DjangoError> {
+    pub fn execute_simple_tag(&self, name: &str, args: &[String]) -> Result<String, DjangoError> {
         let func = self.simple_tags.get(name).ok_or_else(|| {
             DjangoError::TemplateSyntaxError(format!(
                 "Simple tag '{name}' not found in library '{}'",
@@ -353,9 +349,7 @@ mod tests {
     #[test]
     fn test_library_register_filter() {
         let mut lib = Library::new("test");
-        lib.register_filter("double", |value, _args| {
-            format!("{value}{value}")
-        });
+        lib.register_filter("double", |value, _args| format!("{value}{value}"));
 
         assert!(lib.has_filter("double"));
         assert!(!lib.has_filter("triple"));
@@ -365,9 +359,7 @@ mod tests {
     #[test]
     fn test_library_apply_filter() {
         let mut lib = Library::new("test");
-        lib.register_filter("double", |value, _args| {
-            format!("{value}{value}")
-        });
+        lib.register_filter("double", |value, _args| format!("{value}{value}"));
 
         let result = lib.apply_filter("double", "abc", &[]).unwrap();
         assert_eq!(result, "abcabc");
@@ -443,10 +435,13 @@ mod tests {
         let mut lib = Library::new("test");
         lib.register_inclusion_tag("sidebar", |_args| {
             let mut ctx = HashMap::new();
-            ctx.insert("items".to_string(), ContextValue::List(vec![
-                ContextValue::from("Home"),
-                ContextValue::from("About"),
-            ]));
+            ctx.insert(
+                "items".to_string(),
+                ContextValue::List(vec![
+                    ContextValue::from("Home"),
+                    ContextValue::from("About"),
+                ]),
+            );
             ("sidebar.html".to_string(), ctx)
         });
 
@@ -478,12 +473,8 @@ mod tests {
     #[test]
     fn test_library_multiple_filters() {
         let mut lib = Library::new("text_utils");
-        lib.register_filter("reverse", |value, _| {
-            value.chars().rev().collect()
-        });
-        lib.register_filter("upper", |value, _| {
-            value.to_uppercase()
-        });
+        lib.register_filter("reverse", |value, _| value.chars().rev().collect());
+        lib.register_filter("upper", |value, _| value.to_uppercase());
         lib.register_filter("repeat", |value, args| {
             let n: usize = args.first().and_then(|s| s.parse().ok()).unwrap_or(1);
             value.repeat(n)
@@ -500,9 +491,7 @@ mod tests {
     #[test]
     fn test_library_install_filters() {
         let mut lib = Library::new("test");
-        lib.register_filter("custom_double", |value, _args| {
-            format!("{value}{value}")
-        });
+        lib.register_filter("custom_double", |value, _args| format!("{value}{value}"));
 
         let mut registry = FilterRegistry::new();
         lib.install_filters(&mut registry);
@@ -630,10 +619,7 @@ mod tests {
         assert_eq!(adapter.name(), "test_adapter");
 
         let result = adapter
-            .apply(
-                &ContextValue::from("hello"),
-                &[ContextValue::from("world")],
-            )
+            .apply(&ContextValue::from("hello"), &[ContextValue::from("world")])
             .unwrap();
         assert_eq!(result.to_display_string(), "hello_world");
     }
@@ -672,7 +658,10 @@ mod tests {
 
         // Inclusion tag
         lib.register_inclusion_tag("user_card", |args| {
-            let name = args.first().cloned().unwrap_or_else(|| "Anonymous".to_string());
+            let name = args
+                .first()
+                .cloned()
+                .unwrap_or_else(|| "Anonymous".to_string());
             let mut ctx = HashMap::new();
             ctx.insert("username".to_string(), ContextValue::from(name));
             ("user_card.html".to_string(), ctx)
@@ -684,7 +673,8 @@ mod tests {
 
         assert_eq!(lib.execute_simple_tag("current_year", &[]).unwrap(), "2026");
         assert_eq!(
-            lib.execute_simple_tag("repeat_text", &["ab".to_string(), "3".to_string()]).unwrap(),
+            lib.execute_simple_tag("repeat_text", &["ab".to_string(), "3".to_string()])
+                .unwrap(),
             "ababab"
         );
 

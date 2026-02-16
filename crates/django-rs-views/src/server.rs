@@ -143,9 +143,7 @@ impl DjangoApp {
 
                     Box::pin(async move {
                         let Some(url_conf) = url_conf.as_ref() else {
-                            return HttpResponse::server_error(
-                                "No URL configuration provided",
-                            );
+                            return HttpResponse::server_error("No URL configuration provided");
                         };
 
                         // Strip leading slash for URL resolution. Django's URL
@@ -160,14 +158,11 @@ impl DjangoApp {
                                 let handler = &resolver_match.func;
                                 handler(request).await
                             }
-                            Err(DjangoError::NotFound(msg)) => {
-                                HttpResponse::not_found(msg)
-                            }
-                            Err(e) => {
-                                HttpResponse::server_error(format!("Routing error: {e}"))
-                            }
+                            Err(DjangoError::NotFound(msg)) => HttpResponse::not_found(msg),
+                            Err(e) => HttpResponse::server_error(format!("Routing error: {e}")),
                         }
-                    }) as std::pin::Pin<Box<dyn std::future::Future<Output = HttpResponse> + Send>>
+                    })
+                        as std::pin::Pin<Box<dyn std::future::Future<Output = HttpResponse> + Send>>
                 });
 
                 let response = middleware.process(django_request, &view_handler).await;
@@ -175,7 +170,9 @@ impl DjangoApp {
             }
         };
 
-        axum::Router::new().route("/{*path}", any(handler.clone())).route("/", any(handler))
+        axum::Router::new()
+            .route("/{*path}", any(handler.clone()))
+            .route("/", any(handler))
     }
 
     /// Runs the application as an HTTP server on the given address.
@@ -189,9 +186,9 @@ impl DjangoApp {
     pub async fn run(self, addr: &str) -> Result<(), DjangoError> {
         let debug = self.settings.debug;
         let router = self.into_axum_router();
-        let listener = tokio::net::TcpListener::bind(addr)
-            .await
-            .map_err(|e| DjangoError::ImproperlyConfigured(format!("Failed to bind to {addr}: {e}")))?;
+        let listener = tokio::net::TcpListener::bind(addr).await.map_err(|e| {
+            DjangoError::ImproperlyConfigured(format!("Failed to bind to {addr}: {e}"))
+        })?;
 
         if debug {
             tracing::info!("Starting development server at http://{addr}/");
@@ -239,8 +236,7 @@ mod tests {
     fn test_django_app_with_middleware() {
         use crate::middleware::builtin::SecurityMiddleware;
 
-        let app = DjangoApp::new(Settings::default())
-            .middleware(SecurityMiddleware::default());
+        let app = DjangoApp::new(Settings::default()).middleware(SecurityMiddleware::default());
         assert_eq!(app.middleware_count(), 1);
     }
 

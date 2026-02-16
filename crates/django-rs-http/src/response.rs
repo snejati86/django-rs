@@ -4,7 +4,6 @@
 //! response patterns, mirroring Django's `django.http.HttpResponse` and its
 //! subclasses (`JsonResponse`, `HttpResponseRedirect`, etc.).
 
-
 use std::pin::Pin;
 
 use axum::response::IntoResponse;
@@ -123,7 +122,10 @@ impl HttpResponse {
 
     /// Creates a 405 Method Not Allowed response with the list of permitted methods.
     pub fn not_allowed(permitted_methods: &[&str]) -> Self {
-        let body = format!("Method Not Allowed. Permitted: {}", permitted_methods.join(", "));
+        let body = format!(
+            "Method Not Allowed. Permitted: {}",
+            permitted_methods.join(", ")
+        );
         let mut response = Self::new(StatusCode::METHOD_NOT_ALLOWED, body);
         if let Ok(value) = HeaderValue::from_str(&permitted_methods.join(", ")) {
             response.headers.insert(http::header::ALLOW, value);
@@ -153,11 +155,7 @@ impl HttpResponse {
 
     /// Adds a header to the response.
     #[must_use]
-    pub fn set_header(
-        mut self,
-        name: http::header::HeaderName,
-        value: HeaderValue,
-    ) -> Self {
+    pub fn set_header(mut self, name: http::header::HeaderName, value: HeaderValue) -> Self {
         self.headers.insert(name, value);
         self
     }
@@ -726,10 +724,7 @@ mod tests {
     fn test_full_content_type_json() {
         let data = serde_json::json!({"k": "v"});
         let resp = JsonResponse::new(&data);
-        assert_eq!(
-            resp.full_content_type(),
-            "application/json; charset=utf-8"
-        );
+        assert_eq!(resp.full_content_type(), "application/json; charset=utf-8");
     }
 
     #[test]
@@ -922,7 +917,13 @@ mod tests {
         // The cookie value should be signed (contains colons for value:timestamp:sig)
         assert!(set_cookie.contains("data="));
         // The signed value should contain the timestamp separator
-        let value_part = set_cookie.split('=').nth(1).unwrap().split(';').next().unwrap();
+        let value_part = set_cookie
+            .split('=')
+            .nth(1)
+            .unwrap()
+            .split(';')
+            .next()
+            .unwrap();
         assert!(value_part.contains(':'));
     }
 

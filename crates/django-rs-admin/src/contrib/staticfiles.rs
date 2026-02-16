@@ -97,10 +97,7 @@ fn list_dir_recursive(
             files.extend(list_dir_recursive(base, &path)?);
         } else if path.is_file() {
             if let Ok(relative) = path.strip_prefix(base) {
-                files.push((
-                    relative.to_string_lossy().to_string(),
-                    path.clone(),
-                ));
+                files.push((relative.to_string_lossy().to_string(), path.clone()));
             }
         }
     }
@@ -117,10 +114,7 @@ fn list_dir_recursive(
 ///
 /// Returns a `DjangoError::IoError` if any file operations fail.
 #[allow(clippy::result_large_err)]
-pub fn collect_static(
-    finder: &StaticFilesFinder,
-    dest: &Path,
-) -> Result<usize, DjangoError> {
+pub fn collect_static(finder: &StaticFilesFinder, dest: &Path) -> Result<usize, DjangoError> {
     let files = finder.list_files();
     let mut count = 0;
 
@@ -173,10 +167,8 @@ mod tests {
 
     #[test]
     fn test_static_files_finder_new() {
-        let finder = StaticFilesFinder::new(vec![
-            PathBuf::from("/static1"),
-            PathBuf::from("/static2"),
-        ]);
+        let finder =
+            StaticFilesFinder::new(vec![PathBuf::from("/static1"), PathBuf::from("/static2")]);
         assert_eq!(finder.dirs().len(), 2);
     }
 
@@ -238,10 +230,7 @@ mod tests {
 
     #[test]
     fn test_mime_type_unknown() {
-        assert_eq!(
-            mime_type_for_extension("xyz"),
-            "application/octet-stream"
-        );
+        assert_eq!(mime_type_for_extension("xyz"), "application/octet-stream");
     }
 
     #[test]

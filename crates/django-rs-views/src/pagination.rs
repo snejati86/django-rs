@@ -446,7 +446,10 @@ mod tests {
     #[test]
     fn test_paginator_page_too_large() {
         let paginator = Paginator::new(make_items(10), 5);
-        assert!(matches!(paginator.page(99), Err(PaginationError::EmptyPage)));
+        assert!(matches!(
+            paginator.page(99),
+            Err(PaginationError::EmptyPage)
+        ));
     }
 
     #[test]

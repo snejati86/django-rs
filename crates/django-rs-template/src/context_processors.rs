@@ -150,9 +150,7 @@ mod tests {
     use super::*;
 
     fn make_request() -> HttpRequest {
-        HttpRequest::builder()
-            .path("/test/")
-            .build()
+        HttpRequest::builder().path("/test/").build()
     }
 
     #[test]
@@ -160,7 +158,10 @@ mod tests {
         let cp = DebugContextProcessor;
         let ctx = cp.process(&make_request());
         assert!(matches!(ctx.get("debug"), Some(ContextValue::Bool(true))));
-        assert!(matches!(ctx.get("sql_queries"), Some(ContextValue::List(_))));
+        assert!(matches!(
+            ctx.get("sql_queries"),
+            Some(ContextValue::List(_))
+        ));
     }
 
     #[test]
@@ -187,10 +188,7 @@ mod tests {
     fn test_media_context_processor() {
         let cp = MediaContextProcessor::new("/media/");
         let ctx = cp.process(&make_request());
-        assert_eq!(
-            ctx.get("MEDIA_URL").unwrap().to_display_string(),
-            "/media/"
-        );
+        assert_eq!(ctx.get("MEDIA_URL").unwrap().to_display_string(), "/media/");
     }
 
     #[test]
@@ -204,9 +202,7 @@ mod tests {
     #[test]
     fn test_request_context_processor() {
         let cp = RequestContextProcessor;
-        let request = HttpRequest::builder()
-            .path("/articles/")
-            .build();
+        let request = HttpRequest::builder().path("/articles/").build();
         let ctx = cp.process(&request);
 
         if let Some(ContextValue::Dict(req)) = ctx.get("request") {
@@ -231,9 +227,6 @@ mod tests {
     fn test_media_context_processor_default() {
         let cp = MediaContextProcessor::default();
         let ctx = cp.process(&make_request());
-        assert_eq!(
-            ctx.get("MEDIA_URL").unwrap().to_display_string(),
-            "/media/"
-        );
+        assert_eq!(ctx.get("MEDIA_URL").unwrap().to_display_string(), "/media/");
     }
 }

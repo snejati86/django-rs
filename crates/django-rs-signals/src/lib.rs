@@ -106,7 +106,10 @@ impl<T: 'static> Signal<T> {
     /// return values from each receiver.
     pub fn send(&self, sender: &T) -> Vec<Option<Box<dyn Any + Send>>> {
         let receivers = self.receivers.read().expect("signal lock poisoned");
-        receivers.iter().map(|(_, callback)| callback(sender)).collect()
+        receivers
+            .iter()
+            .map(|(_, callback)| callback(sender))
+            .collect()
     }
 
     /// Returns the number of connected receivers.
@@ -190,10 +193,7 @@ impl SignalRegistry {
     }
 
     /// Returns a custom named signal, creating it if it does not exist.
-    pub fn get_or_create_custom(
-        &self,
-        name: &str,
-    ) -> Arc<DynSignal> {
+    pub fn get_or_create_custom(&self, name: &str) -> Arc<DynSignal> {
         {
             let custom = self.custom.read().expect("signal registry lock poisoned");
             if let Some(signal) = custom.get(name) {

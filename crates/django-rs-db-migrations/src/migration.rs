@@ -30,10 +30,7 @@ pub struct Migration {
 
 impl Migration {
     /// Creates a new migration.
-    pub fn new(
-        app_label: impl Into<String>,
-        name: impl Into<String>,
-    ) -> Self {
+    pub fn new(app_label: impl Into<String>, name: impl Into<String>) -> Self {
         Self {
             name: name.into(),
             app_label: app_label.into(),
@@ -141,10 +138,7 @@ impl MigrationGraph {
             .entry(parent.clone())
             .or_default()
             .push(child.clone());
-        self.backward_edges
-            .entry(child)
-            .or_default()
-            .push(parent);
+        self.backward_edges.entry(child).or_default().push(parent);
         Ok(())
     }
 
@@ -248,18 +242,12 @@ impl MigrationGraph {
 
     /// Returns the dependencies of a node.
     pub fn dependencies(&self, key: &(String, String)) -> Vec<(String, String)> {
-        self.backward_edges
-            .get(key)
-            .cloned()
-            .unwrap_or_default()
+        self.backward_edges.get(key).cloned().unwrap_or_default()
     }
 
     /// Returns the dependents of a node.
     pub fn dependents(&self, key: &(String, String)) -> Vec<(String, String)> {
-        self.forward_edges
-            .get(key)
-            .cloned()
-            .unwrap_or_default()
+        self.forward_edges.get(key).cloned().unwrap_or_default()
     }
 
     /// Validates that the graph has no cycles.

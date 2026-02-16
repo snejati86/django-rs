@@ -39,9 +39,7 @@ pub fn clean_fields(
             continue;
         }
 
-        let raw = raw_data
-            .get(&field.name)
-            .and_then(|v| v.as_deref());
+        let raw = raw_data.get(&field.name).and_then(|v| v.as_deref());
 
         match clean_field_value(field, raw) {
             Ok(value) => {
@@ -128,10 +126,7 @@ mod tests {
                     strip: false,
                 },
             ),
-            FormFieldDef::new(
-                "email",
-                FormFieldType::Email,
-            ),
+            FormFieldDef::new("email", FormFieldType::Email),
         ];
         let mut raw = HashMap::new();
         // Both fields missing (required)
@@ -167,10 +162,7 @@ mod tests {
         clean_fields(&fields, &raw, &mut cleaned, &mut errors);
 
         assert!(errors.is_empty());
-        assert_eq!(
-            cleaned.get("status"),
-            Some(&Value::String("active".into()))
-        );
+        assert_eq!(cleaned.get("status"), Some(&Value::String("active".into())));
     }
 
     #[test]

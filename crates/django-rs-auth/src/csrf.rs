@@ -77,10 +77,7 @@ impl CsrfMiddleware {
     const fn is_safe_method(method: &http::Method) -> bool {
         matches!(
             *method,
-            http::Method::GET
-                | http::Method::HEAD
-                | http::Method::OPTIONS
-                | http::Method::TRACE
+            http::Method::GET | http::Method::HEAD | http::Method::OPTIONS | http::Method::TRACE
         )
     }
 
@@ -197,7 +194,9 @@ impl Middleware for CsrfMiddleware {
         if Self::is_safe_method(request.method()) && self.get_csrf_cookie(request).is_none() {
             let token = generate_csrf_token();
             if let Ok(value) = http::HeaderValue::from_str(&self.build_cookie(&token)) {
-                response.headers_mut().insert(http::header::SET_COOKIE, value);
+                response
+                    .headers_mut()
+                    .insert(http::header::SET_COOKIE, value);
             }
         }
         response
@@ -305,10 +304,12 @@ fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
 /// Encodes bytes as a hex string.
 fn hex_encode(bytes: &[u8]) -> String {
     use std::fmt::Write;
-    bytes.iter().fold(String::with_capacity(bytes.len() * 2), |mut s, b| {
-        let _ = write!(s, "{b:02x}");
-        s
-    })
+    bytes
+        .iter()
+        .fold(String::with_capacity(bytes.len() * 2), |mut s, b| {
+            let _ = write!(s, "{b:02x}");
+            s
+        })
 }
 
 /// Decodes a hex string into bytes.
@@ -372,7 +373,7 @@ mod tests {
         let m1 = mask_csrf_token(&token);
         let m2 = mask_csrf_token(&token);
         assert_ne!(m1, m2); // Different random masks
-        // But both unmask to the same token
+                            // But both unmask to the same token
         assert_eq!(unmask_csrf_token(&m1), token);
         assert_eq!(unmask_csrf_token(&m2), token);
     }
@@ -491,9 +492,7 @@ mod tests {
     #[tokio::test]
     async fn test_csrf_middleware_allows_get() {
         let mw = CsrfMiddleware::new();
-        let mut request = HttpRequest::builder()
-            .method(http::Method::GET)
-            .build();
+        let mut request = HttpRequest::builder().method(http::Method::GET).build();
         let result = mw.process_request(&mut request).await;
         assert!(result.is_none());
     }
@@ -501,9 +500,7 @@ mod tests {
     #[tokio::test]
     async fn test_csrf_middleware_blocks_post_without_cookie() {
         let mw = CsrfMiddleware::new();
-        let mut request = HttpRequest::builder()
-            .method(http::Method::POST)
-            .build();
+        let mut request = HttpRequest::builder().method(http::Method::POST).build();
         let result = mw.process_request(&mut request).await;
         assert!(result.is_some());
         assert_eq!(result.unwrap().status(), http::StatusCode::FORBIDDEN);
@@ -565,9 +562,7 @@ mod tests {
     #[tokio::test]
     async fn test_csrf_middleware_sets_cookie_on_get_response() {
         let mw = CsrfMiddleware::new();
-        let request = HttpRequest::builder()
-            .method(http::Method::GET)
-            .build();
+        let request = HttpRequest::builder().method(http::Method::GET).build();
         let response = HttpResponse::ok("test");
         let response = mw.process_response(&request, response).await;
         assert!(response.headers().get(http::header::SET_COOKIE).is_some());
@@ -619,9 +614,7 @@ mod tests {
     #[tokio::test]
     async fn test_csrf_middleware_blocks_put() {
         let mw = CsrfMiddleware::new();
-        let mut request = HttpRequest::builder()
-            .method(http::Method::PUT)
-            .build();
+        let mut request = HttpRequest::builder().method(http::Method::PUT).build();
         let result = mw.process_request(&mut request).await;
         assert!(result.is_some());
     }
@@ -629,9 +622,7 @@ mod tests {
     #[tokio::test]
     async fn test_csrf_middleware_blocks_delete() {
         let mw = CsrfMiddleware::new();
-        let mut request = HttpRequest::builder()
-            .method(http::Method::DELETE)
-            .build();
+        let mut request = HttpRequest::builder().method(http::Method::DELETE).build();
         let result = mw.process_request(&mut request).await;
         assert!(result.is_some());
     }

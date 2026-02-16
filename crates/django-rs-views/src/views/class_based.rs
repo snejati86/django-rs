@@ -137,10 +137,12 @@ pub trait View: Send + Sync {
         Self: Sized + 'static,
     {
         let view = std::sync::Arc::new(self);
-        Box::new(move |request: HttpRequest| -> Pin<Box<dyn Future<Output = HttpResponse> + Send>> {
-            let view = view.clone();
-            Box::pin(async move { view.dispatch(request).await })
-        })
+        Box::new(
+            move |request: HttpRequest| -> Pin<Box<dyn Future<Output = HttpResponse> + Send>> {
+                let view = view.clone();
+                Box::pin(async move { view.dispatch(request).await })
+            },
+        )
     }
 }
 
@@ -211,10 +213,7 @@ pub trait TemplateResponseMixin: View {
     /// This is a fallback implementation that serializes the context as JSON
     /// when no template engine is available. For engine-backed rendering, use
     /// `render_to_response_with_engine`.
-    fn render_to_response(
-        &self,
-        context: HashMap<String, serde_json::Value>,
-    ) -> HttpResponse {
+    fn render_to_response(&self, context: HashMap<String, serde_json::Value>) -> HttpResponse {
         let template_name = self.template_name();
         let context_json = serde_json::to_string_pretty(&context).unwrap_or_default();
         let body = format!(
@@ -402,9 +401,7 @@ mod tests {
     #[tokio::test]
     async fn test_view_dispatch_get() {
         let view = TestView;
-        let request = HttpRequest::builder()
-            .method(http::Method::GET)
-            .build();
+        let request = HttpRequest::builder().method(http::Method::GET).build();
         let response = view.dispatch(request).await;
         assert_eq!(response.status(), http::StatusCode::OK);
         assert_eq!(response.content_bytes().unwrap(), b"GET response");
@@ -413,9 +410,7 @@ mod tests {
     #[tokio::test]
     async fn test_view_dispatch_post() {
         let view = TestView;
-        let request = HttpRequest::builder()
-            .method(http::Method::POST)
-            .build();
+        let request = HttpRequest::builder().method(http::Method::POST).build();
         let response = view.dispatch(request).await;
         assert_eq!(response.status(), http::StatusCode::OK);
         assert_eq!(response.content_bytes().unwrap(), b"POST response");
@@ -424,9 +419,7 @@ mod tests {
     #[tokio::test]
     async fn test_view_dispatch_method_not_allowed() {
         let view = TestView;
-        let request = HttpRequest::builder()
-            .method(http::Method::DELETE)
-            .build();
+        let request = HttpRequest::builder().method(http::Method::DELETE).build();
         let response = view.dispatch(request).await;
         assert_eq!(response.status(), http::StatusCode::METHOD_NOT_ALLOWED);
     }
@@ -434,9 +427,7 @@ mod tests {
     #[tokio::test]
     async fn test_view_dispatch_put_not_allowed() {
         let view = TestView;
-        let request = HttpRequest::builder()
-            .method(http::Method::PUT)
-            .build();
+        let request = HttpRequest::builder().method(http::Method::PUT).build();
         let response = view.dispatch(request).await;
         assert_eq!(response.status(), http::StatusCode::METHOD_NOT_ALLOWED);
     }
@@ -444,9 +435,7 @@ mod tests {
     #[tokio::test]
     async fn test_view_head_delegates_to_get() {
         let view = TestView;
-        let request = HttpRequest::builder()
-            .method(http::Method::HEAD)
-            .build();
+        let request = HttpRequest::builder().method(http::Method::HEAD).build();
         let response = view.dispatch(request).await;
         assert_eq!(response.status(), http::StatusCode::OK);
         assert_eq!(response.content_bytes().unwrap(), b"GET response");
@@ -455,9 +444,7 @@ mod tests {
     #[tokio::test]
     async fn test_view_options() {
         let view = TestView;
-        let request = HttpRequest::builder()
-            .method(http::Method::OPTIONS)
-            .build();
+        let request = HttpRequest::builder().method(http::Method::OPTIONS).build();
         let response = view.dispatch(request).await;
         assert_eq!(response.status(), http::StatusCode::OK);
         let allow = response
@@ -488,9 +475,7 @@ mod tests {
     async fn test_view_as_view() {
         let view = TestView;
         let view_fn = view.as_view();
-        let request = HttpRequest::builder()
-            .method(http::Method::GET)
-            .build();
+        let request = HttpRequest::builder().method(http::Method::GET).build();
         let response = view_fn(request).await;
         assert_eq!(response.status(), http::StatusCode::OK);
     }
@@ -498,9 +483,7 @@ mod tests {
     #[tokio::test]
     async fn test_template_view_get() {
         let view = TemplateView::new("home.html");
-        let request = HttpRequest::builder()
-            .method(http::Method::GET)
-            .build();
+        let request = HttpRequest::builder().method(http::Method::GET).build();
         let response = view.dispatch(request).await;
         assert_eq!(response.status(), http::StatusCode::OK);
         let body = String::from_utf8(response.content_bytes().unwrap()).unwrap();
@@ -509,11 +492,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_template_view_with_context() {
-        let view = TemplateView::new("home.html")
-            .with_context("title", serde_json::json!("Home Page"));
-        let request = HttpRequest::builder()
-            .method(http::Method::GET)
-            .build();
+        let view =
+            TemplateView::new("home.html").with_context("title", serde_json::json!("Home Page"));
+        let request = HttpRequest::builder().method(http::Method::GET).build();
         let response = view.dispatch(request).await;
         let body = String::from_utf8(response.content_bytes().unwrap()).unwrap();
         assert!(body.contains("Home Page"));
@@ -534,8 +515,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_template_view_context_mixin() {
-        let view = TemplateView::new("test.html")
-            .with_context("key", serde_json::json!("value"));
+        let view = TemplateView::new("test.html").with_context("key", serde_json::json!("value"));
         let mut kwargs = HashMap::new();
         kwargs.insert("id".to_string(), "42".to_string());
         let context = view.get_context_data(&kwargs);
@@ -546,9 +526,7 @@ mod tests {
     #[tokio::test]
     async fn test_redirect_view_temporary() {
         let view = RedirectView::new("/new-url/");
-        let request = HttpRequest::builder()
-            .method(http::Method::GET)
-            .build();
+        let request = HttpRequest::builder().method(http::Method::GET).build();
         let response = view.dispatch(request).await;
         assert_eq!(response.status(), http::StatusCode::FOUND);
         assert_eq!(
@@ -565,9 +543,7 @@ mod tests {
     #[tokio::test]
     async fn test_redirect_view_permanent() {
         let view = RedirectView::permanent("/permanent/");
-        let request = HttpRequest::builder()
-            .method(http::Method::GET)
-            .build();
+        let request = HttpRequest::builder().method(http::Method::GET).build();
         let response = view.dispatch(request).await;
         assert_eq!(response.status(), http::StatusCode::MOVED_PERMANENTLY);
     }
@@ -575,9 +551,7 @@ mod tests {
     #[tokio::test]
     async fn test_redirect_view_post() {
         let view = RedirectView::new("/new-url/");
-        let request = HttpRequest::builder()
-            .method(http::Method::POST)
-            .build();
+        let request = HttpRequest::builder().method(http::Method::POST).build();
         let response = view.dispatch(request).await;
         assert_eq!(response.status(), http::StatusCode::FOUND);
     }

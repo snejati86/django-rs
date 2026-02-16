@@ -111,18 +111,32 @@ impl SchemaEditor for PostgresSchemaEditor {
             col_defs.push(format!("\"{}\" {}", fd.column, self.column_sql(&fd)));
 
             // Foreign key constraint
-            if let FieldType::ForeignKey { ref to, ref on_delete, .. } = fd.field_type {
+            if let FieldType::ForeignKey {
+                ref to,
+                ref on_delete,
+                ..
+            } = fd.field_type
+            {
                 let target_table = fk_target_table(to);
                 constraints.push(format!(
                     "FOREIGN KEY (\"{}\") REFERENCES \"{}\" (\"id\") ON DELETE {}",
-                    fd.column, target_table, on_delete_sql(*on_delete)
+                    fd.column,
+                    target_table,
+                    on_delete_sql(*on_delete)
                 ));
             }
-            if let FieldType::OneToOneField { ref to, ref on_delete, .. } = fd.field_type {
+            if let FieldType::OneToOneField {
+                ref to,
+                ref on_delete,
+                ..
+            } = fd.field_type
+            {
                 let target_table = fk_target_table(to);
                 constraints.push(format!(
                     "FOREIGN KEY (\"{}\") REFERENCES \"{}\" (\"id\") ON DELETE {}",
-                    fd.column, target_table, on_delete_sql(*on_delete)
+                    fd.column,
+                    target_table,
+                    on_delete_sql(*on_delete)
                 ));
             }
         }
@@ -203,10 +217,7 @@ impl SchemaEditor for PostgresSchemaEditor {
     }
 
     fn create_index(&self, table_name: &str, index: &Index) -> Vec<String> {
-        let idx_name = index
-            .name
-            .as_deref()
-            .unwrap_or("unnamed_index");
+        let idx_name = index.name.as_deref().unwrap_or("unnamed_index");
         let unique = if index.unique { "UNIQUE " } else { "" };
         let cols: Vec<String> = index.fields.iter().map(|f| format!("\"{f}\"")).collect();
         vec![format!(
@@ -252,7 +263,10 @@ fn pg_type_sql(field_type: &FieldType, max_length: Option<usize>) -> String {
     match field_type {
         FieldType::AutoField => "SERIAL".to_string(),
         FieldType::BigAutoField => "BIGSERIAL".to_string(),
-        FieldType::CharField | FieldType::EmailField | FieldType::UrlField | FieldType::SlugField => {
+        FieldType::CharField
+        | FieldType::EmailField
+        | FieldType::UrlField
+        | FieldType::SlugField => {
             let len = max_length.unwrap_or(255);
             format!("VARCHAR({len})")
         }
@@ -321,18 +335,32 @@ impl SchemaEditor for SqliteSchemaEditor {
             let fd = field.to_field_def();
             col_defs.push(format!("\"{}\" {}", fd.column, self.column_sql(&fd)));
 
-            if let FieldType::ForeignKey { ref to, ref on_delete, .. } = fd.field_type {
+            if let FieldType::ForeignKey {
+                ref to,
+                ref on_delete,
+                ..
+            } = fd.field_type
+            {
                 let target_table = fk_target_table(to);
                 constraints.push(format!(
                     "FOREIGN KEY (\"{}\") REFERENCES \"{}\" (\"id\") ON DELETE {}",
-                    fd.column, target_table, on_delete_sql(*on_delete)
+                    fd.column,
+                    target_table,
+                    on_delete_sql(*on_delete)
                 ));
             }
-            if let FieldType::OneToOneField { ref to, ref on_delete, .. } = fd.field_type {
+            if let FieldType::OneToOneField {
+                ref to,
+                ref on_delete,
+                ..
+            } = fd.field_type
+            {
                 let target_table = fk_target_table(to);
                 constraints.push(format!(
                     "FOREIGN KEY (\"{}\") REFERENCES \"{}\" (\"id\") ON DELETE {}",
-                    fd.column, target_table, on_delete_sql(*on_delete)
+                    fd.column,
+                    target_table,
+                    on_delete_sql(*on_delete)
                 ));
             }
         }
@@ -359,9 +387,7 @@ impl SchemaEditor for SqliteSchemaEditor {
         // SQLite table recreation strategy
         vec![
             format!("-- SQLite: recreate table to drop column \"{column_name}\""),
-            format!(
-                "ALTER TABLE \"{table_name}\" DROP COLUMN \"{column_name}\""
-            ),
+            format!("ALTER TABLE \"{table_name}\" DROP COLUMN \"{column_name}\""),
         ]
     }
 
@@ -381,9 +407,7 @@ impl SchemaEditor for SqliteSchemaEditor {
                 if new_field.null { " NULL" } else { " NOT NULL" },
                 default_sql(new_field)
             ),
-            format!(
-                "CREATE TABLE \"__{table_name}_new\" AS SELECT * FROM \"{table_name}\""
-            ),
+            format!("CREATE TABLE \"__{table_name}_new\" AS SELECT * FROM \"{table_name}\""),
             format!("DROP TABLE \"{table_name}\""),
             format!("ALTER TABLE \"__{table_name}_new\" RENAME TO \"{table_name}\""),
         ]
@@ -397,10 +421,7 @@ impl SchemaEditor for SqliteSchemaEditor {
     }
 
     fn create_index(&self, table_name: &str, index: &Index) -> Vec<String> {
-        let idx_name = index
-            .name
-            .as_deref()
-            .unwrap_or("unnamed_index");
+        let idx_name = index.name.as_deref().unwrap_or("unnamed_index");
         let unique = if index.unique { "UNIQUE " } else { "" };
         let cols: Vec<String> = index.fields.iter().map(|f| format!("\"{f}\"")).collect();
         vec![format!(
@@ -442,8 +463,7 @@ impl SchemaEditor for SqliteSchemaEditor {
             && matches!(
                 field.field_type,
                 FieldType::AutoField | FieldType::BigAutoField
-            )
-        {
+            ) {
             " AUTOINCREMENT"
         } else {
             ""
@@ -510,18 +530,32 @@ impl SchemaEditor for MySqlSchemaEditor {
             let fd = field.to_field_def();
             col_defs.push(format!("`{}` {}", fd.column, self.column_sql(&fd)));
 
-            if let FieldType::ForeignKey { ref to, ref on_delete, .. } = fd.field_type {
+            if let FieldType::ForeignKey {
+                ref to,
+                ref on_delete,
+                ..
+            } = fd.field_type
+            {
                 let target_table = fk_target_table(to);
                 constraints.push(format!(
                     "FOREIGN KEY (`{}`) REFERENCES `{}` (`id`) ON DELETE {}",
-                    fd.column, target_table, on_delete_sql(*on_delete)
+                    fd.column,
+                    target_table,
+                    on_delete_sql(*on_delete)
                 ));
             }
-            if let FieldType::OneToOneField { ref to, ref on_delete, .. } = fd.field_type {
+            if let FieldType::OneToOneField {
+                ref to,
+                ref on_delete,
+                ..
+            } = fd.field_type
+            {
                 let target_table = fk_target_table(to);
                 constraints.push(format!(
                     "FOREIGN KEY (`{}`) REFERENCES `{}` (`id`) ON DELETE {}",
-                    fd.column, target_table, on_delete_sql(*on_delete)
+                    fd.column,
+                    target_table,
+                    on_delete_sql(*on_delete)
                 ));
             }
         }
@@ -570,10 +604,7 @@ impl SchemaEditor for MySqlSchemaEditor {
     }
 
     fn create_index(&self, table_name: &str, index: &Index) -> Vec<String> {
-        let idx_name = index
-            .name
-            .as_deref()
-            .unwrap_or("unnamed_index");
+        let idx_name = index.name.as_deref().unwrap_or("unnamed_index");
         let unique = if index.unique { "UNIQUE " } else { "" };
         let cols: Vec<String> = index.fields.iter().map(|f| format!("`{f}`")).collect();
         vec![format!(
@@ -613,8 +644,7 @@ impl SchemaEditor for MySqlSchemaEditor {
             && matches!(
                 field.field_type,
                 FieldType::AutoField | FieldType::BigAutoField
-            )
-        {
+            ) {
             " AUTO_INCREMENT"
         } else {
             ""
@@ -629,7 +659,10 @@ fn mysql_type_sql(field_type: &FieldType, max_length: Option<usize>) -> String {
     match field_type {
         FieldType::AutoField => "INT".to_string(),
         FieldType::BigAutoField => "BIGINT".to_string(),
-        FieldType::CharField | FieldType::EmailField | FieldType::UrlField | FieldType::SlugField => {
+        FieldType::CharField
+        | FieldType::EmailField
+        | FieldType::UrlField
+        | FieldType::SlugField => {
             let len = max_length.unwrap_or(255);
             format!("VARCHAR({len})")
         }
@@ -691,11 +724,7 @@ mod tests {
         MySqlSchemaEditor
     }
 
-    fn make_model(
-        app: &str,
-        name: &str,
-        fields: Vec<MigrationFieldDef>,
-    ) -> ModelState {
+    fn make_model(app: &str, name: &str, fields: Vec<MigrationFieldDef>) -> ModelState {
         ModelState::new(app, name, fields)
     }
 
@@ -987,9 +1016,7 @@ mod tests {
         let sqls = pg().rename_column("blog_post", "title", "headline");
         assert_eq!(
             sqls,
-            vec![
-                "ALTER TABLE \"blog_post\" RENAME COLUMN \"title\" TO \"headline\""
-            ]
+            vec!["ALTER TABLE \"blog_post\" RENAME COLUMN \"title\" TO \"headline\""]
         );
     }
 
@@ -1289,10 +1316,7 @@ mod tests {
     #[test]
     fn test_mysql_drop_column() {
         let sqls = mysql().drop_column("blog_post", "title");
-        assert_eq!(
-            sqls,
-            vec!["ALTER TABLE `blog_post` DROP COLUMN `title`"]
-        );
+        assert_eq!(sqls, vec!["ALTER TABLE `blog_post` DROP COLUMN `title`"]);
     }
 
     // ── MySQL ALTER COLUMN (MODIFY) ─────────────────────────────────

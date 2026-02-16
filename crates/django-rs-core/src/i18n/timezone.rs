@@ -128,7 +128,10 @@ pub fn localtime(dt: &DateTime<FixedOffset>) -> DateTime<FixedOffset> {
 /// assert_eq!(est.month(), 12);
 /// assert_eq!(est.hour(), 19);
 /// ```
-pub fn localtime_with_offset(dt: &DateTime<FixedOffset>, offset_seconds: i32) -> DateTime<FixedOffset> {
+pub fn localtime_with_offset(
+    dt: &DateTime<FixedOffset>,
+    offset_seconds: i32,
+) -> DateTime<FixedOffset> {
     let tz = FixedOffset::east_opt(offset_seconds)
         .unwrap_or_else(|| FixedOffset::east_opt(0).expect("UTC offset"));
     dt.with_timezone(&tz)

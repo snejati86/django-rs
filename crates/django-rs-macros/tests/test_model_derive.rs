@@ -445,7 +445,11 @@ pub struct Article {
     #[field(primary_key, auto)]
     pub id: i64,
 
-    #[field(max_length = 200, verbose_name = "Article Title", help_text = "The main title of the article")]
+    #[field(
+        max_length = 200,
+        verbose_name = "Article Title",
+        help_text = "The main title of the article"
+    )]
     pub title: String,
 }
 
@@ -553,11 +557,7 @@ fn test_type_inference_numeric() {
 #[test]
 fn test_type_inference_bool() {
     let meta = TypeTestModel::meta();
-    let bool_f = meta
-        .fields
-        .iter()
-        .find(|f| f.name == "bool_field")
-        .unwrap();
+    let bool_f = meta.fields.iter().find(|f| f.name == "bool_field").unwrap();
     assert!(matches!(bool_f.field_type, FieldType::BooleanField));
 }
 
@@ -660,8 +660,5 @@ fn test_default_value() {
     let meta = DefaultsModel::meta();
     let status = meta.fields.iter().find(|f| f.name == "status").unwrap();
     assert!(status.default.is_some());
-    assert_eq!(
-        status.default,
-        Some(Value::String("draft".to_string()))
-    );
+    assert_eq!(status.default, Some(Value::String("draft".to_string())));
 }

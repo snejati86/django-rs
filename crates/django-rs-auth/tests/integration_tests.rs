@@ -33,7 +33,10 @@ async fn test_full_registration_login_logout_flow() {
     let mut reg_form = UserCreationForm::new();
     let data = QueryDict::parse("username=testuser&password1=Str0ngP@ss!&password2=Str0ngP@ss!");
     reg_form.bind(&data);
-    assert!(reg_form.is_valid().await, "Registration form should be valid");
+    assert!(
+        reg_form.is_valid().await,
+        "Registration form should be valid"
+    );
 
     let username = reg_form.get_username().unwrap();
     let password = reg_form.get_password().unwrap();
@@ -60,12 +63,10 @@ async fn test_full_registration_login_logout_flow() {
     // Note: we need the user in the backend we query
     let auth_backend = ModelBackend::new();
     auth_backend.add_user(user.clone()).await;
-    let auth_result = django_rs_auth::authenticate(
-        &creds,
-        &[Box::new(auth_backend) as Box<dyn AuthBackend>],
-    )
-    .await
-    .unwrap();
+    let auth_result =
+        django_rs_auth::authenticate(&creds, &[Box::new(auth_backend) as Box<dyn AuthBackend>])
+            .await
+            .unwrap();
     assert!(auth_result.is_some(), "Authentication should succeed");
 
     // Step 4: Login to session

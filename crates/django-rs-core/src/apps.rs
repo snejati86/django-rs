@@ -32,7 +32,10 @@ pub trait AppConfig: Send + Sync {
     ///
     /// For example, `"django_rs.contrib.auth"` yields `"auth"`.
     fn label(&self) -> &str {
-        self.name().rsplit('.').next().unwrap_or_else(|| self.name())
+        self.name()
+            .rsplit('.')
+            .next()
+            .unwrap_or_else(|| self.name())
     }
 
     /// Returns a human-readable name for the application.
@@ -115,10 +118,7 @@ impl AppRegistry {
     ///
     /// Panics if `populate` has already been called.
     pub fn populate(&mut self) {
-        assert!(
-            !self.ready,
-            "AppRegistry has already been populated"
-        );
+        assert!(!self.ready, "AppRegistry has already been populated");
 
         for app in &self.apps {
             app.ready();

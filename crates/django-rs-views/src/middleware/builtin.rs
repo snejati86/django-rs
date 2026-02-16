@@ -166,9 +166,9 @@ impl Middleware for CommonMiddleware {
             } else {
                 format!("{new_path}?{}", request.query_string())
             };
-            return Some(
-                django_rs_http::HttpResponsePermanentRedirect::new(&redirect_url),
-            );
+            return Some(django_rs_http::HttpResponsePermanentRedirect::new(
+                &redirect_url,
+            ));
         }
 
         None
@@ -409,10 +409,9 @@ impl CorsMiddleware {
 
     fn add_cors_headers(&self, response: &mut HttpResponse, origin: &str) {
         if let Ok(value) = http::header::HeaderValue::from_str(origin) {
-            response.headers_mut().insert(
-                http::header::ACCESS_CONTROL_ALLOW_ORIGIN,
-                value,
-            );
+            response
+                .headers_mut()
+                .insert(http::header::ACCESS_CONTROL_ALLOW_ORIGIN, value);
         }
 
         if self.allow_credentials {
@@ -442,26 +441,23 @@ impl Middleware for CorsMiddleware {
 
                 let methods = self.allowed_methods.join(", ");
                 if let Ok(value) = http::header::HeaderValue::from_str(&methods) {
-                    response.headers_mut().insert(
-                        http::header::ACCESS_CONTROL_ALLOW_METHODS,
-                        value,
-                    );
+                    response
+                        .headers_mut()
+                        .insert(http::header::ACCESS_CONTROL_ALLOW_METHODS, value);
                 }
 
                 let headers_str = self.allowed_headers.join(", ");
                 if let Ok(value) = http::header::HeaderValue::from_str(&headers_str) {
-                    response.headers_mut().insert(
-                        http::header::ACCESS_CONTROL_ALLOW_HEADERS,
-                        value,
-                    );
+                    response
+                        .headers_mut()
+                        .insert(http::header::ACCESS_CONTROL_ALLOW_HEADERS, value);
                 }
 
                 let max_age = self.max_age.to_string();
                 if let Ok(value) = http::header::HeaderValue::from_str(&max_age) {
-                    response.headers_mut().insert(
-                        http::header::ACCESS_CONTROL_MAX_AGE,
-                        value,
-                    );
+                    response
+                        .headers_mut()
+                        .insert(http::header::ACCESS_CONTROL_MAX_AGE, value);
                 }
 
                 return Some(response);
@@ -566,7 +562,9 @@ impl Middleware for AuthenticationMiddleware {
 /// Message severity levels matching Django's message framework.
 ///
 /// Each level has a numeric value for comparison and filtering.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+)]
 #[repr(u8)]
 pub enum MessageLevel {
     /// Debug messages (level 10) — only shown in development.
@@ -736,7 +734,8 @@ pub fn add_message_with_tags(
         serde_json::to_value(&all_messages).unwrap_or(serde_json::Value::Array(vec![])),
     );
 
-    let new_session_data = serde_json::to_string(&session_data).unwrap_or_else(|_| "{}".to_string());
+    let new_session_data =
+        serde_json::to_string(&session_data).unwrap_or_else(|_| "{}".to_string());
 
     let meta = request.meta_mut();
     meta.insert("_messages_added".to_string(), new_added);
@@ -839,13 +838,13 @@ impl LocaleMiddleware {
             };
 
             // Normalize: take the primary language tag (e.g., "en" from "en-US")
-            let primary = lang
-                .split('-')
-                .next()
-                .unwrap_or(lang)
-                .to_lowercase();
+            let primary = lang.split('-').next().unwrap_or(lang).to_lowercase();
 
-            if self.supported_languages.iter().any(|s| s.to_lowercase() == primary) {
+            if self
+                .supported_languages
+                .iter()
+                .any(|s| s.to_lowercase() == primary)
+            {
                 candidates.push((quality, primary));
             }
         }
@@ -895,9 +894,7 @@ impl Middleware for LocaleMiddleware {
         // 2. Check cookie
         if let Some(lang) = Self::get_cookie_value(request, "django_language") {
             if self.supported_languages.contains(&lang) {
-                request
-                    .meta_mut()
-                    .insert("LANGUAGE_CODE".to_string(), lang);
+                request.meta_mut().insert("LANGUAGE_CODE".to_string(), lang);
                 return None;
             }
         }
@@ -909,9 +906,7 @@ impl Middleware for LocaleMiddleware {
             .and_then(|v| v.to_str().ok())
         {
             if let Some(lang) = self.parse_accept_language(accept_lang) {
-                request
-                    .meta_mut()
-                    .insert("LANGUAGE_CODE".to_string(), lang);
+                request.meta_mut().insert("LANGUAGE_CODE".to_string(), lang);
                 return None;
             }
         }
@@ -1127,10 +1122,7 @@ impl CacheMiddleware {
     }
 
     fn is_cacheable_request(request: &HttpRequest) -> bool {
-        matches!(
-            *request.method(),
-            http::Method::GET | http::Method::HEAD
-        )
+        matches!(*request.method(), http::Method::GET | http::Method::HEAD)
     }
 
     fn is_cacheable_response(response: &HttpResponse) -> bool {
@@ -1145,7 +1137,10 @@ impl CacheMiddleware {
             .and_then(|v| v.to_str().ok())
         {
             let cc_lower = cc.to_lowercase();
-            if cc_lower.contains("private") || cc_lower.contains("no-cache") || cc_lower.contains("no-store") {
+            if cc_lower.contains("private")
+                || cc_lower.contains("no-cache")
+                || cc_lower.contains("no-store")
+            {
                 return false;
             }
         }
@@ -1495,7 +1490,10 @@ mod tests {
         let response = HttpResponse::ok("small");
         let result = mw.process_response(&request, response).await;
 
-        assert!(result.headers().get(http::header::CONTENT_ENCODING).is_none());
+        assert!(result
+            .headers()
+            .get(http::header::CONTENT_ENCODING)
+            .is_none());
     }
 
     #[tokio::test]
@@ -1506,7 +1504,10 @@ mod tests {
         let response = HttpResponse::ok(&body);
         let result = mw.process_response(&request, response).await;
 
-        assert!(result.headers().get(http::header::CONTENT_ENCODING).is_none());
+        assert!(result
+            .headers()
+            .get(http::header::CONTENT_ENCODING)
+            .is_none());
     }
 
     #[tokio::test]
@@ -1518,7 +1519,10 @@ mod tests {
         let response = HttpResponse::ok("hello world! test data");
         let result = mw.process_response(&request, response).await;
 
-        assert!(result.headers().get(http::header::CONTENT_ENCODING).is_some());
+        assert!(result
+            .headers()
+            .get(http::header::CONTENT_ENCODING)
+            .is_some());
     }
 
     // ── ConditionalGetMiddleware tests ──────────────────────────────
@@ -1759,9 +1763,7 @@ mod tests {
     #[tokio::test]
     async fn test_auth_middleware_empty_session() {
         let mw = AuthenticationMiddleware;
-        let mut request = HttpRequest::builder()
-            .meta("SESSION_DATA", "{}")
-            .build();
+        let mut request = HttpRequest::builder().meta("SESSION_DATA", "{}").build();
         mw.process_request(&mut request).await;
         assert_eq!(request.meta().get("USER_AUTHENTICATED").unwrap(), "false");
     }
@@ -1805,9 +1807,7 @@ mod tests {
     #[tokio::test]
     async fn test_message_middleware_loads_empty_store() {
         let mw = MessageMiddleware;
-        let mut request = HttpRequest::builder()
-            .meta("SESSION_DATA", "{}")
-            .build();
+        let mut request = HttpRequest::builder().meta("SESSION_DATA", "{}").build();
         mw.process_request(&mut request).await;
         assert_eq!(request.meta().get("_messages_store").unwrap(), "[]");
     }
@@ -1947,9 +1947,7 @@ mod tests {
     #[tokio::test]
     async fn test_locale_default_language() {
         let mw = LocaleMiddleware::default();
-        let mut request = HttpRequest::builder()
-            .meta("SESSION_DATA", "{}")
-            .build();
+        let mut request = HttpRequest::builder().meta("SESSION_DATA", "{}").build();
         mw.process_request(&mut request).await;
         assert_eq!(request.meta().get("LANGUAGE_CODE").unwrap(), "en");
     }
@@ -2027,17 +2025,25 @@ mod tests {
     #[tokio::test]
     async fn test_locale_response_headers() {
         let mw = LocaleMiddleware::default();
-        let request = HttpRequest::builder()
-            .meta("LANGUAGE_CODE", "en")
-            .build();
+        let request = HttpRequest::builder().meta("LANGUAGE_CODE", "en").build();
         let response = HttpResponse::ok("test");
         let result = mw.process_response(&request, response).await;
         assert_eq!(
-            result.headers().get("content-language").unwrap().to_str().unwrap(),
+            result
+                .headers()
+                .get("content-language")
+                .unwrap()
+                .to_str()
+                .unwrap(),
             "en"
         );
         assert_eq!(
-            result.headers().get(http::header::VARY).unwrap().to_str().unwrap(),
+            result
+                .headers()
+                .get(http::header::VARY)
+                .unwrap()
+                .to_str()
+                .unwrap(),
             "Accept-Language"
         );
     }
@@ -2094,8 +2100,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_login_required_exempt_url() {
-        let mw = LoginRequiredMiddleware::default()
-            .with_exempt_urls(vec!["/public/".to_string()]);
+        let mw = LoginRequiredMiddleware::default().with_exempt_urls(vec!["/public/".to_string()]);
         let mut request = HttpRequest::builder()
             .path("/public/page/")
             .meta("USER_AUTHENTICATED", "false")
@@ -2185,7 +2190,12 @@ mod tests {
         let cached_response = result.unwrap();
         assert_eq!(cached_response.status(), http::StatusCode::OK);
         assert_eq!(
-            cached_response.headers().get("x-cache").unwrap().to_str().unwrap(),
+            cached_response
+                .headers()
+                .get("x-cache")
+                .unwrap()
+                .to_str()
+                .unwrap(),
             "HIT"
         );
     }

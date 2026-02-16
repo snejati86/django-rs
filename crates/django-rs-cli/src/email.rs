@@ -35,11 +35,7 @@ pub struct Attachment {
 
 impl Attachment {
     /// Creates a new attachment.
-    pub fn new(
-        filename: impl Into<String>,
-        content: Vec<u8>,
-        mimetype: impl Into<String>,
-    ) -> Self {
+    pub fn new(filename: impl Into<String>, content: Vec<u8>, mimetype: impl Into<String>) -> Self {
         Self {
             filename: filename.into(),
             content,
@@ -414,7 +410,12 @@ pub async fn send_mass_mail(
     let messages: Vec<EmailMessage> = datatuple
         .iter()
         .map(|(subject, body, from_email, to)| {
-            EmailMessage::new(subject.clone(), body.clone(), from_email.clone(), to.clone())
+            EmailMessage::new(
+                subject.clone(),
+                body.clone(),
+                from_email.clone(),
+                to.clone(),
+            )
         })
         .collect();
 
@@ -517,8 +518,7 @@ mod tests {
 
     #[test]
     fn test_smtp_backend_with_credentials() {
-        let backend = SmtpBackend::new("smtp.example.com", 587)
-            .with_credentials("user", "pass");
+        let backend = SmtpBackend::new("smtp.example.com", 587).with_credentials("user", "pass");
         assert_eq!(backend.username.as_deref(), Some("user"));
         assert_eq!(backend.password.as_deref(), Some("pass"));
     }
@@ -608,8 +608,18 @@ mod tests {
     async fn test_inmemory_backend_send_many() {
         let backend = InMemoryBackend::new();
 
-        let msg1 = EmailMessage::new("Subject 1", "Body 1", "from@test.com", vec!["to@test.com".to_string()]);
-        let msg2 = EmailMessage::new("Subject 2", "Body 2", "from@test.com", vec!["to@test.com".to_string()]);
+        let msg1 = EmailMessage::new(
+            "Subject 1",
+            "Body 1",
+            "from@test.com",
+            vec!["to@test.com".to_string()],
+        );
+        let msg2 = EmailMessage::new(
+            "Subject 2",
+            "Body 2",
+            "from@test.com",
+            vec!["to@test.com".to_string()],
+        );
 
         let count = backend.send_many(&[msg1, msg2]).await.unwrap();
         assert_eq!(count, 2);
@@ -665,8 +675,11 @@ mod tests {
 
     #[test]
     fn test_email_with_attachment() {
-        let msg = sample_email()
-            .with_attachment(Attachment::new("file.txt", b"hello".to_vec(), "text/plain"));
+        let msg = sample_email().with_attachment(Attachment::new(
+            "file.txt",
+            b"hello".to_vec(),
+            "text/plain",
+        ));
         assert_eq!(msg.attachments.len(), 1);
         assert_eq!(msg.attachments[0].filename, "file.txt");
     }
@@ -679,8 +692,11 @@ mod tests {
 
     #[test]
     fn test_format_message_with_attachments() {
-        let msg = sample_email()
-            .with_attachment(Attachment::new("doc.pdf", vec![0; 1024], "application/pdf"));
+        let msg = sample_email().with_attachment(Attachment::new(
+            "doc.pdf",
+            vec![0; 1024],
+            "application/pdf",
+        ));
         let formatted = msg.format_message();
         assert!(formatted.contains("--- Attachments ---"));
         assert!(formatted.contains("doc.pdf"));

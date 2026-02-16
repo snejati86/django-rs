@@ -103,9 +103,7 @@ mod tests {
 
     #[test]
     fn test_lazy_string_with_translation() {
-        crate::i18n::catalog::register_translations("lazy_test_lang", vec![
-            ("Greet", "Saludo"),
-        ]);
+        crate::i18n::catalog::register_translations("lazy_test_lang", vec![("Greet", "Saludo")]);
 
         let lazy = LazyString::new("Greet".to_string());
         assert_eq!(lazy.to_string(), "Greet"); // default language

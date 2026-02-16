@@ -155,9 +155,7 @@ mod tests {
         let cmd = SqlflushCommand;
         let cli = clap::Command::new("test")
             .subcommand(cmd.add_arguments(clap::Command::new("sqlflush")));
-        let matches = cli
-            .try_get_matches_from(["test", "sqlflush"])
-            .unwrap();
+        let matches = cli.try_get_matches_from(["test", "sqlflush"]).unwrap();
         let (_, sub_matches) = matches.subcommand().unwrap();
 
         let settings = Settings::default();

@@ -67,7 +67,9 @@ impl Engine {
     pub fn from_settings(settings: &django_rs_core::settings::TemplateSettings) -> Self {
         let mut engine = Self::new();
         engine.dirs = settings.dirs.clone();
-        engine.loaders.push(Box::new(FileSystemLoader::new(settings.dirs.clone())));
+        engine
+            .loaders
+            .push(Box::new(FileSystemLoader::new(settings.dirs.clone())));
 
         if let Some(auto_escape) = settings.options.get("auto_escape") {
             engine.auto_escape = auto_escape.as_bool().unwrap_or(true);
@@ -80,7 +82,8 @@ impl Engine {
     pub fn set_dirs(&mut self, dirs: Vec<PathBuf>) {
         self.dirs = dirs.clone();
         // Insert filesystem loader at the beginning
-        self.loaders.insert(0, Box::new(FileSystemLoader::new(dirs)));
+        self.loaders
+            .insert(0, Box::new(FileSystemLoader::new(dirs)));
     }
 
     /// Adds a template loader.
@@ -335,7 +338,10 @@ mod tests {
         engine.add_string_template("test.html", "{{ content }}");
 
         let mut ctx = Context::new();
-        ctx.set("content", ContextValue::from("<script>alert('xss')</script>"));
+        ctx.set(
+            "content",
+            ContextValue::from("<script>alert('xss')</script>"),
+        );
         let result = engine.render_to_string("test.html", &mut ctx).unwrap();
         assert!(result.contains("&lt;script&gt;"));
         assert!(!result.contains("<script>"));
@@ -365,10 +371,7 @@ mod tests {
         );
 
         ctx.set("show", ContextValue::Bool(false));
-        assert_eq!(
-            engine.render_to_string("test.html", &mut ctx).unwrap(),
-            ""
-        );
+        assert_eq!(engine.render_to_string("test.html", &mut ctx).unwrap(), "");
     }
 
     #[test]
@@ -400,19 +403,31 @@ mod tests {
 
         let mut ctx = Context::new();
         ctx.set("x", ContextValue::Integer(1));
-        assert_eq!(engine.render_to_string("test.html", &mut ctx).unwrap(), "one");
+        assert_eq!(
+            engine.render_to_string("test.html", &mut ctx).unwrap(),
+            "one"
+        );
 
         ctx.set("x", ContextValue::Integer(2));
-        assert_eq!(engine.render_to_string("test.html", &mut ctx).unwrap(), "two");
+        assert_eq!(
+            engine.render_to_string("test.html", &mut ctx).unwrap(),
+            "two"
+        );
 
         ctx.set("x", ContextValue::Integer(3));
-        assert_eq!(engine.render_to_string("test.html", &mut ctx).unwrap(), "other");
+        assert_eq!(
+            engine.render_to_string("test.html", &mut ctx).unwrap(),
+            "other"
+        );
     }
 
     #[test]
     fn test_engine_for_tag() {
         let engine = Engine::new();
-        engine.add_string_template("test.html", "{% for item in items %}{{ item }} {% endfor %}");
+        engine.add_string_template(
+            "test.html",
+            "{% for item in items %}{{ item }} {% endfor %}",
+        );
 
         let mut ctx = Context::new();
         ctx.set(
@@ -598,10 +613,7 @@ mod tests {
             "base.html",
             "BASE{% block content %}default{% endblock %}END",
         );
-        engine.add_string_template(
-            "child.html",
-            r#"{% extends "base.html" %}"#,
-        );
+        engine.add_string_template("child.html", r#"{% extends "base.html" %}"#);
 
         let mut ctx = Context::new();
         let result = engine.render_to_string("child.html", &mut ctx).unwrap();
@@ -611,10 +623,7 @@ mod tests {
     #[test]
     fn test_engine_block_super() {
         let engine = Engine::new();
-        engine.add_string_template(
-            "base.html",
-            "{% block content %}parent{% endblock %}",
-        );
+        engine.add_string_template("base.html", "{% block content %}parent{% endblock %}");
         engine.add_string_template(
             "child.html",
             r#"{% extends "base.html" %}{% block content %}{{ block.super }}-child{% endblock %}"#,
@@ -773,10 +782,16 @@ mod tests {
 
         let mut ctx = Context::new();
         ctx.set("x", ContextValue::from("hello"));
-        assert_eq!(engine.render_to_string("test.html", &mut ctx).unwrap(), "match");
+        assert_eq!(
+            engine.render_to_string("test.html", &mut ctx).unwrap(),
+            "match"
+        );
 
         ctx.set("x", ContextValue::from("bye"));
-        assert_eq!(engine.render_to_string("test.html", &mut ctx).unwrap(), "no");
+        assert_eq!(
+            engine.render_to_string("test.html", &mut ctx).unwrap(),
+            "no"
+        );
     }
 
     #[test]
@@ -839,10 +854,7 @@ mod tests {
     #[test]
     fn test_engine_for_with_dict() {
         let engine = Engine::new();
-        engine.add_string_template(
-            "test.html",
-            "{% for key in data %}{{ key }}{% endfor %}",
-        );
+        engine.add_string_template("test.html", "{% for key in data %}{{ key }}{% endfor %}");
 
         let mut ctx = Context::new();
         let mut data = HashMap::new();

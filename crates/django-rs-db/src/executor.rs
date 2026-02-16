@@ -48,17 +48,11 @@ pub trait DbExecutor: Send + Sync {
     /// Executes an INSERT and returns the last inserted row ID.
     /// Backends provide a default implementation using `execute` + a follow-up
     /// query, but can override for efficiency.
-    async fn insert_returning_id(
-        &self,
-        sql: &str,
-        params: &[Value],
-    ) -> DjangoResult<Value> {
+    async fn insert_returning_id(&self, sql: &str, params: &[Value]) -> DjangoResult<Value> {
         self.execute_sql(sql, params).await?;
         // Default: query last_insert_rowid (SQLite) or LASTVAL() (PG)
         // Each backend should override this for correctness.
-        let row = self
-            .query("SELECT last_insert_rowid() AS id", &[])
-            .await?;
+        let row = self.query("SELECT last_insert_rowid() AS id", &[]).await?;
         if let Some(r) = row.into_iter().next() {
             Ok(r.get::<Value>("id")?)
         } else {
@@ -222,10 +216,7 @@ pub async fn delete_model_with_hooks<M: ModelLifecycleHooks>(
 /// # Errors
 ///
 /// Returns an error if the PK is not set or the record does not exist.
-pub async fn refresh_model<M: Model>(
-    model: &mut M,
-    db: &dyn DbExecutor,
-) -> DjangoResult<()> {
+pub async fn refresh_model<M: Model>(model: &mut M, db: &dyn DbExecutor) -> DjangoResult<()> {
     let pk_value = model.pk().ok_or_else(|| {
         DjangoError::DatabaseError("Cannot refresh a model without a primary key".to_string())
     })?;
@@ -274,9 +265,7 @@ mod tests {
                     unique_together: vec![],
                     indexes: vec![],
                     abstract_model: false,
-                    fields: vec![
-                        FieldDef::new("id", FieldType::BigAutoField).primary_key(),
-                    ],
+                    fields: vec![FieldDef::new("id", FieldType::BigAutoField).primary_key()],
                     constraints: vec![],
                     inheritance_type: crate::query::compiler::InheritanceType::None,
                 });
@@ -304,9 +293,7 @@ mod tests {
                 vec![("id", Value::Int(self.id))]
             }
             fn from_row(row: &Row) -> Result<Self, DjangoError> {
-                Ok(Dummy {
-                    id: row.get("id")?,
-                })
+                Ok(Dummy { id: row.get("id")? })
             }
         }
 

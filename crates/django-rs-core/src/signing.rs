@@ -114,9 +114,9 @@ impl Signer {
     ///
     /// Returns an error if the signature is invalid or the format is wrong.
     pub fn unsign(&self, signed_value: &str) -> Result<String, DjangoError> {
-        let (value, sig) = signed_value
-            .rsplit_once(&self.sep)
-            .ok_or_else(|| DjangoError::BadRequest("No separator found in signed value".to_string()))?;
+        let (value, sig) = signed_value.rsplit_once(&self.sep).ok_or_else(|| {
+            DjangoError::BadRequest("No separator found in signed value".to_string())
+        })?;
 
         // Try primary key
         let expected = self.make_signature(value, &self.key);
@@ -132,7 +132,9 @@ impl Signer {
             }
         }
 
-        Err(DjangoError::BadRequest("Signature verification failed".to_string()))
+        Err(DjangoError::BadRequest(
+            "Signature verification failed".to_string(),
+        ))
     }
 }
 
@@ -210,16 +212,14 @@ impl TimestampSigner {
         let value_with_ts = self.signer.unsign(signed_value)?;
 
         // Split off the timestamp (last segment)
-        let (value, timestamp_str) = value_with_ts
-            .rsplit_once(&self.signer.sep)
-            .ok_or_else(|| {
+        let (value, timestamp_str) =
+            value_with_ts.rsplit_once(&self.signer.sep).ok_or_else(|| {
                 DjangoError::BadRequest("No timestamp found in signed value".to_string())
             })?;
 
         if let Some(max_age) = max_age {
-            let ts = base62_decode(timestamp_str).map_err(|_| {
-                DjangoError::BadRequest("Invalid timestamp encoding".to_string())
-            })?;
+            let ts = base62_decode(timestamp_str)
+                .map_err(|_| DjangoError::BadRequest("Invalid timestamp encoding".to_string()))?;
 
             let now = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
@@ -258,20 +258,15 @@ impl TimestampSigner {
 /// let loaded: serde_json::Value = loads(&signed, "secret", None).unwrap();
 /// assert_eq!(loaded, data);
 /// ```
-pub fn dumps(
-    data: &serde_json::Value,
-    key: &str,
-    compress: bool,
-) -> Result<String, DjangoError> {
-    let json_bytes = serde_json::to_vec(data).map_err(|e| {
-        DjangoError::SerializationError(format!("Failed to serialize data: {e}"))
-    })?;
+pub fn dumps(data: &serde_json::Value, key: &str, compress: bool) -> Result<String, DjangoError> {
+    let json_bytes = serde_json::to_vec(data)
+        .map_err(|e| DjangoError::SerializationError(format!("Failed to serialize data: {e}")))?;
 
     let (payload, is_compressed) = if compress {
         let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
-        encoder.write_all(&json_bytes).map_err(|e| {
-            DjangoError::SerializationError(format!("Compression failed: {e}"))
-        })?;
+        encoder
+            .write_all(&json_bytes)
+            .map_err(|e| DjangoError::SerializationError(format!("Compression failed: {e}")))?;
         let compressed = encoder.finish().map_err(|e| {
             DjangoError::SerializationError(format!("Compression finish failed: {e}"))
         })?;
@@ -293,8 +288,7 @@ pub fn dumps(
         encoded
     };
 
-    let signer = TimestampSigner::new(key)
-        .with_salt("django.core.signing.dumps".to_string());
+    let signer = TimestampSigner::new(key).with_salt("django.core.signing.dumps".to_string());
     Ok(signer.sign(&prefixed))
 }
 
@@ -314,35 +308,31 @@ pub fn loads<T: serde::de::DeserializeOwned>(
     key: &str,
     max_age: Option<u64>,
 ) -> Result<T, DjangoError> {
-    let ts_signer = TimestampSigner::new(key)
-        .with_salt("django.core.signing.dumps".to_string());
+    let ts_signer = TimestampSigner::new(key).with_salt("django.core.signing.dumps".to_string());
 
     let payload = ts_signer.unsign(signed, max_age)?;
 
-    let (encoded, is_compressed) =
-        payload.strip_prefix(COMPRESS_PREFIX).map_or(
-            (payload.as_str(), false),
-            |rest| (rest, true),
-        );
+    let (encoded, is_compressed) = payload
+        .strip_prefix(COMPRESS_PREFIX)
+        .map_or((payload.as_str(), false), |rest| (rest, true));
 
-    let raw_bytes = URL_SAFE_NO_PAD.decode(encoded).map_err(|e| {
-        DjangoError::SerializationError(format!("Base64 decode failed: {e}"))
-    })?;
+    let raw_bytes = URL_SAFE_NO_PAD
+        .decode(encoded)
+        .map_err(|e| DjangoError::SerializationError(format!("Base64 decode failed: {e}")))?;
 
     let json_bytes = if is_compressed {
         let mut decompressor = ZlibDecoder::new(&raw_bytes[..]);
         let mut decompressed = Vec::new();
-        decompressor.read_to_end(&mut decompressed).map_err(|e| {
-            DjangoError::SerializationError(format!("Decompression failed: {e}"))
-        })?;
+        decompressor
+            .read_to_end(&mut decompressed)
+            .map_err(|e| DjangoError::SerializationError(format!("Decompression failed: {e}")))?;
         decompressed
     } else {
         raw_bytes
     };
 
-    serde_json::from_slice(&json_bytes).map_err(|e| {
-        DjangoError::SerializationError(format!("JSON deserialization failed: {e}"))
-    })
+    serde_json::from_slice(&json_bytes)
+        .map_err(|e| DjangoError::SerializationError(format!("JSON deserialization failed: {e}")))
 }
 
 // ============================================================

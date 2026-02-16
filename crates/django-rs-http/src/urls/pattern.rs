@@ -23,8 +23,7 @@ pub type ConverterEntry = (String, Box<dyn PathConverter>);
 /// A handler is an async function that takes an [`HttpRequest`](crate::HttpRequest)
 /// and returns an [`HttpResponse`](crate::HttpResponse). It is wrapped in an `Arc`
 /// so it can be shared across threads.
-pub type RouteHandler =
-    Arc<dyn Fn(crate::HttpRequest) -> crate::BoxFuture + Send + Sync>;
+pub type RouteHandler = Arc<dyn Fn(crate::HttpRequest) -> crate::BoxFuture + Send + Sync>;
 
 /// A single URL pattern that matches a path and invokes a handler.
 ///
@@ -147,9 +146,7 @@ fn parse_type_and_name(inner: &str) -> (&str, &str) {
 ///
 /// Returns an error if a converter type is unknown.
 #[allow(clippy::type_complexity)]
-fn parse_django_pattern(
-    route: &str,
-) -> DjangoResult<(String, Vec<ConverterEntry>)> {
+fn parse_django_pattern(route: &str) -> DjangoResult<(String, Vec<ConverterEntry>)> {
     let mut regex_parts = String::from("^");
     let mut converter_list = Vec::new();
     let mut remaining = route;
@@ -160,14 +157,11 @@ fn parse_django_pattern(
             let prefix = &remaining[..start];
             regex_parts.push_str(&regex::escape(prefix));
 
-            let end = remaining[start..]
-                .find('>')
-                .ok_or_else(|| {
-                    DjangoError::ImproperlyConfigured(format!(
-                        "Unclosed angle bracket in route: {route}"
-                    ))
-                })?
-                + start;
+            let end = remaining[start..].find('>').ok_or_else(|| {
+                DjangoError::ImproperlyConfigured(format!(
+                    "Unclosed angle bracket in route: {route}"
+                ))
+            })? + start;
 
             let inner = &remaining[start + 1..end];
             let (type_name, param_name) = parse_type_and_name(inner);
@@ -214,15 +208,10 @@ fn parse_django_pattern(
 /// # Errors
 ///
 /// Returns an error if the route contains unknown converter types or invalid syntax.
-pub fn path(
-    route: &str,
-    callback: RouteHandler,
-    name: Option<&str>,
-) -> DjangoResult<URLPattern> {
+pub fn path(route: &str, callback: RouteHandler, name: Option<&str>) -> DjangoResult<URLPattern> {
     let (regex_str, converter_list) = parse_django_pattern(route)?;
-    let regex = Regex::new(&regex_str).map_err(|e| {
-        DjangoError::ImproperlyConfigured(format!("Invalid pattern regex: {e}"))
-    })?;
+    let regex = Regex::new(&regex_str)
+        .map_err(|e| DjangoError::ImproperlyConfigured(format!("Invalid pattern regex: {e}")))?;
 
     Ok(URLPattern {
         route: route.to_string(),
@@ -258,9 +247,8 @@ pub fn re_path(
         format!("{full_regex}$")
     };
 
-    let regex = Regex::new(&full_regex).map_err(|e| {
-        DjangoError::ImproperlyConfigured(format!("Invalid regex pattern: {e}"))
-    })?;
+    let regex = Regex::new(&full_regex)
+        .map_err(|e| DjangoError::ImproperlyConfigured(format!("Invalid regex pattern: {e}")))?;
 
     Ok(URLPattern {
         route: regex_str.to_string(),
@@ -289,14 +277,11 @@ pub fn path_prefix(route: &str) -> DjangoResult<URLPattern> {
             let prefix = &remaining[..start];
             regex_str.push_str(&regex::escape(prefix));
 
-            let end = remaining[start..]
-                .find('>')
-                .ok_or_else(|| {
-                    DjangoError::ImproperlyConfigured(format!(
-                        "Unclosed angle bracket in route: {route}"
-                    ))
-                })?
-                + start;
+            let end = remaining[start..].find('>').ok_or_else(|| {
+                DjangoError::ImproperlyConfigured(format!(
+                    "Unclosed angle bracket in route: {route}"
+                ))
+            })? + start;
 
             let inner = &remaining[start + 1..end];
             let (type_name, param_name) = parse_type_and_name(inner);
@@ -319,9 +304,8 @@ pub fn path_prefix(route: &str) -> DjangoResult<URLPattern> {
     })?;
 
     // Use a dummy handler for prefix patterns
-    let dummy_handler: RouteHandler = Arc::new(|_req| {
-        Box::pin(async { crate::HttpResponse::not_found("Not found") })
-    });
+    let dummy_handler: RouteHandler =
+        Arc::new(|_req| Box::pin(async { crate::HttpResponse::not_found("Not found") }));
 
     Ok(URLPattern {
         route: route.to_string(),
@@ -372,7 +356,9 @@ mod tests {
     #[test]
     fn test_path_with_uuid_param() {
         let p = path("items/<uuid:id>/", dummy_handler(), None).unwrap();
-        let kwargs = p.full_match("items/550e8400-e29b-41d4-a716-446655440000/").unwrap();
+        let kwargs = p
+            .full_match("items/550e8400-e29b-41d4-a716-446655440000/")
+            .unwrap();
         assert_eq!(
             kwargs.get("id").unwrap(),
             "550e8400-e29b-41d4-a716-446655440000"
@@ -439,12 +425,7 @@ mod tests {
     #[test]
     fn test_re_path_auto_anchors() {
         // Without explicit ^ and $, they should be added
-        let p = re_path(
-            r"articles/(?P<id>[0-9]+)/",
-            dummy_handler(),
-            None,
-        )
-        .unwrap();
+        let p = re_path(r"articles/(?P<id>[0-9]+)/", dummy_handler(), None).unwrap();
         assert!(p.full_match("articles/42/").is_some());
     }
 

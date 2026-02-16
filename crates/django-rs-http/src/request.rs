@@ -92,17 +92,17 @@ impl HttpRequest {
 
         // HTTP_ headers
         for (name, value) in &headers {
-            let meta_key = format!(
-                "HTTP_{}",
-                name.as_str().to_uppercase().replace('-', "_")
-            );
+            let meta_key = format!("HTTP_{}", name.as_str().to_uppercase().replace('-', "_"));
             if let Ok(v) = value.to_str() {
                 meta.insert(meta_key, v.to_string());
             }
         }
 
         // Standard META entries
-        if let Some(host) = headers.get(http::header::HOST).and_then(|v| v.to_str().ok()) {
+        if let Some(host) = headers
+            .get(http::header::HOST)
+            .and_then(|v| v.to_str().ok())
+        {
             meta.insert("SERVER_NAME".to_string(), host.to_string());
             meta.insert("HTTP_HOST".to_string(), host.to_string());
         }
@@ -115,10 +115,7 @@ impl HttpRequest {
             meta.insert("CONTENT_TYPE".to_string(), ct.clone());
         }
 
-        meta.insert(
-            "CONTENT_LENGTH".to_string(),
-            body.len().to_string(),
-        );
+        meta.insert("CONTENT_LENGTH".to_string(), body.len().to_string());
 
         let scheme = if headers
             .get("x-forwarded-proto")
@@ -135,7 +132,10 @@ impl HttpRequest {
             .as_deref()
             .is_some_and(|ct| ct.starts_with("multipart/form-data"))
         {
-            if let Some(boundary) = content_type.as_deref().and_then(crate::upload::extract_boundary) {
+            if let Some(boundary) = content_type
+                .as_deref()
+                .and_then(crate::upload::extract_boundary)
+            {
                 match crate::upload::parse_multipart(&body, boundary) {
                     Ok(multipart) => {
                         let mut post_dict = QueryDict::new_mutable();
@@ -485,7 +485,11 @@ impl HttpRequestBuilder {
             .as_deref()
             .is_some_and(|ct| ct.starts_with("multipart/form-data"))
         {
-            if let Some(boundary) = self.content_type.as_deref().and_then(crate::upload::extract_boundary) {
+            if let Some(boundary) = self
+                .content_type
+                .as_deref()
+                .and_then(crate::upload::extract_boundary)
+            {
                 match crate::upload::parse_multipart(&self.body, boundary) {
                     Ok(multipart) => {
                         let mut post_dict = QueryDict::new_mutable();
@@ -541,9 +545,7 @@ mod tests {
 
     #[test]
     fn test_builder_method() {
-        let req = HttpRequest::builder()
-            .method(Method::POST)
-            .build();
+        let req = HttpRequest::builder().method(Method::POST).build();
         assert_eq!(req.method(), &Method::POST);
     }
 
@@ -685,17 +687,13 @@ mod tests {
 
     #[test]
     fn test_content_type() {
-        let req = HttpRequest::builder()
-            .content_type("text/html")
-            .build();
+        let req = HttpRequest::builder().content_type("text/html").build();
         assert_eq!(req.content_type(), Some("text/html"));
     }
 
     #[test]
     fn test_path_info() {
-        let req = HttpRequest::builder()
-            .path("/articles/2024/")
-            .build();
+        let req = HttpRequest::builder().path("/articles/2024/").build();
         assert_eq!(req.path_info(), "/articles/2024/");
     }
 
@@ -721,14 +719,15 @@ mod tests {
         };
         req.set_resolver_match(resolver_match);
         assert!(req.resolver_match().is_some());
-        assert_eq!(req.resolver_match().unwrap().url_name.as_deref(), Some("test"));
+        assert_eq!(
+            req.resolver_match().unwrap().url_name.as_deref(),
+            Some("test")
+        );
     }
 
     #[test]
     fn test_headers() {
-        let req = HttpRequest::builder()
-            .header("accept", "text/html")
-            .build();
+        let req = HttpRequest::builder().header("accept", "text/html").build();
         assert_eq!(
             req.headers().get("accept").unwrap().to_str().unwrap(),
             "text/html"

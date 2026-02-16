@@ -50,9 +50,7 @@ impl SqliteBackend {
 
         // Enable WAL mode for better concurrent read performance
         conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;")
-            .map_err(|e| {
-                DjangoError::OperationalError(format!("Failed to set pragmas: {e}"))
-            })?;
+            .map_err(|e| DjangoError::OperationalError(format!("Failed to set pragmas: {e}")))?;
 
         Ok(Self {
             path,
@@ -89,26 +87,17 @@ impl SqliteBackend {
                 Value::String(s) => stmt.raw_bind_parameter(idx, s.as_str()),
                 Value::Bytes(b) => stmt.raw_bind_parameter(idx, b.as_slice()),
                 Value::Date(d) => stmt.raw_bind_parameter(idx, d.to_string().as_str()),
-                Value::DateTime(dt) => {
-                    stmt.raw_bind_parameter(idx, dt.to_string().as_str())
-                }
-                Value::DateTimeTz(dt) => {
-                    stmt.raw_bind_parameter(idx, dt.to_string().as_str())
-                }
+                Value::DateTime(dt) => stmt.raw_bind_parameter(idx, dt.to_string().as_str()),
+                Value::DateTimeTz(dt) => stmt.raw_bind_parameter(idx, dt.to_string().as_str()),
                 Value::Time(t) => stmt.raw_bind_parameter(idx, t.to_string().as_str()),
                 Value::Duration(d) => {
                     stmt.raw_bind_parameter(idx, d.num_microseconds().unwrap_or(0))
                 }
                 Value::Uuid(u) => stmt.raw_bind_parameter(idx, u.to_string().as_str()),
-                Value::Json(j) => {
-                    stmt.raw_bind_parameter(idx, j.to_string().as_str())
-                }
+                Value::Json(j) => stmt.raw_bind_parameter(idx, j.to_string().as_str()),
                 Value::List(vals) => {
                     let json = serde_json::to_string(
-                        &vals
-                            .iter()
-                            .map(|v| v.to_string())
-                            .collect::<Vec<_>>(),
+                        &vals.iter().map(|v| v.to_string()).collect::<Vec<_>>(),
                     )
                     .unwrap_or_default();
                     stmt.raw_bind_parameter(idx, json.as_str())
@@ -117,9 +106,7 @@ impl SqliteBackend {
                     let json = serde_json::to_string(map).unwrap_or_default();
                     stmt.raw_bind_parameter(idx, json.as_str())
                 }
-                Value::Range { .. } => {
-                    stmt.raw_bind_parameter(idx, param.to_string().as_str())
-                }
+                Value::Range { .. } => stmt.raw_bind_parameter(idx, param.to_string().as_str()),
             }
             .map_err(|e| DjangoError::DatabaseError(format!("Bind error: {e}")))?;
         }
@@ -135,7 +122,9 @@ impl SqliteBackend {
             .iter()
             .enumerate()
             .map(|(i, _)| {
-                let val_ref = sqlite_row.get_ref(i).unwrap_or(rusqlite::types::ValueRef::Null);
+                let val_ref = sqlite_row
+                    .get_ref(i)
+                    .unwrap_or(rusqlite::types::ValueRef::Null);
                 match val_ref {
                     rusqlite::types::ValueRef::Null => Value::Null,
                     rusqlite::types::ValueRef::Integer(v) => Value::Int(v),
@@ -193,16 +182,12 @@ impl DatabaseBackend for SqliteBackend {
                 .prepare(&sql)
                 .map_err(|e| DjangoError::DatabaseError(format!("{e}")))?;
 
-            let column_names: Vec<String> = stmt
-                .column_names()
-                .into_iter()
-                .map(String::from)
-                .collect();
+            let column_names: Vec<String> =
+                stmt.column_names().into_iter().map(String::from).collect();
 
             Self::bind_params(&mut stmt, &params)?;
 
-            let mut raw_rows = stmt
-                .raw_query();
+            let mut raw_rows = stmt.raw_query();
 
             let mut rows = Vec::new();
             while let Some(row) = raw_rows
@@ -268,11 +253,7 @@ impl django_rs_db::DbExecutor for SqliteBackend {
         DatabaseBackend::query_one(self, sql, params).await
     }
 
-    async fn insert_returning_id(
-        &self,
-        sql: &str,
-        params: &[Value],
-    ) -> Result<Value, DjangoError> {
+    async fn insert_returning_id(&self, sql: &str, params: &[Value]) -> Result<Value, DjangoError> {
         let conn = self.conn.clone();
         let sql = sql.to_string();
         let params = params.to_vec();
@@ -355,10 +336,7 @@ mod tests {
             .unwrap();
 
         backend
-            .execute(
-                "INSERT INTO test (val) VALUES (?)",
-                &[Value::from("hello")],
-            )
+            .execute("INSERT INTO test (val) VALUES (?)", &[Value::from("hello")])
             .await
             .unwrap();
 
@@ -405,7 +383,10 @@ mod tests {
 
         let result = backend.query_one("SELECT val FROM test", &[]).await;
         assert!(result.is_err());
-        assert!(matches!(result, Err(DjangoError::MultipleObjectsReturned(_))));
+        assert!(matches!(
+            result,
+            Err(DjangoError::MultipleObjectsReturned(_))
+        ));
     }
 
     #[tokio::test]
@@ -449,10 +430,7 @@ mod tests {
             .unwrap();
 
         backend
-            .execute(
-                "INSERT INTO test (price) VALUES (?)",
-                &[Value::from(19.99)],
-            )
+            .execute("INSERT INTO test (price) VALUES (?)", &[Value::from(19.99)])
             .await
             .unwrap();
 
@@ -469,10 +447,7 @@ mod tests {
     async fn test_sqlite_blob_handling() {
         let backend = SqliteBackend::memory().unwrap();
         backend
-            .execute(
-                "CREATE TABLE test (id INTEGER PRIMARY KEY, data BLOB)",
-                &[],
-            )
+            .execute("CREATE TABLE test (id INTEGER PRIMARY KEY, data BLOB)", &[])
             .await
             .unwrap();
 
@@ -485,10 +460,7 @@ mod tests {
             .await
             .unwrap();
 
-        let rows = backend
-            .query("SELECT data FROM test", &[])
-            .await
-            .unwrap();
+        let rows = backend.query("SELECT data FROM test", &[]).await.unwrap();
 
         assert_eq!(rows.len(), 1);
         // The blob should round-trip correctly
@@ -512,10 +484,7 @@ mod tests {
 
         for name in &["Alice", "Bob", "Charlie"] {
             backend
-                .execute(
-                    "INSERT INTO users (name) VALUES (?)",
-                    &[Value::from(*name)],
-                )
+                .execute("INSERT INTO users (name) VALUES (?)", &[Value::from(*name)])
                 .await
                 .unwrap();
         }

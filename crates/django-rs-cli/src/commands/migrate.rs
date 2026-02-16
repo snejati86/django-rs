@@ -81,8 +81,7 @@ impl ManagementCommand for MigrateCommand {
         }
 
         // Load migrations from the filesystem
-        let mut loader =
-            django_rs_db_migrations::MigrationLoader::new(migrations_dir);
+        let mut loader = django_rs_db_migrations::MigrationLoader::new(migrations_dir);
         let graph = loader.load()?;
 
         if graph.is_empty() {
@@ -116,8 +115,7 @@ impl ManagementCommand for MigrateCommand {
         // Build the executor with the SQLite schema editor (default)
         let schema_editor: Box<dyn django_rs_db_migrations::SchemaEditor> =
             Box::new(django_rs_db_migrations::SqliteSchemaEditor);
-        let executor =
-            django_rs_db_migrations::MigrationExecutor::new(schema_editor);
+        let executor = django_rs_db_migrations::MigrationExecutor::new(schema_editor);
 
         // Build the migration plan
         let plan = executor.make_plan(&graph, target.as_ref())?;
@@ -130,14 +128,12 @@ impl ManagementCommand for MigrateCommand {
         tracing::info!("Planned {} migration(s)", plan.len());
         for step in &plan.steps {
             let direction = if step.backwards { "Unapply" } else { "Apply" };
-            tracing::info!(
-                "  {direction} {}.{}",
-                step.migration.0,
-                step.migration.1
-            );
+            tracing::info!("  {direction} {}.{}", step.migration.0, step.migration.1);
         }
 
-        tracing::info!("Migrations planned successfully (database execution requires backend connection)");
+        tracing::info!(
+            "Migrations planned successfully (database execution requires backend connection)"
+        );
 
         Ok(())
     }

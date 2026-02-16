@@ -140,10 +140,7 @@ mod tests {
     #[test]
     fn test_build_cargo_test_args_with_app() {
         let args = build_cargo_test_args(Some("django-rs-core"), 1, false, &[]);
-        assert_eq!(
-            args,
-            vec!["test", "--package", "django-rs-core"]
-        );
+        assert_eq!(args, vec!["test", "--package", "django-rs-core"]);
     }
 
     #[test]

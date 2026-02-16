@@ -352,10 +352,7 @@ mod tests {
         db.reset_query_count();
 
         let pk = db
-            .insert_returning_id(
-                "INSERT INTO irc (val) VALUES (?)",
-                &[Value::from("test")],
-            )
+            .insert_returning_id("INSERT INTO irc (val) VALUES (?)", &[Value::from("test")])
             .await
             .unwrap();
         assert_eq!(pk, Value::Int(1));

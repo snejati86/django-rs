@@ -76,18 +76,14 @@ impl TestClient {
         self.logged_in_user = Some(user.clone());
 
         // Store user info in session (mirrors Django session-based auth)
-        self.session.set(
-            "_auth_user_id",
-            serde_json::json!(user.username),
-        );
+        self.session
+            .set("_auth_user_id", serde_json::json!(user.username));
         self.session.set(
             "_auth_user_backend",
             serde_json::json!("django_rs.auth.backends.ModelBackend"),
         );
-        self.session.set(
-            "_auth_user_hash",
-            serde_json::json!("test-hash"),
-        );
+        self.session
+            .set("_auth_user_hash", serde_json::json!("test-hash"));
 
         // Set a session cookie
         self.cookies
@@ -236,9 +232,7 @@ impl TestClient {
         path: &str,
         content_type: Option<&str>,
     ) -> TestResponse {
-        let mut builder = Request::builder()
-            .method(method)
-            .uri(path);
+        let mut builder = Request::builder().method(method).uri(path);
 
         if let Some(ct) = content_type {
             builder = builder.header("content-type", ct);
@@ -311,7 +305,8 @@ impl TestClient {
         let body_bytes = response
             .into_body()
             .collect()
-            .await.map_or_else(|_| Bytes::new(), http_body_util::Collected::to_bytes);
+            .await
+            .map_or_else(|_| Bytes::new(), http_body_util::Collected::to_bytes);
 
         TestResponse {
             status,
@@ -356,9 +351,7 @@ impl TestResponse {
 
     /// Returns the value of a header by name.
     pub fn header(&self, name: &str) -> Option<&str> {
-        self.headers
-            .get(name)
-            .and_then(|v| v.to_str().ok())
+        self.headers.get(name).and_then(|v| v.to_str().ok())
     }
 
     /// Returns `true` if the response has the specified header.
@@ -380,33 +373,16 @@ mod tests {
     fn test_app() -> Router {
         Router::new()
             .route("/hello", get(|| async { "Hello, World!" }))
-            .route("/json", get(|| async {
-                axum::Json(serde_json::json!({"key": "value"}))
-            }))
             .route(
-                "/echo",
-                post(|body: String| async move { body }),
+                "/json",
+                get(|| async { axum::Json(serde_json::json!({"key": "value"})) }),
             )
-            .route(
-                "/put",
-                put(|body: String| async move { body }),
-            )
-            .route(
-                "/patch",
-                patch(|body: String| async move { body }),
-            )
-            .route(
-                "/delete",
-                delete(|| async { "deleted" }),
-            )
-            .route(
-                "/head",
-                head(|| async { "" }),
-            )
-            .route(
-                "/options",
-                options(|| async { "GET, POST" }),
-            )
+            .route("/echo", post(|body: String| async move { body }))
+            .route("/put", put(|body: String| async move { body }))
+            .route("/patch", patch(|body: String| async move { body }))
+            .route("/delete", delete(|| async { "deleted" }))
+            .route("/head", head(|| async { "" }))
+            .route("/options", options(|| async { "GET, POST" }))
             .route(
                 "/cookie",
                 get(|headers: http::HeaderMap| async move {
@@ -706,9 +682,6 @@ mod tests {
         let mut client = TestClient::new(test_app());
         let _response = client.get("/set-cookie").await;
 
-        assert_eq!(
-            client.cookies().get("session"),
-            Some(&"abc123".to_string())
-        );
+        assert_eq!(client.cookies().get("session"), Some(&"abc123".to_string()));
     }
 }
