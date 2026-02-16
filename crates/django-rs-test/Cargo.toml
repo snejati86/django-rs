@@ -30,3 +30,5 @@ bytes = "1"
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["full"] }
+django-rs-template.workspace = true
+django-rs-forms.workspace = true

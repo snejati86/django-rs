@@ -148,8 +148,13 @@ impl DjangoApp {
                             );
                         };
 
+                        // Strip leading slash for URL resolution. Django's URL
+                        // patterns don't include a leading slash (e.g. "articles/"
+                        // not "/articles/"), but HTTP request paths always start
+                        // with "/". This mirrors Django's WSGIHandler behavior.
                         let path = request.path().to_string();
-                        match url_conf.resolve(&path) {
+                        let path = path.strip_prefix('/').unwrap_or(&path);
+                        match url_conf.resolve(path) {
                             Ok(resolver_match) => {
                                 request.set_resolver_match(resolver_match.clone());
                                 let handler = &resolver_match.func;
