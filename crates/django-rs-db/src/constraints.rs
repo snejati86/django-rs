@@ -1,7 +1,7 @@
 //! Database constraints for model-level integrity rules.
 //!
-//! This module provides [`CheckConstraint`] and [`UniqueConstraint`] types that
-//! correspond to Django's `CheckConstraint` and `UniqueConstraint` from
+//! This module provides [`CheckConstraint`], [`UniqueConstraint`], and [`ExclusionConstraint`] types that
+//! correspond to Django's `CheckConstraint`, `UniqueConstraint`, and `ExclusionConstraint` from
 //! `django.db.models.constraints`. They are declared in a model's `Meta.constraints`
 //! list and generate SQL during migration/schema operations.
 //!
@@ -235,6 +235,118 @@ impl Constraint for UniqueConstraint {
         if self.nulls_distinct == Some(false) {
             sql.push_str(" NULLS NOT DISTINCT");
         }
+
+        if let Some(ref q) = self.condition {
+            let compiler = SqlCompiler::new(DatabaseBackendType::PostgreSQL);
+            let node = WhereNode::from_q(q);
+            let mut cond_sql = String::new();
+            let mut params = Vec::new();
+            compiler.compile_where_node_pub(&node, &mut cond_sql, &mut params);
+            let final_cond = inline_params(&cond_sql, &params);
+            sql.push_str(&format!(" WHERE {final_cond}"));
+        }
+
+        sql
+    }
+}
+
+/// A PostgreSQL EXCLUDE constraint that prevents overlapping values.
+///
+/// Exclusion constraints are a generalization of unique constraints that allow
+/// specifying an operator for each column pair. They are commonly used with
+/// range types to prevent overlapping time ranges.
+///
+/// This is the equivalent of Django's `ExclusionConstraint` (PostgreSQL only).
+///
+/// # Examples
+///
+/// ```
+/// use django_rs_db::constraints::{ExclusionConstraint, Constraint};
+///
+/// // Prevent overlapping reservations for the same room
+/// let constraint = ExclusionConstraint::new(
+///     "no_overlapping_reservations",
+///     vec![
+///         ("room_id".to_string(), "=".to_string()),
+///         ("during".to_string(), "&&".to_string()),
+///     ],
+/// );
+/// let sql = constraint.to_sql("reservations");
+/// assert!(sql.contains("EXCLUDE"));
+/// ```
+#[derive(Debug, Clone)]
+pub struct ExclusionConstraint {
+    /// The constraint name.
+    name: String,
+    /// Pairs of (column, operator) that define the exclusion condition.
+    expressions: Vec<(String, String)>,
+    /// The index type to use (default: GiST).
+    index_type: String,
+    /// Optional WHERE condition for a partial exclusion constraint.
+    condition: Option<Q>,
+}
+
+impl ExclusionConstraint {
+    /// Creates a new exclusion constraint.
+    ///
+    /// Each expression is a `(column_name, operator)` pair. Common operators:
+    /// - `"="` for equality
+    /// - `"&&"` for range overlap
+    /// - `"<>"` for inequality
+    pub fn new(name: impl Into<String>, expressions: Vec<(String, String)>) -> Self {
+        Self {
+            name: name.into(),
+            expressions,
+            index_type: "gist".to_string(),
+            condition: None,
+        }
+    }
+
+    /// Sets the index type for the exclusion constraint (default: "gist").
+    pub fn using(mut self, index_type: impl Into<String>) -> Self {
+        self.index_type = index_type.into();
+        self
+    }
+
+    /// Adds a condition for a partial exclusion constraint.
+    pub fn condition(mut self, q: Q) -> Self {
+        self.condition = Some(q);
+        self
+    }
+
+    /// Returns the expressions.
+    pub fn expressions(&self) -> &[(String, String)] {
+        &self.expressions
+    }
+
+    /// Returns the index type.
+    pub fn get_index_type(&self) -> &str {
+        &self.index_type
+    }
+
+    /// Returns the optional condition.
+    pub fn get_condition(&self) -> Option<&Q> {
+        self.condition.as_ref()
+    }
+}
+
+impl Constraint for ExclusionConstraint {
+    fn name(&self) -> &str {
+        &self.name
+    }
+
+    fn to_sql(&self, _table: &str) -> String {
+        let expr_parts: Vec<String> = self
+            .expressions
+            .iter()
+            .map(|(col, op)| format!("\"{}\" WITH {}", col, op))
+            .collect();
+        let mut sql = format!(
+            "\"{}\" EXCLUDE USING {} ({})",
+            self.name,
+            self.index_type,
+            expr_parts.join(", ")
+        );
 
         if let Some(ref q) = self.condition {
             let compiler = SqlCompiler::new(DatabaseBackendType::PostgreSQL);
@@ -668,5 +780,113 @@ mod tests {
         let q = Q::filter("active", Lookup::Exact(Value::from(true)));
         let constraint = UniqueConstraint::new("test", vec!["col".to_string()]).condition(q);
         assert!(constraint.get_condition().is_some());
+    }
+
+    // ── ExclusionConstraint tests ──────────────────────────────────────
+
+    #[test]
+    fn test_exclusion_constraint_creation() {
+        let constraint = ExclusionConstraint::new(
+            "no_overlap",
+            vec![
+                ("room_id".to_string(), "=".to_string()),
+                ("during".to_string(), "&&".to_string()),
+            ],
+        );
+        assert_eq!(constraint.name(), "no_overlap");
+        assert_eq!(constraint.expressions().len(), 2);
+    }
+
+    #[test]
+    fn test_exclusion_constraint_to_sql() {
+        let constraint = ExclusionConstraint::new(
+            "no_overlap",
+            vec![
+                ("room_id".to_string(), "=".to_string()),
+                ("during".to_string(), "&&".to_string()),
+            ],
+        );
+        let sql = constraint.to_sql("reservations");
+        assert_eq!(
+            sql,
+            "\"no_overlap\" EXCLUDE USING gist (\"room_id\" WITH =, \"during\" WITH &&)"
+        );
+    }
+
+    #[test]
+    fn test_exclusion_constraint_custom_index_type() {
+        let constraint = ExclusionConstraint::new(
+            "no_overlap",
+            vec![("range_col".to_string(), "&&".to_string())],
+        )
+        .using("spgist");
+        let sql = constraint.to_sql("t");
+        assert!(sql.contains("USING spgist"));
+    }
+
+    #[test]
+    fn test_exclusion_constraint_with_condition() {
+        let constraint = ExclusionConstraint::new(
+            "no_overlap_active",
+            vec![
+                ("room_id".to_string(), "=".to_string()),
+                ("during".to_string(), "&&".to_string()),
+            ],
+        )
+        .condition(Q::filter("is_active", Lookup::Exact(Value::from(true))));
+        let sql = constraint.to_sql("reservations");
+        assert!(sql.contains("EXCLUDE"));
+        assert!(sql.contains("WHERE"));
+        assert!(sql.contains("\"is_active\" = TRUE"));
+    }
+
+    #[test]
+    fn test_exclusion_constraint_create_sql() {
+        let constraint =
+            ExclusionConstraint::new("no_overlap", vec![("during".to_string(), "&&".to_string())]);
+        let sql = constraint.create_sql("reservations");
+        assert!(sql.starts_with("ALTER TABLE \"reservations\" ADD CONSTRAINT"));
+        assert!(sql.contains("EXCLUDE"));
+    }
+
+    #[test]
+    fn test_exclusion_constraint_drop_sql() {
+        let constraint =
+            ExclusionConstraint::new("no_overlap", vec![("during".to_string(), "&&".to_string())]);
+        let sql = constraint.drop_sql("reservations");
+        assert_eq!(
+            sql,
+            "ALTER TABLE \"reservations\" DROP CONSTRAINT \"no_overlap\""
+        );
+    }
+
+    #[test]
+    fn test_exclusion_constraint_default_index_type() {
+        let constraint =
+            ExclusionConstraint::new("test", vec![("col".to_string(), "=".to_string())]);
+        assert_eq!(constraint.get_index_type(), "gist");
+    }
+
+    #[test]
+    fn test_exclusion_constraint_get_condition() {
+        let constraint =
+            ExclusionConstraint::new("test", vec![("col".to_string(), "=".to_string())]);
+        assert!(constraint.get_condition().is_none());
+
+        let constraint_with_cond =
+            ExclusionConstraint::new("test", vec![("col".to_string(), "=".to_string())])
+                .condition(Q::filter("x", Lookup::Gt(Value::from(0))));
+        assert!(constraint_with_cond.get_condition().is_some());
+    }
+
+    #[test]
+    fn test_exclusion_constraint_as_trait_object() {
+        let constraints: Vec<BoxedConstraint> = vec![Box::new(ExclusionConstraint::new(
+            "no_overlap",
+            vec![("during".to_string(), "&&".to_string())],
+        ))];
+        assert_eq!(constraints[0].name(), "no_overlap");
+        let sql = constraints[0].to_sql("t");
+        assert!(sql.contains("EXCLUDE"));
     }
 }

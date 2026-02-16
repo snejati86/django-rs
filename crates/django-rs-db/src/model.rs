@@ -183,19 +183,57 @@ pub struct Index {
     /// The index type (B-tree by default; PostgreSQL supports additional types).
     #[serde(default)]
     pub index_type: IndexType,
+    /// Whether to create the index concurrently (PostgreSQL only).
+    /// Uses `CREATE INDEX CONCURRENTLY` to avoid locking writes.
+    #[serde(default)]
+    pub concurrently: bool,
+    /// SQL expressions to index instead of or in addition to columns.
+    /// Example: `vec!["LOWER(email)".to_string()]`
+    #[serde(default)]
+    pub expressions: Vec<String>,
+    /// Columns to include in a covering index (PostgreSQL `INCLUDE` clause).
+    #[serde(default)]
+    pub include: Vec<String>,
+    /// Optional WHERE clause for a partial index.
+    #[serde(default)]
+    pub condition: Option<String>,
 }
 
 impl Index {
     /// Generates the CREATE INDEX DDL statement for this index.
     pub fn create_sql(&self, table: &str) -> String {
         let unique_str = if self.unique { "UNIQUE " } else { "" };
+        let concurrently_str = if self.concurrently {
+            "CONCURRENTLY "
+        } else {
+            ""
+        };
         let idx_name = self.name.as_deref().unwrap_or("idx");
-        let cols: Vec<String> = self.fields.iter().map(|f| format!("\"{f}\"")).collect();
+
+        // Combine regular columns and expressions
+        let mut index_cols: Vec<String> = self.fields.iter().map(|f| format!("\"{f}\"")).collect();
+        index_cols.extend(self.expressions.iter().cloned());
+
         let using = self.index_type.sql_using_clause();
-        format!(
-            "CREATE {unique_str}INDEX \"{idx_name}\" ON \"{table}\" {using} ({})",
-            cols.join(", ")
-        )
+
+        let mut sql = format!(
+            "CREATE {unique_str}INDEX {concurrently_str}\"{idx_name}\" ON \"{table}\" {using} ({})",
+            index_cols.join(", ")
+        );
+
+        // INCLUDE clause for covering indexes
+        if !self.include.is_empty() {
+            let include_cols: Vec<String> =
+                self.include.iter().map(|f| format!("\"{f}\"")).collect();
+            sql.push_str(&format!(" INCLUDE ({})", include_cols.join(", ")));
+        }
+
+        // WHERE clause for partial indexes
+        if let Some(ref cond) = self.condition {
+            sql.push_str(&format!(" WHERE {cond}"));
+        }
+
+        sql
     }
 }
 
@@ -268,6 +306,10 @@ impl From<GinIndex> for Index {
             fields: gin.fields,
             unique: false,
             index_type: IndexType::Gin,
+            concurrently: false,
+            expressions: Vec::new(),
+            include: Vec::new(),
+            condition: None,
         }
     }
 }
@@ -301,6 +343,10 @@ impl From<GistIndex> for Index {
             fields: gist.fields,
             unique: false,
             index_type: IndexType::Gist,
+            concurrently: false,
+            expressions: Vec::new(),
+            include: Vec::new(),
+            condition: None,
         }
     }
 }
@@ -334,6 +380,10 @@ impl From<BrinIndex> for Index {
             fields: brin.fields,
             unique: false,
             index_type: IndexType::Brin,
+            concurrently: false,
+            expressions: Vec::new(),
+            include: Vec::new(),
+            condition: None,
         }
     }
 }
@@ -367,6 +417,10 @@ impl From<SpGistIndex> for Index {
             fields: spgist.fields,
             unique: false,
             index_type: IndexType::SpGist,
+            concurrently: false,
+            expressions: Vec::new(),
+            include: Vec::new(),
+            condition: None,
         }
     }
 }
@@ -401,6 +455,10 @@ impl From<BloomIndex> for Index {
             fields: bloom.fields,
             unique: false,
             index_type: IndexType::Bloom,
+            concurrently: false,
+            expressions: Vec::new(),
+            include: Vec::new(),
+            condition: None,
         }
     }
 }
@@ -525,6 +583,10 @@ mod tests {
             fields: vec!["name".to_string()],
             unique: false,
             index_type: IndexType::BTree,
+            concurrently: false,
+            expressions: Vec::new(),
+            include: Vec::new(),
+            condition: None,
         };
         assert_eq!(idx.name.as_deref(), Some("idx_name"));
         assert!(!idx.unique);
@@ -538,6 +600,10 @@ mod tests {
             fields: vec!["name".to_string()],
             unique: false,
             index_type: IndexType::BTree,
+            concurrently: false,
+            expressions: Vec::new(),
+            include: Vec::new(),
+            condition: None,
         };
         let sql = idx.create_sql("users");
         assert_eq!(
@@ -553,6 +619,10 @@ mod tests {
             fields: vec!["email".to_string()],
             unique: true,
             index_type: IndexType::BTree,
+            concurrently: false,
+            expressions: Vec::new(),
+            include: Vec::new(),
+            condition: None,
         };
         let sql = idx.create_sql("users");
         assert!(sql.starts_with("CREATE UNIQUE INDEX"));
@@ -631,11 +701,100 @@ mod tests {
             fields: vec!["user_id".to_string(), "project_id".to_string()],
             unique: true,
             index_type: IndexType::BTree,
+            concurrently: false,
+            expressions: Vec::new(),
+            include: Vec::new(),
+            condition: None,
         };
         let sql = idx.create_sql("memberships");
         assert_eq!(
             sql,
             "CREATE UNIQUE INDEX \"idx_user_project\" ON \"memberships\" USING btree (\"user_id\", \"project_id\")"
         );
+    }
+
+    #[test]
+    fn test_index_create_sql_concurrently() {
+        let idx = Index {
+            name: Some("idx_title".into()),
+            fields: vec!["title".into()],
+            unique: false,
+            index_type: IndexType::default(),
+            concurrently: true,
+            expressions: Vec::new(),
+            include: Vec::new(),
+            condition: None,
+        };
+        let sql = idx.create_sql("blog_post");
+        assert!(sql.contains("CONCURRENTLY"));
+    }
+
+    #[test]
+    fn test_index_create_sql_expression() {
+        let idx = Index {
+            name: Some("idx_lower_email".into()),
+            fields: Vec::new(),
+            unique: true,
+            index_type: IndexType::default(),
+            concurrently: false,
+            expressions: vec!["LOWER(\"email\")".to_string()],
+            include: Vec::new(),
+            condition: None,
+        };
+        let sql = idx.create_sql("users");
+        assert!(sql.contains("LOWER(\"email\")"));
+        assert!(sql.contains("UNIQUE"));
+    }
+
+    #[test]
+    fn test_index_create_sql_covering() {
+        let idx = Index {
+            name: Some("idx_title_include".into()),
+            fields: vec!["title".into()],
+            unique: false,
+            index_type: IndexType::default(),
+            concurrently: false,
+            expressions: Vec::new(),
+            include: vec!["body".into(), "created_at".into()],
+            condition: None,
+        };
+        let sql = idx.create_sql("blog_post");
+        assert!(sql.contains("INCLUDE (\"body\", \"created_at\")"));
+    }
+
+    #[test]
+    fn test_index_create_sql_partial() {
+        let idx = Index {
+            name: Some("idx_active_users".into()),
+            fields: vec!["email".into()],
+            unique: true,
+            index_type: IndexType::default(),
+            concurrently: false,
+            expressions: Vec::new(),
+            include: Vec::new(),
+            condition: Some("\"is_active\" = TRUE".to_string()),
+        };
+        let sql = idx.create_sql("users");
+        assert!(sql.contains("WHERE \"is_active\" = TRUE"));
+    }
+
+    #[test]
+    fn test_index_create_sql_all_features() {
+        let idx = Index {
+            name: Some("idx_full".into()),
+            fields: vec!["email".into()],
+            unique: true,
+            index_type: IndexType::Gin,
+            concurrently: true,
+            expressions: Vec::new(),
+            include: vec!["name".into()],
+            condition: Some("\"is_active\" = TRUE".to_string()),
+        };
+        let sql = idx.create_sql("users");
+        assert!(sql.contains("CONCURRENTLY"));
+        assert!(sql.contains("UNIQUE"));
+        assert!(sql.contains("USING gin"));
+        assert!(sql.contains("INCLUDE (\"name\")"));
+        assert!(sql.contains("WHERE"));
     }
 }

@@ -19,7 +19,7 @@
 //! - [`fields`] - Field definitions ([`FieldDef`](fields::FieldDef)) and types
 //! - [`value`] - The backend-agnostic [`Value`](value::Value) enum
 //! - [`query`] - Query building, lookups, expressions, and compilation
-//! - [`constraints`] - Database constraints (CHECK, UNIQUE)
+//! - [`constraints`] - Database constraints (CHECK, UNIQUE, EXCLUDE)
 //! - [`validators`] - Field validators
 
 // These clippy lints are intentionally allowed for the ORM crate:
@@ -62,7 +62,7 @@ pub mod validators;
 pub mod value;
 
 // Re-export the most commonly used types at the crate root.
-pub use constraints::{CheckConstraint, Constraint, UniqueConstraint};
+pub use constraints::{CheckConstraint, Constraint, ExclusionConstraint, UniqueConstraint};
 pub use executor::{
     create_model, create_model_with_hooks, delete_model, delete_model_with_hooks, refresh_model,
     save_model, save_model_with_hooks, DbExecutor, ModelLifecycleHooks,

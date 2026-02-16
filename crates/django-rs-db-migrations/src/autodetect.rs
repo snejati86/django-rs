@@ -776,6 +776,10 @@ mod tests {
                     fields: vec!["title".into()],
                     unique: false,
                     index_type: IndexType::default(),
+                    concurrently: false,
+                    expressions: Vec::new(),
+                    include: Vec::new(),
+                    condition: None,
                 }],
                 ..ModelOptions::default()
             }),
@@ -797,6 +801,10 @@ mod tests {
                     fields: vec!["title".into()],
                     unique: false,
                     index_type: IndexType::default(),
+                    concurrently: false,
+                    expressions: Vec::new(),
+                    include: Vec::new(),
+                    condition: None,
                 }],
                 ..ModelOptions::default()
             }),

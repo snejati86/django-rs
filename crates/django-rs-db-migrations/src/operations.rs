@@ -586,6 +586,112 @@ impl Operation for AlterUniqueTogether {
     }
 }
 
+/// Adds a named constraint to a table.
+///
+/// Generates `ALTER TABLE ... ADD CONSTRAINT` DDL. Works with any
+/// constraint type (CHECK, UNIQUE, EXCLUDE, etc.).
+#[derive(Debug, Clone)]
+pub struct AddConstraint {
+    /// The model name the constraint is for.
+    pub model_name: String,
+    /// The constraint name.
+    pub constraint_name: String,
+    /// The constraint SQL (the part after `ADD CONSTRAINT`).
+    /// For example: `"price_positive" CHECK ("price" > 0)`
+    pub constraint_sql: String,
+}
+
+impl Operation for AddConstraint {
+    fn describe(&self) -> String {
+        format!(
+            "Add constraint {} to {}",
+            self.constraint_name, self.model_name
+        )
+    }
+
+    fn state_forwards(&self, _app_label: &str, _state: &mut ProjectState) {
+        // Constraints don't modify the field-level project state
+    }
+
+    fn database_forwards(
+        &self,
+        app_label: &str,
+        schema_editor: &dyn SchemaEditor,
+        _from_state: &ProjectState,
+        _to_state: &ProjectState,
+    ) -> Result<Vec<String>, DjangoError> {
+        let table_name = format!("{app_label}_{}", self.model_name);
+        Ok(schema_editor.add_constraint(&table_name, &self.constraint_sql))
+    }
+
+    fn database_backwards(
+        &self,
+        app_label: &str,
+        schema_editor: &dyn SchemaEditor,
+        _from_state: &ProjectState,
+        _to_state: &ProjectState,
+    ) -> Result<Vec<String>, DjangoError> {
+        let table_name = format!("{app_label}_{}", self.model_name);
+        Ok(schema_editor.drop_constraint(&table_name, &self.constraint_name))
+    }
+
+    fn reversible(&self) -> bool {
+        true
+    }
+}
+
+/// Removes a named constraint from a table.
+///
+/// Generates `ALTER TABLE ... DROP CONSTRAINT` DDL.
+#[derive(Debug, Clone)]
+pub struct RemoveConstraint {
+    /// The model name the constraint belongs to.
+    pub model_name: String,
+    /// The name of the constraint to remove.
+    pub constraint_name: String,
+    /// The original constraint SQL (for reversibility).
+    pub constraint_sql: String,
+}
+
+impl Operation for RemoveConstraint {
+    fn describe(&self) -> String {
+        format!(
+            "Remove constraint {} from {}",
+            self.constraint_name, self.model_name
+        )
+    }
+
+    fn state_forwards(&self, _app_label: &str, _state: &mut ProjectState) {
+        // Constraints don't modify the field-level project state
+    }
+
+    fn database_forwards(
+        &self,
+        app_label: &str,
+        schema_editor: &dyn SchemaEditor,
+        _from_state: &ProjectState,
+        _to_state: &ProjectState,
+    ) -> Result<Vec<String>, DjangoError> {
+        let table_name = format!("{app_label}_{}", self.model_name);
+        Ok(schema_editor.drop_constraint(&table_name, &self.constraint_name))
+    }
+
+    fn database_backwards(
+        &self,
+        app_label: &str,
+        schema_editor: &dyn SchemaEditor,
+        _from_state: &ProjectState,
+        _to_state: &ProjectState,
+    ) -> Result<Vec<String>, DjangoError> {
+        let table_name = format!("{app_label}_{}", self.model_name);
+        Ok(schema_editor.add_constraint(&table_name, &self.constraint_sql))
+    }
+
+    fn reversible(&self) -> bool {
+        true
+    }
+}
+
 /// Runs raw SQL in a migration.
 ///
 /// Both forward and backward SQL must be provided for reversibility.
@@ -1017,6 +1123,10 @@ mod tests {
                 fields: vec!["title".into()],
                 unique: false,
                 index_type: IndexType::default(),
+                concurrently: false,
+                expressions: Vec::new(),
+                include: Vec::new(),
+                condition: None,
             },
         };
         assert_eq!(op.describe(), "Add index idx_title on post");
@@ -1031,6 +1141,10 @@ mod tests {
                 fields: vec!["title".into()],
                 unique: false,
                 index_type: IndexType::default(),
+                concurrently: false,
+                expressions: Vec::new(),
+                include: Vec::new(),
+                condition: None,
             },
         };
         let sqls = op
@@ -1099,6 +1213,126 @@ mod tests {
             .unwrap();
         assert!(!sqls.is_empty());
         assert!(sqls[0].contains("UNIQUE"));
+    }
+
+    // ── AddConstraint ─────────────────────────────────────────────
+
+    #[test]
+    fn test_add_constraint_describe() {
+        let op = AddConstraint {
+            model_name: "post".into(),
+            constraint_name: "price_positive".into(),
+            constraint_sql: "\"price_positive\" CHECK (\"price\" > 0)".into(),
+        };
+        assert_eq!(op.describe(), "Add constraint price_positive to post");
+    }
+
+    #[test]
+    fn test_add_constraint_database_forwards() {
+        let op = AddConstraint {
+            model_name: "post".into(),
+            constraint_name: "price_positive".into(),
+            constraint_sql: "\"price_positive\" CHECK (\"price\" > 0)".into(),
+        };
+        let sqls = op
+            .database_forwards(
+                "blog",
+                &pg_editor(),
+                &ProjectState::new(),
+                &ProjectState::new(),
+            )
+            .unwrap();
+        assert!(sqls[0].contains("ALTER TABLE"));
+        assert!(sqls[0].contains("ADD CONSTRAINT"));
+        assert!(sqls[0].contains("CHECK"));
+    }
+
+    #[test]
+    fn test_add_constraint_database_backwards() {
+        let op = AddConstraint {
+            model_name: "post".into(),
+            constraint_name: "price_positive".into(),
+            constraint_sql: "\"price_positive\" CHECK (\"price\" > 0)".into(),
+        };
+        let sqls = op
+            .database_backwards(
+                "blog",
+                &pg_editor(),
+                &ProjectState::new(),
+                &ProjectState::new(),
+            )
+            .unwrap();
+        assert!(sqls[0].contains("DROP CONSTRAINT"));
+        assert!(sqls[0].contains("price_positive"));
+    }
+
+    #[test]
+    fn test_add_constraint_reversible() {
+        let op = AddConstraint {
+            model_name: "post".into(),
+            constraint_name: "test".into(),
+            constraint_sql: "\"test\" CHECK (1=1)".into(),
+        };
+        assert!(op.reversible());
+    }
+
+    // ── RemoveConstraint ──────────────────────────────────────────
+
+    #[test]
+    fn test_remove_constraint_describe() {
+        let op = RemoveConstraint {
+            model_name: "post".into(),
+            constraint_name: "price_positive".into(),
+            constraint_sql: "\"price_positive\" CHECK (\"price\" > 0)".into(),
+        };
+        assert_eq!(op.describe(), "Remove constraint price_positive from post");
+    }
+
+    #[test]
+    fn test_remove_constraint_database_forwards() {
+        let op = RemoveConstraint {
+            model_name: "post".into(),
+            constraint_name: "price_positive".into(),
+            constraint_sql: "\"price_positive\" CHECK (\"price\" > 0)".into(),
+        };
+        let sqls = op
+            .database_forwards(
+                "blog",
+                &pg_editor(),
+                &ProjectState::new(),
+                &ProjectState::new(),
+            )
+            .unwrap();
+        assert!(sqls[0].contains("DROP CONSTRAINT"));
+    }
+
+    #[test]
+    fn test_remove_constraint_database_backwards() {
+        let op = RemoveConstraint {
+            model_name: "post".into(),
+            constraint_name: "price_positive".into(),
+            constraint_sql: "\"price_positive\" CHECK (\"price\" > 0)".into(),
+        };
+        let sqls = op
+            .database_backwards(
+                "blog",
+                &pg_editor(),
+                &ProjectState::new(),
+                &ProjectState::new(),
+            )
+            .unwrap();
+        assert!(sqls[0].contains("ADD CONSTRAINT"));
+        assert!(sqls[0].contains("CHECK"));
+    }
+
+    #[test]
+    fn test_remove_constraint_reversible() {
+        let op = RemoveConstraint {
+            model_name: "post".into(),
+            constraint_name: "test".into(),
+            constraint_sql: "\"test\" CHECK (1=1)".into(),
+        };
+        assert!(op.reversible());
     }
 
     // ── RunSQL ──────────────────────────────────────────────────────

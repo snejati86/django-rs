@@ -504,6 +504,10 @@ mod tests {
                     fields: vec!["title".into()],
                     unique: false,
                     index_type: IndexType::default(),
+                    concurrently: false,
+                    expressions: Vec::new(),
+                    include: Vec::new(),
+                    condition: None,
                 },
             },
             SquashableOp::RemoveIndex {
@@ -687,6 +691,10 @@ mod tests {
                 fields: vec!["title".into()],
                 unique: false,
                 index_type: IndexType::default(),
+                concurrently: false,
+                expressions: Vec::new(),
+                include: Vec::new(),
+                condition: None,
             },
         };
         let boxed = op.to_operation();

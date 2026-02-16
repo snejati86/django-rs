@@ -479,6 +479,10 @@ mod tests {
                         fields: vec!["email".into()],
                         unique: true,
                         index_type: IndexType::default(),
+                        concurrently: false,
+                        expressions: Vec::new(),
+                        include: Vec::new(),
+                        condition: None,
                     },
                 },
                 SerializableOperation::RemoveIndex {
@@ -814,6 +818,10 @@ mod tests {
             fields: vec!["email".into()],
             unique: true,
             index_type: IndexType::default(),
+            concurrently: false,
+            expressions: Vec::new(),
+            include: Vec::new(),
+            condition: None,
         };
         let json = serde_json::to_string(&index).unwrap();
         let deserialized: Index = serde_json::from_str(&json).unwrap();

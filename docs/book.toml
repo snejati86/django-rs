@@ -1,0 +1,14 @@
+[book]
+title = "django-rs Tutorial"
+authors = ["Sina Nejati"]
+language = "en"
+src = "src"
+
+[build]
+build-dir = "book"
+
+[output.html]
+default-theme = "rust"
+preferred-dark-theme = "ayu"
+git-repository-url = "https://github.com/snejati86/django-rs"
+edit-url-template = "https://github.com/snejati86/django-rs/edit/main/docs/{path}"

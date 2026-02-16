@@ -11,14 +11,15 @@ Cargo.lock
 admin-frontend/dist/
 admin-frontend/node_modules/
 node_modules/
+docs/book/
 
-# Internal docs and benchmarks
-docs/
+# Internal analysis
+.internal-docs/
 examples/crm-benchmark/
 
 # Tool artifacts
 .playwright-mcp/
 .dockerignore
 
-# Images
-*.png
+# Root-level images (not docs screenshots)
+/admin-initial.png

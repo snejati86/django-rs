@@ -266,6 +266,10 @@ pub fn derive_model_impl(input: DeriveInput) -> TokenStream {
                     fields: vec![#field_name.to_string()],
                     unique: false,
                     index_type: django_rs_db::model::IndexType::BTree,
+                    concurrently: false,
+                    expressions: Vec::new(),
+                    include: Vec::new(),
+                    condition: None,
                 }
             }
         })
@@ -284,6 +288,10 @@ pub fn derive_model_impl(input: DeriveInput) -> TokenStream {
                     fields: vec![#field_name.to_string()],
                     unique: true,
                     index_type: django_rs_db::model::IndexType::BTree,
+                    concurrently: false,
+                    expressions: Vec::new(),
+                    include: Vec::new(),
+                    condition: None,
                 }
             }
         })

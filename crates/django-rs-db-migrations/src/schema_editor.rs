@@ -52,6 +52,12 @@ pub trait SchemaEditor: Send + Sync {
     /// Generates a `UNIQUE` constraint DDL.
     fn add_unique_constraint(&self, table_name: &str, columns: &[&str]) -> Vec<String>;
 
+    /// Generates `ALTER TABLE ... ADD CONSTRAINT` DDL.
+    fn add_constraint(&self, table_name: &str, constraint_sql: &str) -> Vec<String>;
+
+    /// Generates `ALTER TABLE ... DROP CONSTRAINT` DDL.
+    fn drop_constraint(&self, table_name: &str, constraint_name: &str) -> Vec<String>;
+
     /// Generates the SQL fragment for a column definition (type, constraints).
     fn column_sql(&self, field: &FieldDef) -> String;
 }
@@ -219,11 +225,33 @@ impl SchemaEditor for PostgresSchemaEditor {
     fn create_index(&self, table_name: &str, index: &Index) -> Vec<String> {
         let idx_name = index.name.as_deref().unwrap_or("unnamed_index");
         let unique = if index.unique { "UNIQUE " } else { "" };
-        let cols: Vec<String> = index.fields.iter().map(|f| format!("\"{f}\"")).collect();
-        vec![format!(
-            "CREATE {unique}INDEX \"{idx_name}\" ON \"{table_name}\" ({})",
-            cols.join(", ")
-        )]
+        let concurrently = if index.concurrently {
+            "CONCURRENTLY "
+        } else {
+            ""
+        };
+
+        let mut index_cols: Vec<String> = index.fields.iter().map(|f| format!("\"{f}\"")).collect();
+        index_cols.extend(index.expressions.iter().cloned());
+
+        let using = index.index_type.sql_using_clause();
+
+        let mut sql = format!(
+            "CREATE {unique}INDEX {concurrently}\"{idx_name}\" ON \"{table_name}\" {using} ({})",
+            index_cols.join(", ")
+        );
+
+        if !index.include.is_empty() {
+            let include_cols: Vec<String> =
+                index.include.iter().map(|f| format!("\"{f}\"")).collect();
+            sql.push_str(&format!(" INCLUDE ({})", include_cols.join(", ")));
+        }
+
+        if let Some(ref cond) = index.condition {
+            sql.push_str(&format!(" WHERE {cond}"));
+        }
+
+        vec![sql]
     }
 
     fn drop_index(&self, index_name: &str) -> Vec<String> {
@@ -236,6 +264,18 @@ impl SchemaEditor for PostgresSchemaEditor {
         vec![format!(
             "ALTER TABLE \"{table_name}\" ADD CONSTRAINT \"{constraint_name}\" UNIQUE ({})",
             cols.join(", ")
+        )]
+    }
+
+    fn add_constraint(&self, table_name: &str, constraint_sql: &str) -> Vec<String> {
+        vec![format!(
+            "ALTER TABLE \"{table_name}\" ADD CONSTRAINT {constraint_sql}"
+        )]
+    }
+
+    fn drop_constraint(&self, table_name: &str, constraint_name: &str) -> Vec<String> {
+        vec![format!(
+            "ALTER TABLE \"{table_name}\" DROP CONSTRAINT \"{constraint_name}\""
         )]
     }
 
@@ -423,11 +463,20 @@ impl SchemaEditor for SqliteSchemaEditor {
     fn create_index(&self, table_name: &str, index: &Index) -> Vec<String> {
         let idx_name = index.name.as_deref().unwrap_or("unnamed_index");
         let unique = if index.unique { "UNIQUE " } else { "" };
-        let cols: Vec<String> = index.fields.iter().map(|f| format!("\"{f}\"")).collect();
-        vec![format!(
+
+        let mut index_cols: Vec<String> = index.fields.iter().map(|f| format!("\"{f}\"")).collect();
+        index_cols.extend(index.expressions.iter().cloned());
+
+        let mut sql = format!(
             "CREATE {unique}INDEX \"{idx_name}\" ON \"{table_name}\" ({})",
-            cols.join(", ")
-        )]
+            index_cols.join(", ")
+        );
+
+        if let Some(ref cond) = index.condition {
+            sql.push_str(&format!(" WHERE {cond}"));
+        }
+
+        vec![sql]
     }
 
     fn drop_index(&self, index_name: &str) -> Vec<String> {
@@ -442,6 +491,17 @@ impl SchemaEditor for SqliteSchemaEditor {
             "CREATE UNIQUE INDEX \"{idx_name}\" ON \"{table_name}\" ({})",
             cols.join(", ")
         )]
+    }
+
+    fn add_constraint(&self, table_name: &str, constraint_sql: &str) -> Vec<String> {
+        // SQLite doesn't support ADD CONSTRAINT; use table recreation
+        vec![format!(
+            "-- SQLite: recreate table to add constraint on \"{table_name}\": {constraint_sql}"
+        )]
+    }
+
+    fn drop_constraint(&self, table_name: &str, constraint_name: &str) -> Vec<String> {
+        vec![format!("-- SQLite: recreate table to drop constraint \"{constraint_name}\" on \"{table_name}\"")]
     }
 
     fn column_sql(&self, field: &FieldDef) -> String {
@@ -623,6 +683,18 @@ impl SchemaEditor for MySqlSchemaEditor {
         vec![format!(
             "ALTER TABLE `{table_name}` ADD CONSTRAINT `{constraint_name}` UNIQUE ({})",
             cols.join(", ")
+        )]
+    }
+
+    fn add_constraint(&self, table_name: &str, constraint_sql: &str) -> Vec<String> {
+        vec![format!(
+            "ALTER TABLE `{table_name}` ADD CONSTRAINT {constraint_sql}"
+        )]
+    }
+
+    fn drop_constraint(&self, table_name: &str, constraint_name: &str) -> Vec<String> {
+        vec![format!(
+            "ALTER TABLE `{table_name}` DROP CONSTRAINT `{constraint_name}`"
         )]
     }
 
@@ -1029,11 +1101,15 @@ mod tests {
             fields: vec!["title".into()],
             unique: false,
             index_type: IndexType::default(),
+            concurrently: false,
+            expressions: Vec::new(),
+            include: Vec::new(),
+            condition: None,
         };
         let sqls = pg().create_index("blog_post", &idx);
         assert_eq!(
             sqls,
-            vec!["CREATE INDEX \"idx_title\" ON \"blog_post\" (\"title\")"]
+            vec!["CREATE INDEX \"idx_title\" ON \"blog_post\" USING btree (\"title\")"]
         );
     }
 
@@ -1044,6 +1120,10 @@ mod tests {
             fields: vec!["email".into()],
             unique: true,
             index_type: IndexType::default(),
+            concurrently: false,
+            expressions: Vec::new(),
+            include: Vec::new(),
+            condition: None,
         };
         let sqls = pg().create_index("users", &idx);
         assert!(sqls[0].contains("UNIQUE INDEX"));
@@ -1180,6 +1260,10 @@ mod tests {
             fields: vec!["title".into()],
             unique: false,
             index_type: IndexType::default(),
+            concurrently: false,
+            expressions: Vec::new(),
+            include: Vec::new(),
+            condition: None,
         };
         let sqls = sqlite().create_index("blog_post", &idx);
         assert!(sqls[0].contains("CREATE INDEX"));
@@ -1346,6 +1430,10 @@ mod tests {
             fields: vec!["title".into()],
             unique: false,
             index_type: IndexType::default(),
+            concurrently: false,
+            expressions: Vec::new(),
+            include: Vec::new(),
+            condition: None,
         };
         let sqls = mysql().create_index("blog_post", &idx);
         assert!(sqls[0].contains("CREATE INDEX `idx_title`"));
@@ -1362,6 +1450,53 @@ mod tests {
         let sqls = mysql().add_unique_constraint("blog_post", &["a", "b"]);
         assert!(sqls[0].contains("UNIQUE"));
         assert!(sqls[0].contains("`a`"));
+    }
+
+    // ── Constraint operations ──────────────────────────────────────
+
+    #[test]
+    fn test_pg_add_constraint() {
+        let sqls = pg().add_constraint("blog_post", "\"price_positive\" CHECK (\"price\" > 0)");
+        assert_eq!(
+            sqls,
+            vec![
+                "ALTER TABLE \"blog_post\" ADD CONSTRAINT \"price_positive\" CHECK (\"price\" > 0)"
+            ]
+        );
+    }
+
+    #[test]
+    fn test_pg_drop_constraint() {
+        let sqls = pg().drop_constraint("blog_post", "price_positive");
+        assert_eq!(
+            sqls,
+            vec!["ALTER TABLE \"blog_post\" DROP CONSTRAINT \"price_positive\""]
+        );
+    }
+
+    #[test]
+    fn test_sqlite_add_constraint() {
+        let sqls = sqlite().add_constraint("blog_post", "\"test\" CHECK (1=1)");
+        assert!(sqls[0].contains("SQLite"));
+        assert!(sqls[0].contains("recreate"));
+    }
+
+    #[test]
+    fn test_sqlite_drop_constraint() {
+        let sqls = sqlite().drop_constraint("blog_post", "test");
+        assert!(sqls[0].contains("SQLite"));
+    }
+
+    #[test]
+    fn test_mysql_add_constraint() {
+        let sqls = mysql().add_constraint("blog_post", "\"test\" CHECK (1=1)");
+        assert!(sqls[0].contains("ADD CONSTRAINT"));
+    }
+
+    #[test]
+    fn test_mysql_drop_constraint() {
+        let sqls = mysql().drop_constraint("blog_post", "test");
+        assert!(sqls[0].contains("DROP CONSTRAINT"));
     }
 
     // ── Cross-backend comparison ────────────────────────────────────
@@ -1450,5 +1585,88 @@ mod tests {
     #[test]
     fn test_on_delete_do_nothing() {
         assert_eq!(on_delete_sql(OnDelete::DoNothing), "NO ACTION");
+    }
+
+    // ── Advanced index features ───────────────────────────────────────
+
+    #[test]
+    fn test_pg_create_index_concurrently() {
+        let idx = Index {
+            name: Some("idx_concurrent".into()),
+            fields: vec!["title".into()],
+            unique: false,
+            index_type: IndexType::default(),
+            concurrently: true,
+            expressions: Vec::new(),
+            include: Vec::new(),
+            condition: None,
+        };
+        let sqls = pg().create_index("blog_post", &idx);
+        assert!(sqls[0].contains("CONCURRENTLY"));
+    }
+
+    #[test]
+    fn test_pg_create_index_expression() {
+        let idx = Index {
+            name: Some("idx_lower_email".into()),
+            fields: Vec::new(),
+            unique: true,
+            index_type: IndexType::default(),
+            concurrently: false,
+            expressions: vec!["LOWER(\"email\")".to_string()],
+            include: Vec::new(),
+            condition: None,
+        };
+        let sqls = pg().create_index("users", &idx);
+        assert!(sqls[0].contains("LOWER(\"email\")"));
+    }
+
+    #[test]
+    fn test_pg_create_index_covering() {
+        let idx = Index {
+            name: Some("idx_cover".into()),
+            fields: vec!["title".into()],
+            unique: false,
+            index_type: IndexType::default(),
+            concurrently: false,
+            expressions: Vec::new(),
+            include: vec!["body".into()],
+            condition: None,
+        };
+        let sqls = pg().create_index("blog_post", &idx);
+        assert!(sqls[0].contains("INCLUDE (\"body\")"));
+    }
+
+    #[test]
+    fn test_pg_create_index_partial() {
+        let idx = Index {
+            name: Some("idx_partial".into()),
+            fields: vec!["email".into()],
+            unique: true,
+            index_type: IndexType::default(),
+            concurrently: false,
+            expressions: Vec::new(),
+            include: Vec::new(),
+            condition: Some("\"is_active\" = TRUE".to_string()),
+        };
+        let sqls = pg().create_index("users", &idx);
+        assert!(sqls[0].contains("WHERE \"is_active\" = TRUE"));
+    }
+
+    #[test]
+    fn test_sqlite_create_index_partial() {
+        let idx = Index {
+            name: Some("idx_partial".into()),
+            fields: vec!["email".into()],
+            unique: true,
+            index_type: IndexType::default(),
+            concurrently: false,
+            expressions: Vec::new(),
+            include: Vec::new(),
+            condition: Some("\"is_active\" = 1".to_string()),
+        };
+        let sqls = sqlite().create_index("users", &idx);
+        assert!(sqls[0].contains("WHERE"));
+        assert!(!sqls[0].contains("CONCURRENTLY")); // SQLite doesn't support CONCURRENTLY
     }
 }
