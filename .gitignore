@@ -6,3 +6,19 @@ Cargo.lock
 .env
 .idea/
 .vscode/
+
+# Build artifacts
+admin-frontend/dist/
+admin-frontend/node_modules/
+node_modules/
+
+# Internal docs and benchmarks
+docs/
+examples/crm-benchmark/
+
+# Tool artifacts
+.playwright-mcp/
+.dockerignore
+
+# Images
+*.png

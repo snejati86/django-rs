@@ -9,15 +9,18 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use axum::extract::{Path, Query, State};
+use axum::http::StatusCode;
 use axum::response::IntoResponse;
-use axum::routing::get;
+use axum::routing::{get, post};
 use axum::Router;
 use serde::Deserialize;
 
 use crate::actions::ActionRegistry;
 use crate::api::{
-    build_model_index, CurrentUserResponse, ListParams, ModelSchemaResponse,
+    build_model_index, CurrentUserResponse, LoginRequest, LoginResponse, ModelSchemaResponse,
 };
+use crate::db::{AdminDbExecutor, AdminListParams, InMemoryAdminDb};
+use crate::log_entry::{InMemoryLogEntryStore, LogEntryStore};
 use crate::model_admin::ModelAdmin;
 
 /// The admin site, responsible for model registration and route generation.
@@ -47,6 +50,10 @@ pub struct AdminSite {
     static_dir: Option<PathBuf>,
     /// Action registries per model key.
     action_registries: HashMap<String, ActionRegistry>,
+    /// Optional database executor for CRUD operations.
+    db: Option<Arc<dyn AdminDbExecutor>>,
+    /// Optional log entry store for audit trail.
+    log_store: Option<Arc<dyn LogEntryStore>>,
 }
 
 impl AdminSite {
@@ -60,6 +67,8 @@ impl AdminSite {
             registered_models: HashMap::new(),
             static_dir: None,
             action_registries: HashMap::new(),
+            db: None,
+            log_store: None,
         }
     }
 
@@ -74,6 +83,20 @@ impl AdminSite {
     #[must_use]
     pub fn static_dir(mut self, dir: PathBuf) -> Self {
         self.static_dir = Some(dir);
+        self
+    }
+
+    /// Sets the database executor for CRUD operations.
+    #[must_use]
+    pub fn db(mut self, db: Arc<dyn AdminDbExecutor>) -> Self {
+        self.db = Some(db);
+        self
+    }
+
+    /// Sets the log entry store for the audit trail.
+    #[must_use]
+    pub fn log_store(mut self, store: Arc<dyn LogEntryStore>) -> Self {
+        self.log_store = Some(store);
         self
     }
 
@@ -145,25 +168,53 @@ impl AdminSite {
     ///
     /// The generated routes are:
     ///
+    /// - `POST /login/` - Authenticate and get token
+    /// - `POST /logout/` - Invalidate session
     /// - `GET /` - List all registered models
     /// - `GET /me/` - Current user info
+    /// - `GET /log/` - Recent log entries
+    /// - `GET /log/:ct/:id/` - Log entries for a specific object
     /// - `GET /:app/:model/schema` - Model schema/introspection
     /// - `GET /:app/:model/` - List objects (paginated)
+    /// - `POST /:app/:model/` - Create a new object
     /// - `GET /:app/:model/:pk/` - Get single object
+    /// - `PUT /:app/:model/:pk/` - Update an object
+    /// - `DELETE /:app/:model/:pk/` - Delete an object
     /// - `POST /:app/:model/action/` - Execute bulk action
     pub fn into_axum_router(self) -> Router {
+        let db: Arc<dyn AdminDbExecutor> = self
+            .db
+            .unwrap_or_else(|| Arc::new(InMemoryAdminDb::new()));
+        let log_store: Arc<dyn LogEntryStore> = self
+            .log_store
+            .unwrap_or_else(|| Arc::new(InMemoryLogEntryStore::new()));
+
         let shared = Arc::new(AdminSiteState {
             registered_models: self.registered_models,
             url_prefix: self.url_prefix,
             name: self.name,
+            db,
+            log_store,
         });
 
         Router::new()
+            .route("/login/", post(handle_login))
+            .route("/logout/", post(handle_logout))
             .route("/", get(handle_index))
             .route("/me/", get(handle_me))
+            .route("/log/", get(handle_log_recent))
+            .route("/log/{ct}/{id}/", get(handle_log_object))
             .route("/{app}/{model}/schema", get(handle_schema))
-            .route("/{app}/{model}/", get(handle_list))
-            .route("/{app}/{model}/{pk}/", get(handle_detail))
+            .route(
+                "/{app}/{model}/",
+                get(handle_list).post(handle_create),
+            )
+            .route(
+                "/{app}/{model}/{pk}/",
+                get(handle_detail)
+                    .put(handle_update)
+                    .delete(handle_delete),
+            )
             .with_state(shared)
     }
 }
@@ -184,7 +235,46 @@ struct AdminSiteState {
     registered_models: HashMap<String, ModelAdmin>,
     url_prefix: String,
     name: String,
+    db: Arc<dyn AdminDbExecutor>,
+    log_store: Arc<dyn LogEntryStore>,
 }
+
+// ── Authentication Handlers ────────────────────────────────────────
+
+/// Handler for `POST /login/` - authenticate with username/password.
+async fn handle_login(
+    axum::Json(payload): axum::Json<LoginRequest>,
+) -> impl IntoResponse {
+    // Hardcoded admin/admin for development
+    if payload.username == "admin" && payload.password == "admin" {
+        let response = LoginResponse {
+            token: "django-rs-dev-token-admin".to_string(),
+            user: CurrentUserResponse {
+                username: "admin".to_string(),
+                email: "admin@example.com".to_string(),
+                is_staff: true,
+                is_superuser: true,
+                full_name: "Admin User".to_string(),
+            },
+        };
+        axum::Json(serde_json::to_value(response).unwrap_or_default()).into_response()
+    } else {
+        (
+            StatusCode::UNAUTHORIZED,
+            axum::Json(serde_json::json!({
+                "error": "Invalid credentials"
+            })),
+        )
+            .into_response()
+    }
+}
+
+/// Handler for `POST /logout/` - invalidate session.
+async fn handle_logout() -> impl IntoResponse {
+    StatusCode::NO_CONTENT
+}
+
+// ── Index / Me Handlers ────────────────────────────────────────────
 
 /// Handler for `GET /` - list all registered models.
 async fn handle_index(State(state): State<Arc<AdminSiteState>>) -> impl IntoResponse {
@@ -198,7 +288,6 @@ async fn handle_index(State(state): State<Arc<AdminSiteState>>) -> impl IntoResp
 
 /// Handler for `GET /me/` - current user info placeholder.
 async fn handle_me() -> impl IntoResponse {
-    // In a real implementation this would extract the user from the request session/token.
     let user = CurrentUserResponse {
         username: "admin".to_string(),
         email: "admin@example.com".to_string(),
@@ -208,6 +297,35 @@ async fn handle_me() -> impl IntoResponse {
     };
     axum::Json(user)
 }
+
+// ── Log Entry Handlers ─────────────────────────────────────────────
+
+/// Query parameters for the log endpoint.
+#[derive(Debug, Deserialize)]
+struct LogQueryParams {
+    limit: Option<usize>,
+}
+
+/// Handler for `GET /log/` - recent log entries.
+async fn handle_log_recent(
+    State(state): State<Arc<AdminSiteState>>,
+    Query(query): Query<LogQueryParams>,
+) -> impl IntoResponse {
+    let limit = query.limit.unwrap_or(10);
+    let entries = state.log_store.recent(limit);
+    axum::Json(serde_json::to_value(entries).unwrap_or_default())
+}
+
+/// Handler for `GET /log/:ct/:id/` - log entries for a specific object.
+async fn handle_log_object(
+    State(state): State<Arc<AdminSiteState>>,
+    Path((ct, id)): Path<(String, String)>,
+) -> impl IntoResponse {
+    let entries = state.log_store.get_for_object(&ct, &id);
+    axum::Json(serde_json::to_value(entries).unwrap_or_default())
+}
+
+// ── Schema / List / Detail / CRUD Handlers ─────────────────────────
 
 /// Query parameters for the list endpoint.
 #[derive(Debug, Deserialize)]
@@ -226,10 +344,13 @@ async fn handle_schema(
     let key = format!("{app}.{model}");
     state.registered_models.get(&key).map_or_else(
         || {
-            axum::Json(serde_json::json!({
-                "error": format!("Model '{key}' not found")
-            }))
-            .into_response()
+            (
+                StatusCode::NOT_FOUND,
+                axum::Json(serde_json::json!({
+                    "error": format!("Model '{key}' not found")
+                })),
+            )
+                .into_response()
         },
         |admin| {
             let schema = ModelSchemaResponse::from_model_admin(admin);
@@ -247,26 +368,32 @@ async fn handle_list(
     let key = format!("{app}.{model}");
     match state.registered_models.get(&key) {
         Some(admin) => {
-            let params = ListParams {
+            let params = AdminListParams {
                 page: query.page.unwrap_or(1),
                 page_size: query.page_size.unwrap_or(admin.list_per_page),
                 search: query.search,
                 ordering: query.ordering,
                 filters: HashMap::new(),
             };
-            // In a real implementation, objects would come from the database.
-            let objects = Vec::new();
-            let response =
-                crate::api::process_list_request(admin, objects, &params).await;
-            axum::Json(
-                serde_json::to_value(response).unwrap_or_default(),
-            )
-            .into_response()
+            match state.db.list_objects(admin, &params).await {
+                Ok(result) => axum::Json(
+                    serde_json::to_value(result.response).unwrap_or_default(),
+                )
+                .into_response(),
+                Err(e) => (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    axum::Json(serde_json::json!({"error": e})),
+                )
+                    .into_response(),
+            }
         }
-        None => axum::Json(serde_json::json!({
-            "error": format!("Model '{key}' not found")
-        }))
-        .into_response(),
+        None => (
+            StatusCode::NOT_FOUND,
+            axum::Json(serde_json::json!({
+                "error": format!("Model '{key}' not found")
+            })),
+        )
+            .into_response(),
     }
 }
 
@@ -276,19 +403,147 @@ async fn handle_detail(
     Path((app, model, pk)): Path<(String, String, String)>,
 ) -> impl IntoResponse {
     let key = format!("{app}.{model}");
-    if state.registered_models.contains_key(&key) {
-        // In a real implementation, this would fetch the object from the database.
-        axum::Json(serde_json::json!({
-            "model": key,
-            "pk": pk,
-            "detail": "Object detail placeholder"
-        }))
-        .into_response()
-    } else {
-        axum::Json(serde_json::json!({
-            "error": format!("Model '{key}' not found")
-        }))
-        .into_response()
+    match state.registered_models.get(&key) {
+        Some(admin) => match state.db.get_object(admin, &pk).await {
+            Ok(obj) => axum::Json(obj).into_response(),
+            Err(e) => (
+                StatusCode::NOT_FOUND,
+                axum::Json(serde_json::json!({"error": e})),
+            )
+                .into_response(),
+        },
+        None => (
+            StatusCode::NOT_FOUND,
+            axum::Json(serde_json::json!({
+                "error": format!("Model '{key}' not found")
+            })),
+        )
+            .into_response(),
+    }
+}
+
+/// Handler for `POST /:app/:model/` - create a new object.
+async fn handle_create(
+    State(state): State<Arc<AdminSiteState>>,
+    Path((app, model)): Path<(String, String)>,
+    axum::Json(body): axum::Json<HashMap<String, serde_json::Value>>,
+) -> impl IntoResponse {
+    let key = format!("{app}.{model}");
+    match state.registered_models.get(&key) {
+        Some(admin) => match state.db.create_object(admin, &body).await {
+            Ok(obj) => {
+                let pk = obj
+                    .get("id")
+                    .map(|v| v.to_string())
+                    .unwrap_or_default();
+                let repr = obj
+                    .get("title")
+                    .or_else(|| obj.get("name"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("object")
+                    .to_string();
+                state.log_store.log_addition(1, &key, &pk, &repr, "Created via admin");
+                (StatusCode::CREATED, axum::Json(obj)).into_response()
+            }
+            Err(e) => (
+                StatusCode::BAD_REQUEST,
+                axum::Json(serde_json::json!({"error": e})),
+            )
+                .into_response(),
+        },
+        None => (
+            StatusCode::NOT_FOUND,
+            axum::Json(serde_json::json!({
+                "error": format!("Model '{key}' not found")
+            })),
+        )
+            .into_response(),
+    }
+}
+
+/// Handler for `PUT /:app/:model/:pk/` - update an object.
+async fn handle_update(
+    State(state): State<Arc<AdminSiteState>>,
+    Path((app, model, pk)): Path<(String, String, String)>,
+    axum::Json(body): axum::Json<HashMap<String, serde_json::Value>>,
+) -> impl IntoResponse {
+    let key = format!("{app}.{model}");
+    match state.registered_models.get(&key) {
+        Some(admin) => match state.db.update_object(admin, &pk, &body).await {
+            Ok(obj) => {
+                let repr = obj
+                    .get("title")
+                    .or_else(|| obj.get("name"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("object")
+                    .to_string();
+                let changed: Vec<String> = body.keys().cloned().collect();
+                let msg = format!("Changed {}", changed.join(", "));
+                state.log_store.log_change(1, &key, &pk, &repr, &msg);
+                axum::Json(obj).into_response()
+            }
+            Err(e) => (
+                StatusCode::NOT_FOUND,
+                axum::Json(serde_json::json!({"error": e})),
+            )
+                .into_response(),
+        },
+        None => (
+            StatusCode::NOT_FOUND,
+            axum::Json(serde_json::json!({
+                "error": format!("Model '{key}' not found")
+            })),
+        )
+            .into_response(),
+    }
+}
+
+/// Handler for `DELETE /:app/:model/:pk/` - delete an object.
+async fn handle_delete(
+    State(state): State<Arc<AdminSiteState>>,
+    Path((app, model, pk)): Path<(String, String, String)>,
+) -> impl IntoResponse {
+    let key = format!("{app}.{model}");
+    match state.registered_models.get(&key) {
+        Some(admin) => {
+            // Try to get the object repr before deleting
+            let repr = state
+                .db
+                .get_object(admin, &pk)
+                .await
+                .ok()
+                .and_then(|obj| {
+                    obj.get("title")
+                        .or_else(|| obj.get("name"))
+                        .and_then(|v| v.as_str())
+                        .map(String::from)
+                })
+                .unwrap_or_else(|| format!("{key} object"));
+
+            match state.db.delete_object(admin, &pk).await {
+                Ok(true) => {
+                    state.log_store.log_deletion(1, &key, &pk, &repr, "");
+                    StatusCode::NO_CONTENT.into_response()
+                }
+                Ok(false) => (
+                    StatusCode::NOT_FOUND,
+                    axum::Json(serde_json::json!({"error": "Object not found"})),
+                )
+                    .into_response(),
+                Err(e) => (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    axum::Json(serde_json::json!({"error": e})),
+                )
+                    .into_response(),
+            }
+        }
+        None => (
+            StatusCode::NOT_FOUND,
+            axum::Json(serde_json::json!({
+                "error": format!("Model '{key}' not found")
+            })),
+        )
+            .into_response(),
     }
 }
 
@@ -443,5 +698,16 @@ mod tests {
         site.register("blog.comment", ModelAdmin::new("blog", "comment"));
         site.register("auth.user", ModelAdmin::new("auth", "user"));
         assert_eq!(site.model_count(), 3);
+    }
+
+    #[test]
+    fn test_admin_site_with_db_and_log_store() {
+        let db = Arc::new(InMemoryAdminDb::new());
+        let log_store = Arc::new(InMemoryLogEntryStore::new());
+        let mut site = AdminSite::new("admin")
+            .db(db)
+            .log_store(log_store);
+        site.register("blog.article", ModelAdmin::new("blog", "article"));
+        let _router = site.into_axum_router();
     }
 }

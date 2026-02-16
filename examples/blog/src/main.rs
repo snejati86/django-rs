@@ -1,13 +1,6 @@
 //! # django-rs Blog Example
 //!
-//! A working blog application demonstrating the django-rs framework pipeline:
-//!
-//! - **Models**: `Post` and `Comment` implementing the `Model` trait
-//! - **Views**: Function-based views for listing, viewing, and creating posts
-//! - **Templates**: DTL-compatible templates with inheritance
-//! - **URLs**: Named URL patterns with path converters
-//! - **Settings**: Configurable via TOML or programmatic defaults
-//! - **CLI**: Management commands for running, checking, and managing data
+//! A working blog application with a fully functional admin dashboard.
 //!
 //! ## Running
 //!
@@ -15,27 +8,34 @@
 //! cargo run --package blog-example
 //! ```
 //!
-//! This example demonstrates the framework's API and patterns. It creates
-//! sample data, renders templates, and shows how the components connect.
+//! Then open <http://localhost:8000/admin/> in your browser.
+//! Login with **admin** / **admin**.
+//!
+//! ## Endpoints
+//!
+//! - `/admin/` - React admin dashboard (SPA)
+//! - `/api/admin/` - Admin REST API
+//! - `/api/admin/login/` - Login (POST)
+//! - `/api/admin/blog/post/` - Blog posts API
+//! - `/api/admin/blog/comment/` - Comments API
+//! - `/api/admin/auth/user/` - Users API
 
 mod models;
 mod settings;
 mod urls;
 mod views;
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
-use django_rs_cli::command::CommandRegistry;
-use django_rs_cli::commands::register_builtin_commands;
-use django_rs_db::model::Model;
-use django_rs_template::context::{Context, ContextValue};
-use django_rs_template::engine::Engine;
+use django_rs_admin::db::{AdminDbExecutor, InMemoryAdminDb};
+use django_rs_admin::log_entry::InMemoryLogEntryStore;
+use django_rs_admin::model_admin::{FieldSchema, ModelAdmin};
+use django_rs_admin::site::AdminSite;
+use tower_http::services::ServeDir;
 
-use models::{Comment, Post};
-use settings::{blog_settings, load_settings_from_toml};
-use views::{BlogStore, post_create_view, make_post_list_handler};
-
-fn main() {
+#[tokio::main]
+async fn main() {
     // Initialize logging
     tracing_subscriber::fmt()
         .with_env_filter(
@@ -44,295 +44,238 @@ fn main() {
         )
         .init();
 
-    // Load settings - try TOML first, fall back to programmatic defaults
-    let settings = if std::path::Path::new("blog.toml").exists() {
-        tracing::info!("Loading settings from blog.toml");
-        load_settings_from_toml("blog.toml")
-    } else {
-        blog_settings()
-    };
-    tracing::info!(
-        "Blog configured: debug={}, apps={:?}",
-        settings.debug,
-        settings.installed_apps
-    );
+    // ── 1. Create the shared database and log store ────────────────
 
-    // Create the template engine with inline templates for demonstration
-    let engine = create_engine();
+    let db = Arc::new(InMemoryAdminDb::new());
+    let log_store = Arc::new(InMemoryLogEntryStore::new());
 
-    // Create the data store with sample posts
-    let store = BlogStore::with_sample_data();
+    // ── 2. Register models with the admin site ─────────────────────
 
-    // Show the management command registry
-    demonstrate_cli(&settings);
+    let post_admin = ModelAdmin::new("blog", "post")
+        .verbose_name("Post")
+        .verbose_name_plural("Posts")
+        .list_display(vec!["id", "title", "author", "published", "created_at"])
+        .list_display_links(vec!["title"])
+        .search_fields(vec!["title", "content", "author"])
+        .list_filter_fields(vec!["published", "author"])
+        .ordering(vec!["-id"])
+        .list_per_page(25)
+        .fields_schema(vec![
+            FieldSchema::new("id", "BigAutoField").primary_key(),
+            FieldSchema::new("title", "CharField")
+                .max_length(200)
+                .label("Title"),
+            FieldSchema::new("content", "TextField")
+                .label("Content"),
+            FieldSchema::new("author", "CharField")
+                .max_length(100)
+                .label("Author"),
+            FieldSchema::new("published", "BooleanField")
+                .label("Published"),
+            FieldSchema::new("created_at", "DateTimeField")
+                .label("Created at")
+                .read_only(),
+        ]);
 
-    // Show the URL resolver
-    demonstrate_urls(&store, &engine);
+    let comment_admin = ModelAdmin::new("blog", "comment")
+        .verbose_name("Comment")
+        .verbose_name_plural("Comments")
+        .list_display(vec!["id", "post_id", "author", "content", "created_at"])
+        .list_display_links(vec!["content"])
+        .search_fields(vec!["author", "content"])
+        .list_filter_fields(vec!["author"])
+        .ordering(vec!["-id"])
+        .list_per_page(25)
+        .fields_schema(vec![
+            FieldSchema::new("id", "BigAutoField").primary_key(),
+            FieldSchema::new("post_id", "BigIntegerField")
+                .label("Post ID"),
+            FieldSchema::new("author", "CharField")
+                .max_length(100)
+                .label("Author"),
+            FieldSchema::new("content", "TextField")
+                .label("Content"),
+            FieldSchema::new("created_at", "DateTimeField")
+                .label("Created at")
+                .read_only(),
+        ]);
 
-    // Demonstrate template rendering
-    demonstrate_templates(&engine);
+    let user_admin = ModelAdmin::new("auth", "user")
+        .verbose_name("User")
+        .verbose_name_plural("Users")
+        .list_display(vec!["id", "username", "email", "is_staff", "is_active"])
+        .list_display_links(vec!["username"])
+        .search_fields(vec!["username", "email"])
+        .list_filter_fields(vec!["is_staff", "is_active"])
+        .ordering(vec!["id"])
+        .list_per_page(25)
+        .fields_schema(vec![
+            FieldSchema::new("id", "BigAutoField").primary_key(),
+            FieldSchema::new("username", "CharField")
+                .max_length(150)
+                .label("Username"),
+            FieldSchema::new("email", "EmailField")
+                .max_length(254)
+                .label("Email address"),
+            FieldSchema::new("is_staff", "BooleanField")
+                .label("Staff status"),
+            FieldSchema::new("is_active", "BooleanField")
+                .label("Active"),
+        ]);
 
-    // Demonstrate the model API
-    demonstrate_models();
+    let mut site = AdminSite::new("django-rs Blog Admin")
+        .db(db.clone() as Arc<dyn AdminDbExecutor>)
+        .log_store(log_store.clone() as Arc<dyn django_rs_admin::log_entry::LogEntryStore>);
 
-    // Demonstrate view functions
-    demonstrate_views();
+    site.register("blog.post", post_admin);
+    site.register("blog.comment", comment_admin);
+    site.register("auth.user", user_admin);
 
-    // Demonstrate email sending
-    demonstrate_email();
+    // ── 3. Seed sample data ────────────────────────────────────────
 
-    tracing::info!("Blog example complete!");
-}
+    seed_data(&db).await;
+    tracing::info!("Seeded sample data into InMemoryAdminDb");
 
-/// Creates the template engine with inline templates.
-fn create_engine() -> Engine {
-    let engine = Engine::new();
+    // ── 4. Build the combined Axum router ──────────────────────────
 
-    engine.add_string_template(
-        "base.html",
-        r#"<!DOCTYPE html>
-<html>
-<head><title>{% block title %}django-rs Blog{% endblock %}</title></head>
-<body>
-<nav><a href="/posts/">Home</a> | <a href="/posts/create/">New Post</a></nav>
-{% block content %}{% endblock %}
-<footer>Powered by django-rs</footer>
-</body>
-</html>"#,
-    );
+    let admin_router = site.into_axum_router();
 
-    engine.add_string_template(
-        "post_list.html",
-        r#"{% extends "base.html" %}
-{% block title %}{{ title }}{% endblock %}
-{% block content %}
-<h1>{{ title }}</h1>
-{% for post in posts %}<article><h2>{{ post.title }}</h2><p>{{ post.summary }}</p></article>
-{% endfor %}{% endblock %}"#,
-    );
+    // Resolve path to admin-frontend/dist/ relative to the workspace root
+    let manifest_dir = env!("CARGO_MANIFEST_DIR");
+    let spa_dir = std::path::Path::new(manifest_dir)
+        .join("../../admin-frontend/dist")
+        .canonicalize()
+        .unwrap_or_else(|_| {
+            std::path::PathBuf::from(manifest_dir).join("../../admin-frontend/dist")
+        });
 
-    engine.add_string_template(
-        "post_detail.html",
-        r#"{% extends "base.html" %}
-{% block title %}{{ post.title }}{% endblock %}
-{% block content %}
-<h1>{{ post.title }}</h1>
-<p>By {{ post.author }} on {{ post.created_at }}</p>
-<div>{{ post.content }}</div>
-{% endblock %}"#,
-    );
+    tracing::info!("Serving SPA from: {}", spa_dir.display());
 
-    engine
-}
+    // Serve the React SPA with fallback to index.html for client-side routing.
+    // With `base: '/admin/'` in vite.config.ts, all asset paths are prefixed
+    // with /admin/ so everything is served from the single nest_service.
+    let spa_service = ServeDir::new(&spa_dir)
+        .fallback(tower_http::services::ServeFile::new(spa_dir.join("index.html")));
 
-/// Demonstrates the CLI management command registry.
-fn demonstrate_cli(settings: &django_rs_core::Settings) {
-    tracing::info!("--- Management Commands ---");
-
-    let mut registry = CommandRegistry::new();
-    register_builtin_commands(&mut registry);
-
-    tracing::info!("Registered {} commands:", registry.len());
-    for name in registry.list_commands() {
-        if let Some(cmd) = registry.get(name) {
-            tracing::info!("  {} - {}", name, cmd.help());
-        }
-    }
-    tracing::info!("Total: {} commands registered\n", registry.len());
-
-    // Run the check command
-    let check_cmd = registry.get("check").unwrap();
-    let cli = clap::Command::new("blog")
-        .subcommand(check_cmd.add_arguments(clap::Command::new("check")));
-    if let Ok(matches) = cli.try_get_matches_from(["blog", "check"]) {
-        let (_, sub_matches) = matches.subcommand().unwrap();
-
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        match rt.block_on(check_cmd.handle(sub_matches, settings)) {
-            Ok(()) => tracing::info!("System check passed!"),
-            Err(e) => tracing::warn!("System check: {e}"),
-        }
-    }
-}
-
-/// Demonstrates URL routing.
-fn demonstrate_urls(store: &BlogStore, _engine: &Engine) {
-    tracing::info!("\n--- URL Routing ---");
-
-    let store_arc = Arc::new(store.clone());
-    let engine_arc = Arc::new(Engine::new());
-
-    let resolver = urls::blog_urls(store_arc, engine_arc);
-
-    // Resolve some URLs
-    for path in &["posts/", "posts/1/", "posts/42/", "posts/create/"] {
-        match resolver.resolve(path) {
-            Ok(matched) => {
-                tracing::info!(
-                    "  {} -> name={:?}, kwargs={:?}",
-                    path,
-                    matched.url_name,
-                    matched.kwargs,
-                );
-            }
-            Err(e) => tracing::warn!("  {} -> no match: {}", path, e),
-        }
-    }
-
-    // Reverse URL lookup
-    let empty_kwargs = std::collections::HashMap::new();
-    if let Ok(url) = django_rs_http::urls::reverse::reverse("post_list", &[], &empty_kwargs, &resolver) {
-        tracing::info!("  reverse('post_list') -> {url}");
-    }
-}
-
-/// Demonstrates template rendering.
-fn demonstrate_templates(engine: &Engine) {
-    tracing::info!("\n--- Template Rendering ---");
-
-    let mut ctx = Context::new();
-    ctx.set("title", ContextValue::String("Welcome".to_string()));
-
-    let mut posts = Vec::new();
-    let mut post_dict = std::collections::HashMap::new();
-    post_dict.insert("title".to_string(), ContextValue::String("First Post".to_string()));
-    post_dict.insert("summary".to_string(), ContextValue::String("A short summary...".to_string()));
-    post_dict.insert("author".to_string(), ContextValue::String("Alice".to_string()));
-    post_dict.insert("created_at".to_string(), ContextValue::String("2025-01-15".to_string()));
-    posts.push(ContextValue::Dict(post_dict));
-
-    ctx.set("posts", ContextValue::List(posts));
-
-    match engine.render_to_string("post_list.html", &mut ctx) {
-        Ok(html) => {
-            tracing::info!("Rendered post_list.html ({} bytes)", html.len());
-            // Show a snippet
-            let snippet: String = html.chars().take(200).collect();
-            tracing::info!("  Preview: {}...", snippet);
-        }
-        Err(e) => tracing::warn!("Template error: {e}"),
-    }
-}
-
-/// Demonstrates the Model API.
-fn demonstrate_models() {
-    tracing::info!("\n--- Model API ---");
-
-    // Create a post
-    let post = Post::new(
-        "Hello from django-rs",
-        "This is a demonstration of the Model API.",
-        "admin",
-    );
-    tracing::info!("Created post: {:?}", post.title);
-    tracing::info!("  Table: {}", Post::table_name());
-    tracing::info!("  App: {}", Post::app_label());
-    tracing::info!("  Fields: {}", Post::meta().fields.len());
-
-    let values = post.field_values();
-    tracing::info!("  Field values:");
-    for (name, value) in &values {
-        tracing::info!("    {} = {:?}", name, value);
-    }
-
-    // Create a comment
-    let comment = Comment::new(1, "Reader", "Great article!");
-    tracing::info!("\nCreated comment: {:?}", comment.content);
-    tracing::info!("  Table: {}", Comment::table_name());
-    tracing::info!("  Fields: {}", Comment::meta().fields.len());
-}
-
-/// Demonstrates view functions for creating posts and building handlers.
-fn demonstrate_views() {
-    tracing::info!("\n--- View Functions ---");
-
-    let mut store = BlogStore::with_sample_data();
-
-    // Demonstrate post creation via the view function
-    let response = post_create_view("Dynamic Post", "Created at runtime", "demo", &mut store);
-    tracing::info!("Create post response: status={}", response.status());
-
-    // Show that the store now has one more post
-    tracing::info!("Store now has {} published + unpublished posts", store.published_posts().len() + 1);
-
-    // Demonstrate the handler factory
-    let store_arc = Arc::new(store);
-    let engine_arc = Arc::new(Engine::new());
-    let handler = make_post_list_handler(Arc::clone(&store_arc), engine_arc);
-    tracing::info!("Created post list handler via factory (handler is Arc<dyn Fn>)");
-
-    // Use the handler
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    rt.block_on(async {
-        let request = django_rs_http::HttpRequest::builder().path("/posts/").build();
-        let response = (handler)(request).await;
-        tracing::info!("Handler response: status={}", response.status());
-    });
-}
-
-/// Demonstrates the email API.
-fn demonstrate_email() {
-    use django_rs_cli::email::InMemoryBackend;
-
-    tracing::info!("\n--- Email API ---");
-
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    rt.block_on(async {
-        let backend = InMemoryBackend::new();
-
-        // Send a welcome email
-        django_rs_cli::email::send_mail(
-            "Welcome to the Blog!",
-            "Thanks for joining our django-rs blog.",
-            "noreply@blog.example.com",
-            &["reader@example.com".to_string()],
-            &backend,
+    // Axum's `nest()` doesn't forward `/api/admin/` (with trailing slash)
+    // to the nested router's `/` route. Add an explicit redirect so the
+    // frontend's `GET /api/admin/` works correctly.
+    let app = axum::Router::new()
+        .nest("/api/admin", admin_router)
+        .route(
+            "/api/admin/",
+            axum::routing::get(|| async {
+                axum::response::Redirect::temporary("/api/admin")
+            }),
         )
-        .await
-        .unwrap();
+        .nest_service("/admin", spa_service);
 
-        tracing::info!(
-            "Sent {} email(s) via InMemoryBackend",
-            backend.message_count().await
-        );
+    // ── 5. Start the server ────────────────────────────────────────
 
-        let messages = backend.get_messages().await;
-        for msg in &messages {
-            tracing::info!("  Subject: {}", msg.subject);
-            tracing::info!("  From: {}", msg.from_email);
-            tracing::info!("  To: {}", msg.to.join(", "));
-        }
-    });
+    let addr = "127.0.0.1:8000";
+    tracing::info!("Starting django-rs blog server on http://{addr}");
+    tracing::info!("Admin dashboard: http://{addr}/admin/");
+    tracing::info!("Login with: admin / admin");
+
+    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+    axum::serve(listener, app).await.unwrap();
+}
+
+/// Seeds sample blog data into the in-memory database.
+async fn seed_data(db: &InMemoryAdminDb) {
+    let post_admin = ModelAdmin::new("blog", "post")
+        .fields_schema(vec![
+            FieldSchema::new("id", "BigAutoField").primary_key(),
+        ]);
+
+    let comment_admin = ModelAdmin::new("blog", "comment")
+        .fields_schema(vec![
+            FieldSchema::new("id", "BigAutoField").primary_key(),
+        ]);
+
+    let user_admin = ModelAdmin::new("auth", "user")
+        .fields_schema(vec![
+            FieldSchema::new("id", "BigAutoField").primary_key(),
+        ]);
+
+    // ── Users ──
+    for (username, email, is_staff) in [
+        ("admin", "admin@example.com", true),
+        ("alice", "alice@example.com", true),
+        ("bob", "bob@example.com", false),
+    ] {
+        let mut data = HashMap::new();
+        data.insert("username".to_string(), serde_json::json!(username));
+        data.insert("email".to_string(), serde_json::json!(email));
+        data.insert("is_staff".to_string(), serde_json::json!(is_staff));
+        data.insert("is_active".to_string(), serde_json::json!(true));
+        db.create_object(&user_admin, &data).await.unwrap();
+    }
+
+    // ── Posts ──
+    let posts = [
+        ("Getting Started with Rust", "Rust is a systems programming language that runs blazingly fast, prevents segfaults, and guarantees thread safety. In this post, we'll explore the basics of Rust and why it's becoming increasingly popular.", "admin", true),
+        ("Building Web Apps with Axum", "Axum is an ergonomic and modular web framework built with Tokio, Tower, and Hyper. It makes it easy to build reliable, high-performance web services in Rust.", "alice", true),
+        ("Django-rs: Django in Rust", "What if we could bring Django's developer experience to Rust? That's exactly what django-rs aims to do - a full-featured web framework inspired by Django, written in Rust.", "admin", true),
+        ("Understanding Async Rust", "Async programming in Rust can be challenging at first, but once you understand the model, it becomes a powerful tool for building concurrent applications.", "alice", true),
+        ("The Future of Web Frameworks", "As web development evolves, new frameworks continue to push the boundaries of performance and developer experience. Let's look at what's coming next.", "bob", false),
+    ];
+
+    for (title, content, author, published) in posts {
+        let mut data = HashMap::new();
+        data.insert("title".to_string(), serde_json::json!(title));
+        data.insert("content".to_string(), serde_json::json!(content));
+        data.insert("author".to_string(), serde_json::json!(author));
+        data.insert("published".to_string(), serde_json::json!(published));
+        data.insert("created_at".to_string(), serde_json::json!(chrono::Utc::now().to_rfc3339()));
+        db.create_object(&post_admin, &data).await.unwrap();
+    }
+
+    // ── Comments ──
+    let comments = [
+        (1, "bob", "Great introduction to Rust! Very helpful for beginners."),
+        (1, "alice", "I'd love to see a follow-up post about ownership and borrowing."),
+        (2, "admin", "Axum is quickly becoming my favorite web framework."),
+        (2, "bob", "The Tower middleware ecosystem is really powerful."),
+        (3, "alice", "This is exactly what the Rust ecosystem needs!"),
+        (3, "bob", "Can't wait to try django-rs for my next project."),
+        (4, "bob", "Finally, an async explanation that makes sense."),
+    ];
+
+    for (post_id, author, content) in comments {
+        let mut data = HashMap::new();
+        data.insert("post_id".to_string(), serde_json::json!(post_id));
+        data.insert("author".to_string(), serde_json::json!(author));
+        data.insert("content".to_string(), serde_json::json!(content));
+        data.insert("created_at".to_string(), serde_json::json!(chrono::Utc::now().to_rfc3339()));
+        db.create_object(&comment_admin, &data).await.unwrap();
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_create_engine() {
-        let engine = create_engine();
-        let mut ctx = Context::new();
-        ctx.set("title", ContextValue::String("Test".to_string()));
-        ctx.set("posts", ContextValue::List(vec![]));
+    #[tokio::test]
+    async fn test_seed_data() {
+        let db = InMemoryAdminDb::new();
+        seed_data(&db).await;
 
-        let result = engine.render_to_string("post_list.html", &mut ctx);
-        assert!(result.is_ok());
-        let html = result.unwrap();
-        assert!(html.contains("Test"));
-        assert!(html.contains("django-rs"));
+        assert_eq!(db.count("auth.user"), 3);
+        assert_eq!(db.count("blog.post"), 5);
+        assert_eq!(db.count("blog.comment"), 7);
     }
 
     #[test]
     fn test_blog_settings() {
-        let settings = blog_settings();
+        let settings = settings::blog_settings();
         assert!(settings.debug);
         assert!(settings.installed_apps.contains(&"blog".to_string()));
     }
 
     #[test]
     fn test_blog_store_with_sample_data() {
-        let store = BlogStore::with_sample_data();
+        let store = views::BlogStore::with_sample_data();
         assert!(store.published_posts().len() >= 3);
     }
 }

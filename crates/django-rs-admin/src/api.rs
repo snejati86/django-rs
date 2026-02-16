@@ -242,6 +242,24 @@ pub struct CurrentUserResponse {
     pub full_name: String,
 }
 
+/// Login request payload.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LoginRequest {
+    /// The username.
+    pub username: String,
+    /// The password.
+    pub password: String,
+}
+
+/// Login response with a token and user info.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LoginResponse {
+    /// The authentication token.
+    pub token: String,
+    /// The authenticated user info.
+    pub user: CurrentUserResponse,
+}
+
 /// Processes a list request: applies filtering, searching, and pagination.
 ///
 /// This is the core async function that powers the list API endpoint. It applies

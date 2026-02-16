@@ -83,7 +83,7 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
-        <BrowserRouter>
+        <BrowserRouter basename="/admin">
           <AuthProvider>
             <AppRoutes />
             <ToastContainer />

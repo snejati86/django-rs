@@ -104,6 +104,20 @@ impl ModelAdmin {
         }
     }
 
+    /// Sets the verbose name.
+    #[must_use]
+    pub fn verbose_name(mut self, name: impl Into<String>) -> Self {
+        self.verbose_name = name.into();
+        self
+    }
+
+    /// Sets the plural verbose name.
+    #[must_use]
+    pub fn verbose_name_plural(mut self, name: impl Into<String>) -> Self {
+        self.verbose_name_plural = name.into();
+        self
+    }
+
     /// Sets the fields to display in the list view.
     #[must_use]
     pub fn list_display(mut self, fields: Vec<&str>) -> Self {
