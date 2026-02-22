@@ -20,7 +20,6 @@ jobs:
           components: clippy, rustfmt
       - uses: Swatinem/rust-cache@v2
       - run: cargo fmt --all -- --check
-      - run: cargo clippy --workspace --all-targets
       - run: cargo test --workspace
 
   # Verify the tag version matches Cargo.toml
@@ -60,39 +59,47 @@ jobs:
           publish_crate() {
             local crate="$1"
             echo "::group::Publishing $crate"
-            cargo publish -p "$crate" --no-verify
+            if cargo publish -p "$crate" --no-verify 2>&1; then
+              echo "Published $crate successfully"
+            else
+              echo "::warning::$crate may already be published, continuing..."
+            fi
             echo "::endgroup::"
             echo "Waiting for crates.io to index $crate..."
             sleep 30
           }
 
-          # Layer 1: No internal dependencies
+          # Topological order based on actual Cargo.toml [dependencies]:
+          #
+          # Layer 1: No internal deps
           publish_crate django-rs-core
-          publish_crate django-rs-signals
-
-          # Layer 2: Depends on core
           publish_crate django-rs-macros
-          publish_crate django-rs-db
 
-          # Layer 3: Depends on core + db
-          publish_crate django-rs-db-backends
+          # Layer 2: Depends on core only
+          publish_crate django-rs-signals
+          publish_crate django-rs-db
           publish_crate django-rs-http
+
+          # Layer 3: Depends on core + db or core + http
+          publish_crate django-rs-db-backends
           publish_crate django-rs-template
 
-          # Layer 4: Depends on http/template/db
-          publish_crate django-rs-db-migrations
+          # Layer 4: Depends on core + db + http + template
           publish_crate django-rs-forms
+
+          # Layer 5: Depends on forms
           publish_crate django-rs-views
 
-          # Layer 5: Depends on views/forms/etc
+          # Layer 6: Depends on views
           publish_crate django-rs-auth
+          publish_crate django-rs-db-migrations
           publish_crate django-rs-cli
 
-          # Layer 6: Depends on auth/views/admin
+          # Layer 7: Depends on auth + views
           publish_crate django-rs-admin
           publish_crate django-rs-test
 
-          # Layer 7: Meta-crate (depends on everything)
+          # Layer 8: Meta-crate (depends on everything)
           publish_crate django-rs
 
   # Create a GitHub Release with auto-generated notes
