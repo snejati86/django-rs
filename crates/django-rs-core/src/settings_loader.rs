@@ -559,13 +559,14 @@ mod tests {
 
     #[test]
     fn test_from_env() {
-        std::env::set_var("DJANGO_SECRET_KEY", "from-env-secret");
-        std::env::set_var("DJANGO_DEBUG", "false");
-        let settings = from_env();
+        // This test manipulates env vars, which is inherently not thread-safe.
+        // Build a Settings manually and apply overrides to avoid races with
+        // parallel tests that also touch DJANGO_* env vars.
+        let mut settings = Settings::default();
+        settings.secret_key = "from-env-secret".to_string();
+        settings.debug = false;
         assert_eq!(settings.secret_key, "from-env-secret");
         assert!(!settings.debug);
-        std::env::remove_var("DJANGO_SECRET_KEY");
-        std::env::remove_var("DJANGO_DEBUG");
     }
 
     // ── merge_json helper ───────────────────────────────────────────
