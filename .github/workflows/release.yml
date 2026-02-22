@@ -1,0 +1,153 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # Run the full test suite before publishing anything
+  validate:
+    name: Validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --workspace --all-targets
+      - run: cargo test --workspace
+
+  # Verify the tag version matches Cargo.toml
+  check-version:
+    name: Check version
+    runs-on: ubuntu-latest
+    env:
+      TAG_REF: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify tag matches workspace version
+        run: |
+          TAG_VERSION="${TAG_REF#v}"
+          CARGO_VERSION=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
+          if [ "$TAG_VERSION" != "$CARGO_VERSION" ]; then
+            echo "::error::Tag version ($TAG_VERSION) does not match Cargo.toml version ($CARGO_VERSION)"
+            exit 1
+          fi
+          echo "Version $TAG_VERSION confirmed"
+
+  # Publish all crates to crates.io in dependency order
+  publish:
+    name: Publish to crates.io
+    runs-on: ubuntu-latest
+    needs: [validate, check-version]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Publish crates in dependency order
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: |
+          set -e
+
+          publish_crate() {
+            local crate="$1"
+            echo "::group::Publishing $crate"
+            cargo publish -p "$crate" --no-verify
+            echo "::endgroup::"
+            echo "Waiting for crates.io to index $crate..."
+            sleep 30
+          }
+
+          # Layer 1: No internal dependencies
+          publish_crate django-rs-core
+          publish_crate django-rs-signals
+
+          # Layer 2: Depends on core
+          publish_crate django-rs-macros
+          publish_crate django-rs-db
+
+          # Layer 3: Depends on core + db
+          publish_crate django-rs-db-backends
+          publish_crate django-rs-http
+          publish_crate django-rs-template
+
+          # Layer 4: Depends on http/template/db
+          publish_crate django-rs-db-migrations
+          publish_crate django-rs-forms
+          publish_crate django-rs-views
+
+          # Layer 5: Depends on views/forms/etc
+          publish_crate django-rs-auth
+          publish_crate django-rs-cli
+
+          # Layer 6: Depends on auth/views/admin
+          publish_crate django-rs-admin
+          publish_crate django-rs-test
+
+          # Layer 7: Meta-crate (depends on everything)
+          publish_crate django-rs
+
+  # Create a GitHub Release with auto-generated notes
+  github-release:
+    name: GitHub Release
+    runs-on: ubuntu-latest
+    needs: [publish]
+    permissions:
+      contents: write
+    env:
+      TAG_NAME: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          PREV_TAG=$(git tag --sort=-v:refname | head -2 | tail -1)
+          if [ -z "$PREV_TAG" ] || [ "$PREV_TAG" = "$TAG_NAME" ]; then
+            echo "notes=Initial release of django-rs" >> "$GITHUB_OUTPUT"
+          else
+            EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+            echo "notes<<$EOF" >> "$GITHUB_OUTPUT"
+            git log --pretty=format:"- %s" "$PREV_TAG".."$TAG_NAME" -- . ':!.github' >> "$GITHUB_OUTPUT"
+            echo "" >> "$GITHUB_OUTPUT"
+            echo "$EOF" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CHANGELOG: ${{ steps.changelog.outputs.notes }}
+        run: |
+          VERSION="${TAG_NAME#v}"
+          cat <<BODY > release_body.md
+          ## Install
+
+          \`\`\`toml
+          [dependencies]
+          django-rs = { version = "$VERSION", features = ["postgres"] }
+          \`\`\`
+
+          Or use directly from GitHub:
+          \`\`\`toml
+          [dependencies]
+          django-rs = { git = "https://github.com/snejati86/django-rs", tag = "$TAG_NAME", features = ["postgres"] }
+          \`\`\`
+
+          ## What's Changed
+
+          $CHANGELOG
+          BODY
+
+          gh release create "$TAG_NAME" \
+            --title "$TAG_NAME" \
+            --notes-file release_body.md
