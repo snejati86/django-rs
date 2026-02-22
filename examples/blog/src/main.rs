@@ -28,11 +28,12 @@ mod views;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use django_rs_admin::db::{AdminDbExecutor, InMemoryAdminDb};
-use django_rs_admin::log_entry::InMemoryLogEntryStore;
-use django_rs_admin::model_admin::{FieldSchema, ModelAdmin};
-use django_rs_admin::site::AdminSite;
-use tower_http::services::ServeDir;
+use django_rs::admin::db::{AdminDbExecutor, InMemoryAdminDb};
+use django_rs::admin::log_entry::InMemoryLogEntryStore;
+use django_rs::admin::model_admin::{FieldSchema, ModelAdmin};
+use django_rs::admin::site::AdminSite;
+use django_rs::tower_http::services::ServeDir;
+use django_rs::{axum, chrono, serde_json, tokio, tracing, tracing_subscriber};
 
 #[tokio::main]
 async fn main() {
@@ -119,7 +120,7 @@ async fn main() {
 
     let mut site = AdminSite::new("django-rs Blog Admin")
         .db(db.clone() as Arc<dyn AdminDbExecutor>)
-        .log_store(log_store.clone() as Arc<dyn django_rs_admin::log_entry::LogEntryStore>);
+        .log_store(log_store.clone() as Arc<dyn django_rs::admin::log_entry::LogEntryStore>);
 
     site.register("blog.post", post_admin);
     site.register("blog.comment", comment_admin);
@@ -148,9 +149,9 @@ async fn main() {
     // Serve the React SPA with fallback to index.html for client-side routing.
     // With `base: '/admin/'` in vite.config.ts, all asset paths are prefixed
     // with /admin/ so everything is served from the single nest_service.
-    let spa_service = ServeDir::new(&spa_dir).fallback(tower_http::services::ServeFile::new(
-        spa_dir.join("index.html"),
-    ));
+    let spa_service = ServeDir::new(&spa_dir).fallback(
+        django_rs::tower_http::services::ServeFile::new(spa_dir.join("index.html")),
+    );
 
     // Axum's `nest()` doesn't forward `/api/admin/` (with trailing slash)
     // to the nested router's `/` route. Add an explicit redirect so the

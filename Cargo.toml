@@ -26,6 +26,8 @@ rust-version = "1.75"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/snejati86/django-rs"
 description = "A full-featured Django equivalent web framework for Rust"
+keywords = ["web", "framework", "django", "orm", "async"]
+categories = ["web-programming::http-server", "database"]
 
 [workspace.dependencies]
 # Async runtime
@@ -89,20 +91,20 @@ toml = "0.8"
 once_cell = "1"
 
 # Internal crates
-django-rs-core = { path = "crates/django-rs-core" }
-django-rs-macros = { path = "crates/django-rs-macros" }
-django-rs-db = { path = "crates/django-rs-db" }
-django-rs-db-backends = { path = "crates/django-rs-db-backends" }
-django-rs-db-migrations = { path = "crates/django-rs-db-migrations" }
-django-rs-http = { path = "crates/django-rs-http" }
-django-rs-views = { path = "crates/django-rs-views" }
-django-rs-forms = { path = "crates/django-rs-forms" }
-django-rs-template = { path = "crates/django-rs-template" }
-django-rs-auth = { path = "crates/django-rs-auth" }
-django-rs-admin = { path = "crates/django-rs-admin" }
-django-rs-signals = { path = "crates/django-rs-signals" }
-django-rs-cli = { path = "crates/django-rs-cli" }
-django-rs-test = { path = "crates/django-rs-test" }
+django-rs-core = { path = "crates/django-rs-core", version = "0.1.0" }
+django-rs-macros = { path = "crates/django-rs-macros", version = "0.1.0" }
+django-rs-db = { path = "crates/django-rs-db", version = "0.1.0" }
+django-rs-db-backends = { path = "crates/django-rs-db-backends", version = "0.1.0", default-features = false }
+django-rs-db-migrations = { path = "crates/django-rs-db-migrations", version = "0.1.0" }
+django-rs-http = { path = "crates/django-rs-http", version = "0.1.0" }
+django-rs-views = { path = "crates/django-rs-views", version = "0.1.0" }
+django-rs-forms = { path = "crates/django-rs-forms", version = "0.1.0" }
+django-rs-template = { path = "crates/django-rs-template", version = "0.1.0" }
+django-rs-auth = { path = "crates/django-rs-auth", version = "0.1.0" }
+django-rs-admin = { path = "crates/django-rs-admin", version = "0.1.0" }
+django-rs-signals = { path = "crates/django-rs-signals", version = "0.1.0" }
+django-rs-cli = { path = "crates/django-rs-cli", version = "0.1.0" }
+django-rs-test = { path = "crates/django-rs-test", version = "0.1.0" }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

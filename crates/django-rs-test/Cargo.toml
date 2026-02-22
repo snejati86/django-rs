@@ -10,12 +10,16 @@ description = "Testing framework for django-rs: test client, fixtures, assertion
 [lints]
 workspace = true
 
+[features]
+default = ["sqlite"]
+sqlite = ["django-rs-db-backends/sqlite"]
+
 [dependencies]
 django-rs-core.workspace = true
 django-rs-http.workspace = true
 django-rs-views.workspace = true
 django-rs-db.workspace = true
-django-rs-db-backends.workspace = true
+django-rs-db-backends = { workspace = true, default-features = false }
 django-rs-auth.workspace = true
 axum.workspace = true
 hyper.workspace = true

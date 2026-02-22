@@ -45,12 +45,18 @@
 #![allow(clippy::cast_lossless)]
 
 pub mod base;
+#[cfg(feature = "mysql")]
 pub mod mysql;
+#[cfg(feature = "postgres")]
 pub mod postgresql;
+#[cfg(feature = "sqlite")]
 pub mod sqlite;
 
 pub use base::{DatabaseBackend, DatabaseConfig, Transaction};
 pub use django_rs_db::DbExecutor;
+#[cfg(feature = "mysql")]
 pub use mysql::MySqlBackend;
+#[cfg(feature = "postgres")]
 pub use postgresql::PostgresBackend;
+#[cfg(feature = "sqlite")]
 pub use sqlite::SqliteBackend;

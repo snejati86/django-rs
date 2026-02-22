@@ -7,7 +7,8 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use django_rs_core::settings::{DatabaseSettings, Settings, TemplateSettings};
+use django_rs::core::settings::{DatabaseSettings, Settings, TemplateSettings};
+use django_rs::tracing;
 
 /// Creates the blog application settings.
 ///

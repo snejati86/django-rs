@@ -53,6 +53,7 @@ pub mod live_server;
 pub mod mail_outbox;
 pub mod override_settings;
 pub mod request_factory;
+#[cfg(feature = "sqlite")]
 pub mod test_database;
 
 // Re-export primary types at the crate root for convenience.
@@ -68,4 +69,5 @@ pub use live_server::LiveServerTestCase;
 pub use mail_outbox::{EmailMessage, MailOutbox};
 pub use override_settings::{get_settings, override_settings, SettingsOverride};
 pub use request_factory::RequestFactory;
+#[cfg(feature = "sqlite")]
 pub use test_database::TestDatabase;

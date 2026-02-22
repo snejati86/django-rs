@@ -5,10 +5,10 @@
 
 use std::sync::Arc;
 
-use django_rs_http::urls::pattern::path;
-use django_rs_http::urls::resolver::{root, URLEntry, URLResolver};
-use django_rs_http::{HttpRequest, HttpResponse};
-use django_rs_template::engine::Engine;
+use django_rs::http::urls::pattern::path;
+use django_rs::http::urls::resolver::{root, URLEntry, URLResolver};
+use django_rs::http::{HttpRequest, HttpResponse};
+use django_rs::template::engine::Engine;
 
 use crate::views::{post_detail_view, post_list_view, BlogStore};
 
@@ -21,7 +21,7 @@ use crate::views::{post_detail_view, post_list_view, BlogStore};
 pub fn blog_urls(store: Arc<BlogStore>, engine: Arc<Engine>) -> URLResolver {
     let list_store = Arc::clone(&store);
     let list_engine = Arc::clone(&engine);
-    let list_handler: Arc<dyn Fn(HttpRequest) -> django_rs_http::BoxFuture + Send + Sync> =
+    let list_handler: Arc<dyn Fn(HttpRequest) -> django_rs::http::BoxFuture + Send + Sync> =
         Arc::new(move |request: HttpRequest| {
             let s = Arc::clone(&list_store);
             let e = Arc::clone(&list_engine);
@@ -30,7 +30,7 @@ pub fn blog_urls(store: Arc<BlogStore>, engine: Arc<Engine>) -> URLResolver {
 
     let detail_store = Arc::clone(&store);
     let detail_engine = Arc::clone(&engine);
-    let detail_handler: Arc<dyn Fn(HttpRequest) -> django_rs_http::BoxFuture + Send + Sync> =
+    let detail_handler: Arc<dyn Fn(HttpRequest) -> django_rs::http::BoxFuture + Send + Sync> =
         Arc::new(move |request: HttpRequest| {
             let s = Arc::clone(&detail_store);
             let e = Arc::clone(&detail_engine);
@@ -45,7 +45,7 @@ pub fn blog_urls(store: Arc<BlogStore>, engine: Arc<Engine>) -> URLResolver {
             })
         });
 
-    let create_handler: Arc<dyn Fn(HttpRequest) -> django_rs_http::BoxFuture + Send + Sync> =
+    let create_handler: Arc<dyn Fn(HttpRequest) -> django_rs::http::BoxFuture + Send + Sync> =
         Arc::new(move |_request: HttpRequest| {
             Box::pin(async move {
                 // In a full implementation, this would parse the request body.
@@ -132,7 +132,7 @@ mod tests {
 
         let empty_kwargs = std::collections::HashMap::new();
         let url =
-            django_rs_http::urls::reverse::reverse("post_list", &[], &empty_kwargs, &resolver);
+            django_rs::http::urls::reverse::reverse("post_list", &[], &empty_kwargs, &resolver);
         assert!(url.is_ok());
         assert_eq!(url.unwrap(), "/posts/");
     }

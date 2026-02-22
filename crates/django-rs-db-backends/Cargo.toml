@@ -10,14 +10,20 @@ description = "Database backends for django-rs: PostgreSQL, MySQL, and SQLite dr
 [lints]
 workspace = true
 
+[features]
+default = []
+postgres = ["dep:tokio-postgres", "dep:deadpool-postgres"]
+sqlite = ["dep:rusqlite"]
+mysql = ["dep:mysql_async"]
+
 [dependencies]
 django-rs-core.workspace = true
 django-rs-db.workspace = true
 tokio.workspace = true
-tokio-postgres.workspace = true
-deadpool-postgres.workspace = true
-rusqlite.workspace = true
-mysql_async.workspace = true
+tokio-postgres = { workspace = true, optional = true }
+deadpool-postgres = { workspace = true, optional = true }
+rusqlite = { workspace = true, optional = true }
+mysql_async = { workspace = true, optional = true }
 async-trait = "0.1"
 serde.workspace = true
 serde_json.workspace = true

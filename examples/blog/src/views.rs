@@ -6,9 +6,10 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use django_rs_http::{HttpRequest, HttpResponse, JsonResponse};
-use django_rs_template::context::{Context, ContextValue};
-use django_rs_template::engine::Engine;
+use django_rs::http::{HttpRequest, HttpResponse, JsonResponse};
+use django_rs::serde_json;
+use django_rs::template::context::{Context, ContextValue};
+use django_rs::template::engine::Engine;
 
 use crate::models::Post;
 
@@ -182,7 +183,7 @@ pub fn post_create_view(
 pub fn make_post_list_handler(
     store: Arc<BlogStore>,
     engine: Arc<Engine>,
-) -> Arc<dyn Fn(HttpRequest) -> django_rs_http::BoxFuture + Send + Sync> {
+) -> Arc<dyn Fn(HttpRequest) -> django_rs::http::BoxFuture + Send + Sync> {
     Arc::new(move |request: HttpRequest| {
         let store = Arc::clone(&store);
         let engine = Arc::clone(&engine);

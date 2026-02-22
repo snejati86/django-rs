@@ -5,24 +5,7 @@ edition = "2021"
 publish = false
 
 [dependencies]
-django-rs-core = { path = "../../crates/django-rs-core" }
-django-rs-db = { path = "../../crates/django-rs-db" }
-django-rs-http = { path = "../../crates/django-rs-http" }
-django-rs-template = { path = "../../crates/django-rs-template" }
-django-rs-cli = { path = "../../crates/django-rs-cli" }
-django-rs-admin = { path = "../../crates/django-rs-admin" }
-
-axum = "0.8"
-clap = { version = "4", features = ["derive"] }
-tokio = { version = "1", features = ["full"] }
-tower = "0.5"
-tower-http = { version = "0.6", features = ["fs"] }
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-chrono = { version = "0.4", features = ["serde"] }
-async-trait = "0.1"
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+django-rs = { path = "../../django-rs", default-features = true }
 toml = "0.8"
 
 [dev-dependencies]

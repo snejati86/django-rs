@@ -5,23 +5,63 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "A full-featured Django equivalent web framework for Rust — meta-crate that re-exports all sub-crates"
+description = "A full-featured Django equivalent web framework for Rust — batteries-included with ORM, admin, auth, forms, templates, migrations, and more"
+keywords.workspace = true
+categories.workspace = true
 
 [lints]
 workspace = true
 
+[features]
+default = ["full"]
+full = ["macros", "db", "db-migrations", "http", "views", "forms",
+        "template", "auth", "admin", "signals", "cli"]
+
+# Database backends — user picks one or more
+postgres = ["django-rs-db-backends/postgres"]
+sqlite   = ["django-rs-db-backends/sqlite"]
+mysql    = ["django-rs-db-backends/mysql"]
+
+# Individual module features
+macros        = ["dep:django-rs-macros"]
+db            = ["dep:django-rs-db"]
+db-migrations = ["dep:django-rs-db-migrations"]
+http          = ["dep:django-rs-http"]
+views         = ["dep:django-rs-views"]
+forms         = ["dep:django-rs-forms"]
+template      = ["dep:django-rs-template"]
+auth          = ["dep:django-rs-auth"]
+admin         = ["dep:django-rs-admin"]
+signals       = ["dep:django-rs-signals"]
+cli           = ["dep:django-rs-cli"]
+testing       = ["dep:django-rs-test", "sqlite"]
+
 [dependencies]
+# Always included — foundation types and base traits
 django-rs-core.workspace = true
-django-rs-macros.workspace = true
-django-rs-db.workspace = true
-django-rs-db-backends.workspace = true
-django-rs-db-migrations.workspace = true
-django-rs-http.workspace = true
-django-rs-views.workspace = true
-django-rs-forms.workspace = true
-django-rs-template.workspace = true
-django-rs-auth.workspace = true
-django-rs-admin.workspace = true
-django-rs-signals.workspace = true
-django-rs-cli.workspace = true
-django-rs-test.workspace = true
+django-rs-db-backends = { workspace = true, default-features = false }
+
+# Optional sub-crates (enabled via features)
+django-rs-macros = { workspace = true, optional = true }
+django-rs-db = { workspace = true, optional = true }
+django-rs-db-migrations = { workspace = true, optional = true }
+django-rs-http = { workspace = true, optional = true }
+django-rs-views = { workspace = true, optional = true }
+django-rs-forms = { workspace = true, optional = true }
+django-rs-template = { workspace = true, optional = true }
+django-rs-auth = { workspace = true, optional = true }
+django-rs-admin = { workspace = true, optional = true }
+django-rs-signals = { workspace = true, optional = true }
+django-rs-cli = { workspace = true, optional = true }
+django-rs-test = { workspace = true, optional = true }
+
+# Third-party re-exports for user convenience
+tokio.workspace = true
+axum.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+tower-http.workspace = true
+async-trait.workspace = true
